@@ -17,6 +17,7 @@ DEVICE_FLAGS = -DARIES -DTHEJAS32 -Wno-type-limits -Wno-sign-compare -Wno-unused
 LD_SCRIPT    = $(LINKER_DIR)/aries_v3.ld
 
 MCU_COMMON_SRC := \
+    ARIES/startup.S \
     ARIES/system.c \
     ARIES/stub_drivers.c \
     drivers/serial_pinconfig.c
@@ -31,7 +32,7 @@ TARGET_MAP   = $(OBJECT_DIR)/$(FORKNAME)_$(TARGET).map
 LIBS         = -lm -lc -lgcc
 
 LD_FLAGS    := \
-    $(LIBS) \
+    $(LIBS) -nostartfiles \
     $(ARCH_FLAGS) \
     $(LTO_FLAGS) \
     $(DEBUG_FLAGS) \

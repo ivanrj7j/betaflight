@@ -1,5 +1,5 @@
 OUTPUT_ARCH("riscv")
-ENTRY(main)
+ENTRY(_start)
 
 MEMORY
 {
@@ -70,4 +70,8 @@ SECTIONS
     } > RAM
 
     _end = .;
+    PROVIDE(__global_pointer$ = _sdata + 0x800);
+    PROVIDE(__bss_start = _sbss);
+    PROVIDE(__bss_end = _ebss);
 }
+
