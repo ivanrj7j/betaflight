@@ -164,6 +164,12 @@ const char *dmaGetDisplayString(void)
     return "NONE";
 }
 
+uint32_t dmaGetDataLength(dmaResource_t *ref)
+{
+    UNUSED(ref);
+    return 0;
+}
+
 // ----------------------------------------------------------------------------
 // Hardware Timer Driver Stubs
 // ----------------------------------------------------------------------------
@@ -298,21 +304,8 @@ void persistentObjectWrite(persistentObjectId_e id, uint32_t value)
 }
 
 // ----------------------------------------------------------------------------
-// Serial UART Stubs (Phase 2 dummy)
+// Serial UART functions moved to serial_uart_aries.c
 // ----------------------------------------------------------------------------
-uartPort_t *serialUART(uartDevice_t *uart, uint32_t baudRate, portMode_e mode, portOptions_e options)
-{
-    UNUSED(uart);
-    UNUSED(baudRate);
-    UNUSED(mode);
-    UNUSED(options);
-    return NULL;
-}
-
-void uartReconfigure(uartPort_t *uartPort)
-{
-    UNUSED(uartPort);
-}
 
 // ----------------------------------------------------------------------------
 // Motor, Servo, DShot & Sensor Stubs
@@ -371,9 +364,4 @@ uint16_t adcGetValue(adcSource_e source)
 void expressLrsTimerEnableIRQs(const struct timerHardware_s *timer)
 {
     UNUSED(timer);
-}
-
-void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
-{
-    UNUSED(pSerialPinConfig);
 }

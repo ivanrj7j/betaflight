@@ -22,7 +22,7 @@
 | Phase | Milestone Description | Target Subsystems | Status | Completion Date |
 | :---: | :--- | :--- | :---: | :---: |
 | **Phase 1** | Foundation & Trap Handler Verification | `startup.S`, `mtvec`, `trap_entry`, Exception Handling | **Completed** | 2026-10-19 |
-| **Phase 2** | Console & Communication | UART0 (CLI/MSP), Ring Buffer, RX Interrupt | *In Progress* | — |
+| **Phase 2** | Console & Communication | UART0 (CLI/MSP), Ring Buffer, RX Interrupt | **Completed** | 2026-10-19 |
 | **Phase 3** | High-Resolution Timebase | Hardware Timer 0/1, Monotonic `micros()`, Jitter Check | *Pending* | — |
 | **Phase 4** | GPIO & External Interrupts | Bank 0/1 Address-Decoded IO, EXTI (Gyro DRDY) | *Pending* | — |
 | **Phase 5** | SPI Bus & IMU Sensor Driver | SPI0 Master with `CSAAT`, ICM42688P / BMI270 Detection | *Pending* | — |
@@ -122,8 +122,82 @@ Establish a clean bare-metal reset sequence, complete machine register initializ
 
 ---
 
-## 🚀 Next Steps: Phase 2 (Console & Communication)
-1. Implement `src/platform/ARIES/serial_uart_aries.c` utilizing the THEJAS32 UART0 registers (`0x10000100`).
-2. Integrate a transmit/receive ring buffer and hook UART0 RX into `thejas32_interrupt_register(THEJAS32_IRQ_UART0, ...)`.
-3. Enable `#define USE_UART0` and connect UART0 to Betaflight's CLI / MSP serial engine.
-4. Verify interactive CLI response (`# status`) over the CP2102N USB-UART bridge at 115200 baud.
+## 🛠️ Phase 2 Detailed Execution Log
+
+### 1. Objective
+Implement real hardware-backed UART communications for the C-DAC ARIES v3.0 board. Connect UART0 (`0x10000100`) to the onboard Silicon Labs CP2102N USB-UART bridge to support the interactive Betaflight Command Line Interface (CLI) and MultiWii Serial Protocol (MSP), and prepare UART1 (`0x10000200`) for serial radio receivers.
+
+### 2. Files Created & Modified
+
+| File Path | Action | Purpose & Technical Summary |
+| :--- | :---: | :--- |
+| [`src/platform/ARIES/serial_uart_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c) | **Created** | Hardware UART driver for THEJAS32. Implements 16550 divisor baud setting, line control (8N1), FIFO reset/enable, transmit priming, interrupt-driven RX/TX processing (`uartIrqHandler`), and hardware definitions (`uartHardware[UARTDEV_COUNT]`). |
+| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Defined `#define SERIAL_UART_FIRST_INDEX 0` so that `SERIAL_PORT_UART0` maps cleanly to index `0` instead of triggering index offset errors in `serial_post.h`. |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_UART0` and `#define USE_UART1`, with pin allocations set to `NONE` (fixed SoC header/bridge routing). |
+| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/serial_uart_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy implementations of `serialUART`, `uartReconfigure`, and `uartPinConfigure`; added missing `dmaGetDataLength()` stub. |
+| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added public C prototypes for `thejas32_interrupt_register`, `thejas32_interrupt_enable`, and `thejas32_interrupt_disable`. |
+
+---
+
+### 3. Problems / Obstacles Encountered & How Each Was Solved
+
+#### Problem 1: `UART_BUFFERS_EXTERN` Redefinition and Syntax Error
+- **Symptom:** Compiler threw `error: expected declaration specifiers or '...' before numeric constant` on `UART_BUFFERS_EXTERN(0)` in `serial_uart_aries.c`.
+- **Root Cause:** Upstream `drivers/serial_uart_impl.h` already expands `UART_BUFFERS_EXTERN(0)` conditionally when `USE_UART0` is defined. Calling it a second time created an invalid C syntax collision.
+- **Solution:** Removed the manual macro invocation from `serial_uart_aries.c`, allowing the header's canonical external declarations of `uart0TxBuffer` and `uart0RxBuffer` to be referenced cleanly.
+
+#### Problem 2: `NONE` Pin Identifier Undeclared
+- **Symptom:** `error: 'NONE' undeclared here (not in a function)` when setting `.rxPins = { { .pin = NONE } }`.
+- **Root Cause:** In Betaflight's IO system, `NONE` is a preprocessor macro used within target definitions that expands through `DEFIO_TAG__NONE` (`0`).
+- **Solution:** Replaced `NONE` with `DEFIO_TAG__NONE` in the static `uartHardware` table.
+
+#### Problem 3: Linker Error `undefined reference to dmaGetDataLength`
+- **Symptom:** Linker failed with `undefined reference to dmaGetDataLength` in `serial_uart.o` during LTO optimization.
+- **Root Cause:** When `USE_UART` is compiled into Betaflight's shared `serial_uart.c`, buffer occupancy functions check for active DMA channels by querying `dmaGetDataLength()`. Since ARIES v3.0 does not use DMA for UART, this HAL hook was unresolved.
+- **Solution:** Implemented a stub returning `0` in `src/platform/ARIES/stub_drivers.c`:
+  ```c
+  uint32_t dmaGetDataLength(dmaResource_t *ref)
+  {
+      UNUSED(ref);
+      return 0;
+  }
+  ```
+
+#### Problem 4: Index 0 Mapping for `SERIAL_PORT_UART0`
+- **Symptom:** Betaflight's `serial_post.h` by default expects UART numbering to begin at 1 (`SERIAL_UART_FIRST_INDEX 1`), rejecting `USE_UART0` with `#error "USE_UART0 is defined, but SERIAL_UART does not allow index 0"`.
+- **Root Cause:** Target platform did not specify that UART indexing starts at 0.
+- **Solution:** Defined `#define SERIAL_UART_FIRST_INDEX 0` in `src/platform/ARIES/include/platform/platform.h` (matching the pattern used by ESP32 and PICO platforms).
+
+---
+
+### 4. Build & Binary Verification
+
+- **Compilation Command:**
+  ```bash
+  make TARGET=ARIESV3 -j$(nproc)
+  ```
+- **Exit Code:** `0` (Success)
+- **Memory Footprint:**
+  ```text
+     text    data     bss     dec     hex filename
+   723768    6344   60728  790840   c1138 ./obj/main/betaflight_ARIESV3.elf
+  ```
+  - **Flash Usage:** ~723.7 KB / 2,048 KB (35.3%)
+  - **RAM Usage:** ~65.5 KB / 256 KB (25.6%)
+
+- **Symbol Inspection:**
+  - `uart0RxBuffer` and `uart0TxBuffer` allocated in BSS (`0x1000AEA0`, `0x1000AFA0`).
+  - `uart1RxBuffer` and `uart1TxBuffer` allocated in BSS (`0x1000A8A0`, `0x1000A9A0`).
+  - `thejas32_uart0_isr` (`0x20000E24`) and `thejas32_uart1_isr` (`0x20000E30`) present and linked.
+  - `thejas32_uart_set_baudrate` (`0x200032FC`) present and linked.
+  - `uartHardware` table placed in flash (`0x200AF268`).
+
+---
+
+## 🚀 Next Steps: Phase 3 (High-Resolution Timebase)
+1. Hook `THEJAS32_TIMER(0)` (`0x10000A00`) into `src/platform/ARIES/system.c`.
+2. Configure Timer 0 in user-defined periodic or free-running mode with `LoadCount = 0xFFFFFFFF`.
+3. Refine `micros()` to combine hardware decrement counter with an overflow accumulator for glitch-free monotonic timing.
+4. Verify task scheduler loop timing and task jitter in CLI (`tasks` command).
+

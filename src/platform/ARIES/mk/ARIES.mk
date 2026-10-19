@@ -19,6 +19,7 @@ LD_SCRIPT    = $(LINKER_DIR)/aries_v3.ld
 MCU_COMMON_SRC := \
     ARIES/startup.S \
     ARIES/system.c \
+    ARIES/serial_uart_aries.c \
     ARIES/stub_drivers.c \
     drivers/serial_pinconfig.c
 

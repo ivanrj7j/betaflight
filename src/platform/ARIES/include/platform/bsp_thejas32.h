@@ -53,6 +53,11 @@ typedef struct {
 #define THEJAS32_IRQ_GPIO0          10
 #define THEJAS32_IRQ_GPIO1          11
 
+typedef void (*thejas32_irq_handler_t)(void);
+void thejas32_interrupt_register(uint8_t irq_number, thejas32_irq_handler_t handler);
+void thejas32_interrupt_enable(uint8_t irq_number);
+void thejas32_interrupt_disable(uint8_t irq_number);
+
 // -----------------------------------------------------------------------------
 // UART Registers (16550 compatible, Base: 0x10000100 + (0x100 * n))
 // -----------------------------------------------------------------------------

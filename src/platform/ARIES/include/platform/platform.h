@@ -92,9 +92,11 @@ extern uint32_t SystemCoreClock;
 #define SCHEDULER_DELAY_LIMIT           10
 
 // UART Configuration
+#define SERIAL_UART_FIRST_INDEX         0
 #define UART_TRAIT_AF_PORT              1
 #define UARTHARDWARE_MAX_PINS           4
 #define UART_TX_BUFFER_ATTRIBUTE
 #define UART_RX_BUFFER_ATTRIBUTE
 #define SERIAL_TRAIT_PIN_CONFIG         1
+
 

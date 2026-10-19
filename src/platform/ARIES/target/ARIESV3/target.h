@@ -64,6 +64,10 @@
 #define LED0_PIN                NONE
 #define BEEPER_PIN              NONE
 
+#define USE_UART0
+#define UART0_RX_PIN            NONE
+#define UART0_TX_PIN            NONE
+
 #define USE_UART1
 #define UART1_RX_PIN            NONE
 #define UART1_TX_PIN            NONE
