@@ -39,12 +39,22 @@
 #undef USE_DSHOT_BITBANG
 #undef USE_DSHOT_TELEMETRY
 #undef USE_RPM_FILTER
+#undef USE_ESC_SENSOR
+#undef USE_ESC_SENSOR_INFO
+#undef USE_ESC_SENSOR_TELEMETRY
 #undef USE_EXTI
 #undef USE_OCTOSPI
 #undef USE_QUADSPI
+#undef USE_FLASH
+#undef USE_FLASHFS
+#undef USE_RX_PWM
+#undef USE_RX_PPM
+#undef USE_LED_STRIP
 
 // Enable core flight features
+#define USE_SPI
 #define USE_GYRO
+
 #define USE_ACC
 #define USE_CLI
 #define USE_SERIAL_UART
@@ -53,3 +63,7 @@
 // Stubs for pin assignments
 #define LED0_PIN                NONE
 #define BEEPER_PIN              NONE
+
+#define USE_UART1
+#define UART1_RX_PIN            NONE
+#define UART1_TX_PIN            NONE

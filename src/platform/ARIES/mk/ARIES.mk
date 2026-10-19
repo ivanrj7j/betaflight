@@ -12,20 +12,18 @@ INCLUDE_DIRS := \
     $(TARGET_PLATFORM_DIR) \
     $(TARGET_PLATFORM_DIR)/include
 
-ARCH_FLAGS   = -march=rv32im -mabi=ilp32 -mcmodel=medany
-DEVICE_FLAGS = -DARIES -DTHEJAS32
+ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany
+DEVICE_FLAGS = -DARIES -DTHEJAS32 -Wno-type-limits -Wno-sign-compare -Wno-unused-parameter -Wno-incompatible-pointer-types
 LD_SCRIPT    = $(LINKER_DIR)/aries_v3.ld
 
 MCU_COMMON_SRC := \
     ARIES/system.c \
-    ARIES/stub_drivers.c
+    ARIES/stub_drivers.c \
+    drivers/serial_pinconfig.c
 
 MCU_EXCLUDES = \
     drivers/rx/rx_xn297.c \
     drivers/display_ug2864hsweg01.c \
-    telemetry/crsf.c \
-    telemetry/ghst.c \
-    telemetry/srxl.c \
     io/displayport_oled.c
 
 TARGET_MAP   = $(OBJECT_DIR)/$(FORKNAME)_$(TARGET).map

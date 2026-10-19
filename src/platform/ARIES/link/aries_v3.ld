@@ -7,6 +7,12 @@ MEMORY
     RAM   (rwx) : ORIGIN = 0x10000000, LENGTH = 256K
 }
 
+_Min_Stack_Size = 0x800;
+
+/* Base address where configuration is stored in Flash (last 32KB of 2MB flash) */
+__config_start = 0x20000000 + 2048K - 32K;
+__config_end   = 0x20000000 + 2048K;
+
 SECTIONS
 {
     .text : {
@@ -17,6 +23,22 @@ SECTIONS
         *(.srodata*)
         . = ALIGN(4);
         _etext = .;
+    } > FLASH
+
+    .pg_registry : {
+        . = ALIGN(4);
+        PROVIDE_HIDDEN (__pg_registry_start = .);
+        KEEP (*(.pg_registry))
+        KEEP (*(SORT(.pg_registry.*)))
+        PROVIDE_HIDDEN (__pg_registry_end = .);
+    } > FLASH
+
+    .pg_resetdata : {
+        . = ALIGN(4);
+        PROVIDE_HIDDEN (__pg_resetdata_start = .);
+        KEEP (*(.pg_resetdata))
+        KEEP (*(SORT(.pg_resetdata.*)))
+        PROVIDE_HIDDEN (__pg_resetdata_end = .);
     } > FLASH
 
     .data : {

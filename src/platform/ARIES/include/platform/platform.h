@@ -14,6 +14,10 @@
 #define __ASM __asm__
 #endif
 
+#ifndef __NOP
+#define __NOP() __asm__ volatile ("nop")
+#endif
+
 typedef enum { ARIES_IRQ_0 = 0 } IRQn_Type;
 
 // Basic NVIC priority emulation macros for non-ARM core
@@ -27,6 +31,10 @@ typedef enum { ARIES_IRQ_0 = 0 } IRQn_Type;
 __attribute__((always_inline)) static inline void __set_BASEPRI(uint32_t basePri) { (void)basePri; }
 __attribute__((always_inline)) static inline uint32_t __get_BASEPRI(void) { return 0; }
 __attribute__((always_inline)) static inline void __set_BASEPRI_MAX(uint32_t basePri) { (void)basePri; }
+
+// Global interrupt control for RISC-V (MIE bit in mstatus is 1 << 3 = 8)
+__attribute__((always_inline)) static inline void __disable_irq(void) { __asm__ volatile ("csrc mstatus, 8"); }
+__attribute__((always_inline)) static inline void __enable_irq(void) { __asm__ volatile ("csrs mstatus, 8"); }
 
 // Memory section decorators
 #define FAST_CODE
@@ -45,10 +53,45 @@ __attribute__((always_inline)) static inline void __set_BASEPRI_MAX(uint32_t bas
 #define IOCFG_IPU                   0
 #define IOCFG_IN_FLOATING           0
 
+#define GPIO_PIN_RESET              0
+#define GPIO_PIN_SET                1
+
+#define SPI_IO_CS_CFG               IOCFG_OUT_PP
+
 // Bus and device counts
 #define SPIDEV_COUNT                1
+#define MAX_SPI_PIN_SEL             3
 #define I2CDEV_COUNT                1
 #define GYRO_COUNT                  1
 typedef void* ADC_TypeDef;
 
+typedef struct {
+    void* test;
+} DMA_InitTypeDef;
+
 #define TASK_GYROPID_DESIRED_PERIOD 1000 // 1 kHz loop period in us
+
+// FunctionalState (referenced by timer.h and other shared drivers)
+typedef enum { DISABLE = 0, ENABLE = !DISABLE } FunctionalState;
+
+// Unique device ID stubs (no OTP on THEJAS32)
+#define U_ID_0 0
+#define U_ID_1 0
+#define U_ID_2 0
+
+// Flash config buffer type (used by flash_impl.h)
+#define FLASH_CONFIG_BUFFER_TYPE uint32_t
+
+// System core clock (defined in system.c, declared here for shared code)
+extern uint32_t SystemCoreClock;
+
+// Scheduler delay limit (minimum task period in microseconds)
+#define SCHEDULER_DELAY_LIMIT           10
+
+// UART Configuration
+#define UART_TRAIT_AF_PORT              1
+#define UARTHARDWARE_MAX_PINS           4
+#define UART_TX_BUFFER_ATTRIBUTE
+#define UART_RX_BUFFER_ATTRIBUTE
+#define SERIAL_TRAIT_PIN_CONFIG         1
+
