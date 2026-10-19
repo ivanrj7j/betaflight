@@ -32,9 +32,12 @@ __attribute__((always_inline)) static inline void __set_BASEPRI(uint32_t basePri
 __attribute__((always_inline)) static inline uint32_t __get_BASEPRI(void) { return 0; }
 __attribute__((always_inline)) static inline void __set_BASEPRI_MAX(uint32_t basePri) { (void)basePri; }
 
-// Global interrupt control for RISC-V (MIE bit in mstatus is 1 << 3 = 8)
+// Global interrupt control for RISC-V (MIE bit in mstatus is 1 << 3 = 8; MEIE in mie is 1 << 11 = 0x800)
 __attribute__((always_inline)) static inline void __disable_irq(void) { __asm__ volatile ("csrc mstatus, 8"); }
-__attribute__((always_inline)) static inline void __enable_irq(void) { __asm__ volatile ("csrs mstatus, 8"); }
+__attribute__((always_inline)) static inline void __enable_irq(void) {
+    __asm__ volatile ("csrs mie, %0" : : "r"(0x800));
+    __asm__ volatile ("csrs mstatus, 8");
+}
 
 // Memory section decorators
 #define FAST_CODE
