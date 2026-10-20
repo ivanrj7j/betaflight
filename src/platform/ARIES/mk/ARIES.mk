@@ -13,7 +13,7 @@ INCLUDE_DIRS := \
     $(TARGET_PLATFORM_DIR)/include
 
 ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany
-DEVICE_FLAGS = -DARIES -DTHEJAS32 -Wno-type-limits -Wno-sign-compare -Wno-unused-parameter -Wno-incompatible-pointer-types
+DEVICE_FLAGS = -DARIES -DTHEJAS32 -Wno-type-limits -Wno-sign-compare -Wno-unused-parameter -Wno-incompatible-pointer-types -ffast-math -fno-math-errno
 LD_SCRIPT    = $(LINKER_DIR)/aries_v3.ld
 
 MCU_COMMON_SRC := \

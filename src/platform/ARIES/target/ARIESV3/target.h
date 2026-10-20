@@ -77,6 +77,11 @@
 #define USE_SERIAL_UART
 #define FAST_MATH
 
+// Flight loop rate clamping for 100 MHz RV32IM soft-float core:
+// With an 8 kHz gyro (ICM42688P), a denominator of 8 clamps the PID loop to exactly 1.0 kHz (1000 µs),
+// aligning with TASK_GYROPID_DESIRED_PERIOD (1000 µs) and preventing CPU task overruns.
+#define DEFAULT_PID_PROCESS_DENOM 8
+
 // Flash Config & EEPROM Emulation (32 KB reserved sector 0x201F8000 - 0x201FFFFF)
 #define CONFIG_IN_FLASH
 #define FLASH_SECTOR_SIZE               4096
