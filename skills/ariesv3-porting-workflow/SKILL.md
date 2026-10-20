@@ -103,3 +103,43 @@ When completing any implementation phase or resolving blockers:
    - Problems / Obstacles Encountered & Exact Technical Solutions
    - Build Verification & Size metrics
    - Handoff instructions for the next phase
+
+---
+
+## 6. Critical Hardware Risks & Architectural Constraints
+
+Any AI agent or developer continuing this port **must be aware of and strictly adhere to** the following failure modes and architectural limitations documented in [`RISK_ASSESMENT.md`](file:///home/ivan/Desktop/betaflight/RISK_ASSESMENT.md):
+
+### ⚠️ RSK-01: Soft-Float Arithmetic & Loop Overrun (RV32IM without 'F')
+- **The Risk:** THEJAS32 lacks hardware floating-point instructions. All IEEE-754 `float` and `double` operations are computed via software emulation (`libgcc.a` routines: `__addsf3`, `__mulsf3`, `__divsf3`, `__divdf3`). An unconstrained 8 kHz flight loop will overrun the 125 µs task budget, starving the scheduler and freezing control.
+- **The Rule:**
+  - Always clamp the flight loop to **1.0 kHz** (`TASK_GYROPID_DESIRED_PERIOD 1000`).
+  - Never use double-precision float literals (`1.0` -> use `1.0f`).
+  - Maintain `-ffast-math` in `target.h`. Profile task execution time using the CLI `tasks` command.
+
+### ⚠️ RSK-02: Single-Core Atomic Race Conditions (RV32IM without 'A')
+- **The Risk:** Without LR/SC or AMO instructions (`lr.w`, `sc.w`, `amoadd.w`), standard atomic primitives cannot execute atomically in hardware.
+- **The Rule:** Single-core atomic fallback routines (`__atomic_fetch_add_4`) and critical shared state access must disable interrupts globally (`__disable_irq()` / `__enable_irq()`) to prevent corruption from high-frequency peripheral ISRs.
+
+### ⚠️ RSK-03: Timer Interrupt Acknowledgment (`EOI` Register)
+- **The Risk:** THEJAS32 hardware timers (Synopsys DW_apb_timers) assert an interrupt on down-counter underflow. If the interrupt is not cleared, returning via `mret` immediately re-enters the ISR, deadlocking the core in an infinite interrupt loop.
+- **The Rule:** The very first operation inside `thejas32_timer0_isr()` must be:
+  ```c
+  (void)THEJAS32_TIMER(0).EOI;
+  ```
+
+### ⚠️ RSK-04: Multi-Segment SPI Burst Transfers (`Bits.CSAAT`)
+- **The Risk:** IMU sensor reads (e.g. ICM42688P or BMI270) stream 14 continuous bytes. If the SPI controller de-asserts Chip Select between address and data segments, the sensor resets its auto-increment pointer, returning invalid `0x00` or `0xFF` data.
+- **The Rule:** Set `Bits.CSAAT = 1` during all intermediate segments and de-assert (`Bits.CSAAT = 0`) only on the final segment of the transaction.
+
+### ⚠️ RSK-05: Flash Erase Latency & Wait Loop Bounding
+- **The Risk:**
+  - 4 KB sector erase on SPI NOR flash blocks for 30–50 ms. Config writes must **never** be permitted while armed (`ARMING_DISABLED_CLI`).
+  - In simulation or if hardware SPI lines are unresponsive, unbounded `while (status & BUSY)` loops will freeze the CPU.
+- **The Rule:** All SPI flash polling loops must include bounded cycle counters (e.g., 1,000 cycles for byte TX, 100 cycles for Write-Enable WEL polling).
+
+### ⚠️ RSK-06: Clock Tree & Baud Rate Divisor Dependencies
+- **The Risk:** Divisors assume a 100 MHz APB peripheral clock:
+  $$\text{Divisor} = \frac{100,000,000}{16 \times \text{Baudrate}}$$
+  (Divisor = 54 for 115200 baud). If the board's ROM bootloader configures a different crystal or PLL multiplier (e.g. 50 MHz or 40 MHz), the serial console and microsecond timers will run at incorrect speeds.
+- **The Rule:** Keep core clock frequency centralized in `SystemCoreClock` and verify frequency against timer counter ticks.

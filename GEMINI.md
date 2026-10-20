@@ -71,6 +71,7 @@ This repository contains the Betaflight flight controller firmware adapted for t
 | [`skills/ariesv3-porting-workflow/SKILL.md`](file:///home/ivan/Desktop/betaflight/skills/ariesv3-porting-workflow/SKILL.md) | **Authoritative workflow skill** containing build commands, toolchain paths, and HAL rules. |
 | [`IMPLEMENTATION_PLAN.md`](file:///home/ivan/Desktop/betaflight/IMPLEMENTATION_PLAN.md) | Full 8-Phase Architectural Plan covering registers, pins, risks, and roadmap. |
 | [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md) | **Living progress log** with problems, solutions, and binary metrics for every phase. |
+| [`RISK_ASSESMENT.md`](file:///home/ivan/Desktop/betaflight/RISK_ASSESMENT.md) | **Risk matrix & failure modes** with empirical Renode validation findings and mitigations. |
 | [`COMPILATION_GUIDE.md`](file:///home/ivan/Desktop/betaflight/COMPILATION_GUIDE.md) | Step-by-step flashing guide (OpenOCD, JTAG, VEGA Flasher) and CLI verification. |
 | [`PORT_GUIDE.md`](file:///home/ivan/Desktop/betaflight/PORT_GUIDE.md) | Architectural roadmap, hardware pinout diagram, and soft-float CLI tuning. |
 | [`src/platform/ARIES/`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/) | Core target directory containing all ARIES v3.0 platform source files. |

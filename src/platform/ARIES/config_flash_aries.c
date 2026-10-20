@@ -57,7 +57,7 @@ static void thejas32_flash_spi_init(void)
 static bool thejas32_flash_wait_idle(void)
 {
     volatile thejas32_spi_reg_t *spi = &THEJAS32_SPI(THEJAS32_SPI3_INDEX);
-    uint32_t timeout = 100000;
+    uint32_t timeout = 1000;
     while ((spi->Status & (1 << 4)) && --timeout) { // Busy bit
         __asm__ volatile ("nop");
     }
@@ -78,7 +78,7 @@ static void thejas32_flash_set_cs(bool active)
 static bool thejas32_flash_tx_byte(uint8_t byte)
 {
     volatile thejas32_spi_reg_t *spi = &THEJAS32_SPI(THEJAS32_SPI3_INDEX);
-    uint32_t timeout = 100000;
+    uint32_t timeout = 1000;
     while (!(spi->Status & (1 << 7)) && --timeout) { // TX_HOLD_EMPTY
         __asm__ volatile ("nop");
     }
@@ -93,7 +93,7 @@ static bool thejas32_flash_tx_byte(uint8_t byte)
 static uint8_t thejas32_flash_rx_byte(void)
 {
     volatile thejas32_spi_reg_t *spi = &THEJAS32_SPI(THEJAS32_SPI3_INDEX);
-    uint32_t timeout = 100000;
+    uint32_t timeout = 1000;
     while (!(spi->Status & (1 << 6)) && --timeout) { // RX_COMPLETE
         __asm__ volatile ("nop");
     }
@@ -129,7 +129,7 @@ static bool thejas32_flash_write_enable(void)
     thejas32_flash_tx_byte(SPI_FLASH_CMD_WREN);
     thejas32_flash_wait_idle();
 
-    uint32_t timeout = 10000;
+    uint32_t timeout = 100;
     while (--timeout) {
         if (thejas32_flash_read_status() & SPI_FLASH_STATUS_WEL) {
             return true;
