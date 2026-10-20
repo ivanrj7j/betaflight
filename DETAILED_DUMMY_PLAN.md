@@ -18,7 +18,7 @@ The purpose of this phase is **not** to produce a flight-ready binary immediatel
 ## 2. Toolchain & Environment Specifications
 
 * **Compiler:** `riscv32-esp-elf-gcc` (GCC 13.2.0)
-* **Path:** `/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-`
+* **Path:** `~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-`
 * **Architecture Flags:**
   * `-march=rv32im` (RV32 integer base + hardware multiply/divide extension)
   * `-mabi=ilp32` (Standard 32-bit soft-float ABI)
@@ -87,7 +87,7 @@ src/platform/ARIES/
   * Set `PLATFORM_SDK := none` (skips external SDK auto-hydration like esp-idf or pico-sdk).
   * Configure compiler prefix:
     ```makefile
-    ARM_SDK_PREFIX ?= /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-
+    ARM_SDK_PREFIX ?= ~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-
     ```
   * Set `ARCH_FLAGS`:
     ```makefile
@@ -137,7 +137,7 @@ src/platform/ARIES/
 ---
 
 ### Step 4: System Timebase & Cycle Counter (`system.c`)
-* Implement the core timing hooks expected by [`scheduler.c`](file:///home/ivan/Desktop/betaflight/src/main/scheduler/scheduler.c):
+* Implement the core timing hooks expected by [`scheduler.c`](src/main/scheduler/scheduler.c):
   ```c
   #include "platform.h"
   #include "drivers/time.h"
@@ -192,7 +192,7 @@ src/platform/ARIES/
 Execute the build from the project root:
 ```bash
 make clean
-make TARGET=ARIESV3 ARM_SDK_PREFIX=/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf- V=1
+make TARGET=ARIESV3 ARM_SDK_PREFIX=~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf- V=1
 ```
 
 ---
@@ -205,17 +205,17 @@ When the compilation finishes, verify the following:
 2. **Output Artifact:** `obj/betaflight_ARIESV3.elf` must exist.
 3. **Symbol Table Check:**
    ```bash
-   /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-objdump -t obj/betaflight_ARIESV3.elf | grep -E "scheduler|pidController|micros|getCycleCounter"
+   ~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-objdump -t obj/betaflight_ARIESV3.elf | grep -E "scheduler|pidController|micros|getCycleCounter"
    ```
    Confirms all core Betaflight routines were built.
 4. **Soft-Float Linkage Verification:**
    ```bash
-   /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-nm obj/betaflight_ARIESV3.elf | grep -E "__addsf3|__mulsf3|sinf"
+   ~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-nm obj/betaflight_ARIESV3.elf | grep -E "__addsf3|__mulsf3|sinf"
    ```
    Confirms standard software floating-point routines from `libgcc` were resolved cleanly.
 5. **Memory Sizing Check:**
    ```bash
-   /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/betaflight_ARIESV3.elf
+   ~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/betaflight_ARIESV3.elf
    ```
    * Text (Flash) should comfortably be < 1 MB (limit: 2 MB).
    * Data + BSS (RAM) should comfortably be < 120 KB (limit: 256 KB).
@@ -236,7 +236,7 @@ Once this compilation succeeds:
 This section documents the actual step-by-step engineering work performed to bring the C-DAC ARIES v3.0 (THEJAS32 / VEGA ET1031 RISC-V) port from a blank directory to a clean, 100% linked Betaflight ELF and HEX executable.
 
 ### 7.1 Architecture & Baseline Discovery
-* **Toolchain Identification:** Located the pre-installed ESP RISC-V toolchain at `/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-gcc` (GCC 13.2.0).
+* **Toolchain Identification:** Located the pre-installed ESP RISC-V toolchain at `~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-gcc` (GCC 13.2.0).
 * **Hardware Profile:**
   * Core: VEGA ET1031 (RV32IM — integer + multiply/divide, soft-float, 32-bit).
   * System Clock: 100 MHz oscillator.

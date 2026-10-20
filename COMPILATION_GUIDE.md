@@ -10,10 +10,10 @@ All compilation outputs are generated in the `obj/` folder of the Betaflight rep
 
 | File Format | File Path | Description / Use Case |
 | :--- | :--- | :--- |
-| **Intel HEX (`.hex`)** | [`obj/betaflight_2026.12.0-alpha_ARIESV3.hex`](file:///home/ivan/Desktop/betaflight/obj/betaflight_2026.12.0-alpha_ARIESV3.hex) | Standard format containing absolute flash addresses (`0x20000000`). Used by most GUI flashers, OpenOCD, and Betaflight Configurator. |
-| **Raw Binary (`.bin`)** | [`obj/main/betaflight_ARIESV3.bin`](file:///home/ivan/Desktop/betaflight/obj/main/betaflight_ARIESV3.bin) | Pure binary dump (708 KB). Used with direct SPI flash programmers or bootloader write commands at offset `0x20000000`. |
-| **ELF Executable (`.elf`)** | [`obj/main/betaflight_ARIESV3.elf`](file:///home/ivan/Desktop/betaflight/obj/main/betaflight_ARIESV3.elf) | Executable with full symbol table and debug information. Used for GDB hardware debugging and OpenOCD flashing. |
-| **Memory Map (`.map`)** | [`obj/main/betaflight_ARIESV3.map`](file:///home/ivan/Desktop/betaflight/obj/main/betaflight_ARIESV3.map) | Detailed breakdown of memory sections and variable addresses. |
+| **Intel HEX (`.hex`)** | [`obj/betaflight_2026.12.0-alpha_ARIESV3.hex`](obj/betaflight_2026.12.0-alpha_ARIESV3.hex) | Standard format containing absolute flash addresses (`0x20000000`). Used by most GUI flashers, OpenOCD, and Betaflight Configurator. |
+| **Raw Binary (`.bin`)** | [`obj/main/betaflight_ARIESV3.bin`](obj/main/betaflight_ARIESV3.bin) | Pure binary dump (708 KB). Used with direct SPI flash programmers or bootloader write commands at offset `0x20000000`. |
+| **ELF Executable (`.elf`)** | [`obj/main/betaflight_ARIESV3.elf`](obj/main/betaflight_ARIESV3.elf) | Executable with full symbol table and debug information. Used for GDB hardware debugging and OpenOCD flashing. |
+| **Memory Map (`.map`)** | [`obj/main/betaflight_ARIESV3.map`](obj/main/betaflight_ARIESV3.map) | Detailed breakdown of memory sections and variable addresses. |
 
 ---
 
@@ -34,13 +34,13 @@ You can use the installed ESP-IDF RISC-V toolchain (`riscv32-esp-elf-gcc` v13.2.
 
 * **Installed Toolchain Location:**
   ```text
-  /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/
+  ~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/
   ```
 
 * **Verify the Compiler:**
   Run this command in terminal to confirm the compiler is accessible:
   ```bash
-  /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-gcc --version
+  ~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-gcc --version
   ```
   Expected output:
   ```text
@@ -53,7 +53,7 @@ You can use the installed ESP-IDF RISC-V toolchain (`riscv32-esp-elf-gcc` v13.2.
 
 Navigate to your Betaflight repository root:
 ```bash
-cd /home/ivan/Desktop/betaflight
+cd /path/to/betaflight
 ```
 
 ### 3.1 Clean Previous Builds
@@ -82,13 +82,13 @@ make TARGET=ARIESV3 hex
 
 To create a raw `.bin` file directly:
 ```bash
-/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-objcopy -O binary obj/main/betaflight_ARIESV3.elf obj/main/betaflight_ARIESV3.bin
+~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-objcopy -O binary obj/main/betaflight_ARIESV3.elf obj/main/betaflight_ARIESV3.bin
 ```
 
 ### 3.4 Check Binary Size & Memory Utilization
 Run the size inspection tool:
 ```bash
-/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/main/betaflight_ARIESV3.elf
+~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/main/betaflight_ARIESV3.elf
 ```
 
 Expected output:

@@ -40,7 +40,7 @@ Current build configuration reported by the user:
 -   Architecture: RISC-V 32-bit.
 -   ISA flags: `-march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany`.
 -   Toolchain prefix:
-    `/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-`
+    `~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-`
 -   GCC version reported previously: 13.2.0.
 -   Flash map used by the current linker script and Renode platform:
     -   Base: `0x20000000`
@@ -201,8 +201,8 @@ Commands previously used in the Renode monitor:
 
 ``` text
 mach create
-machine LoadPlatformDescription @/home/ivan/ariesv3-sim/ariesv3.repl
-sysbus LoadELF @/home/ivan/Desktop/betaflight/obj/main/betaflight_ARIESV3.elf
+machine LoadPlatformDescription @../../ariesv3-sim/ariesv3.repl
+sysbus LoadELF @obj/main/betaflight_ARIESV3.elf
 sysbus.cpu PC 0x20000000
 start
 ```

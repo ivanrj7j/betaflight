@@ -19,7 +19,7 @@ This skill contains the authoritative development runbook, directory architectur
 - **Clock Speed:** 100 MHz
 - **Memory:** 256 KB internal SRAM (`0x10000000`–`0x1003FFFF`), 2 MB external SPI NOR flash (`0x20000000`–`0x201FFFFF`)
 - **Toolchain:** `riscv32-esp-elf-gcc` (GCC 13.2.0)
-  - Path: `/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-`
+  - Path: `~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-`
 - **Compiler Flags:**
   `-march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany` (Note: `_zicsr` is mandatory in GCC 13 for CSR instructions like `csrr mcycle`).
 
@@ -27,7 +27,7 @@ This skill contains the authoritative development runbook, directory architectur
 
 ## 2. Standard Build & Verification Workflow
 
-Always build from the repository root: `/home/ivan/Desktop/betaflight`.
+Always build from the repository root: `.`.
 
 ### Clean Rebuild
 ```bash
@@ -43,13 +43,13 @@ make TARGET=ARIESV3 -j$(nproc)
 ### Inspection Commands
 ```bash
 # Check memory footprint
-/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/main/betaflight_ARIESV3.elf
+~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/main/betaflight_ARIESV3.elf
 
 # Inspect symbol placement
-/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-nm -n obj/main/betaflight_ARIESV3.elf | grep <symbol>
+~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-nm -n obj/main/betaflight_ARIESV3.elf | grep <symbol>
 
 # Disassemble entry/startup
-/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-objdump -d obj/main/betaflight_ARIESV3.elf --start-address=0x20000000 --stop-address=0x20000200
+~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-objdump -d obj/main/betaflight_ARIESV3.elf --start-address=0x20000000 --stop-address=0x20000200
 ```
 
 ---
@@ -108,7 +108,7 @@ When completing any implementation phase or resolving blockers:
 
 ## 6. Critical Hardware Risks & Architectural Constraints
 
-Any AI agent or developer continuing this port **must be aware of and strictly adhere to** the following failure modes and architectural limitations documented in [`RISK_ASSESMENT.md`](file:///home/ivan/Desktop/betaflight/RISK_ASSESMENT.md):
+Any AI agent or developer continuing this port **must be aware of and strictly adhere to** the following failure modes and architectural limitations documented in [`RISK_ASSESMENT.md`](../../RISK_ASSESMENT.md):
 
 ### ⚠️ RSK-01: Soft-Float Arithmetic & Loop Overrun (RV32IM without 'F')
 - **The Risk:** THEJAS32 lacks hardware floating-point instructions. All IEEE-754 `float` and `double` operations are computed via software emulation (`libgcc.a` routines: `__addsf3`, `__mulsf3`, `__divsf3`, `__divdf3`). An unconstrained 8 kHz flight loop will overrun the 125 µs task budget, starving the scheduler and freezing control.

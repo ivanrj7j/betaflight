@@ -11,7 +11,7 @@ This plan directly incorporates register-level drivers, peripheral mappings, int
 An inspection of `lib/vega-sdk/vega-sdk/bsp/` reveals the exact memory-mapped registers, control words, and interrupt structures for the THEJAS32 SoC:
 
 ### 1.1 Memory Map & Peripheral Base Addresses
-From [`lib/vega-sdk/vega-sdk/bsp/include/config.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/config.h) and driver headers:
+From [`lib/vega-sdk/vega-sdk/bsp/include/config.h`](lib/vega-sdk/vega-sdk/bsp/include/config.h) and driver headers:
 
 | Peripheral | Base Address | Register Structure / Notes |
 | :--- | :--- | :--- |

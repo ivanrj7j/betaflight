@@ -6,9 +6,9 @@
 > **To Any Agent or Developer Picking Up this Project:**
 > Before continuing work, you **must load and follow the porting skill**:
 >
-> 📁 **Skill File:** [`skills/ariesv3-porting-workflow/SKILL.md`](file:///home/ivan/Desktop/betaflight/skills/ariesv3-porting-workflow/SKILL.md)
+> 📁 **Skill File:** [`skills/ariesv3-porting-workflow/SKILL.md`](skills/ariesv3-porting-workflow/SKILL.md)
 >
-> This skill contains the active build instructions, toolchain configuration (`riscv32-esp-elf-gcc` v13.2.0), peripheral register mappings from the C-DAC VEGA SDK BSP, and the required logging protocol for [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md).
+> This skill contains the active build instructions, toolchain configuration (`riscv32-esp-elf-gcc` v13.2.0), peripheral register mappings from the C-DAC VEGA SDK BSP, and the required logging protocol for [`HAL_PROGRESS.md`](HAL_PROGRESS.md).
 
 ---
 
@@ -81,14 +81,16 @@ This repository contains the Betaflight flight controller firmware adapted for t
 
 | File | Purpose / Description |
 | :--- | :--- |
-| [`skills/ariesv3-porting-workflow/SKILL.md`](file:///home/ivan/Desktop/betaflight/skills/ariesv3-porting-workflow/SKILL.md) | **Authoritative workflow skill** containing build commands, toolchain paths, and HAL rules. |
-| [`IMPLEMENTATION_PLAN.md`](file:///home/ivan/Desktop/betaflight/IMPLEMENTATION_PLAN.md) | Full 8-Phase Architectural Plan covering registers, pins, risks, and roadmap. |
-| [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md) | **Living progress log** with problems, solutions, and binary metrics for every phase. |
-| [`RISK_ASSESMENT.md`](file:///home/ivan/Desktop/betaflight/RISK_ASSESMENT.md) | **Risk matrix & failure modes** with empirical Renode validation findings and mitigations. |
-| [`COMPILATION_GUIDE.md`](file:///home/ivan/Desktop/betaflight/COMPILATION_GUIDE.md) | Step-by-step flashing guide (OpenOCD, JTAG, VEGA Flasher) and CLI verification. |
-| [`PORT_GUIDE.md`](file:///home/ivan/Desktop/betaflight/PORT_GUIDE.md) | Architectural roadmap, hardware pinout diagram, and soft-float CLI tuning. |
-| [`src/platform/ARIES/`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/) | Core target directory containing all ARIES v3.0 platform source files. |
-| [`lib/vega-sdk/vega-sdk/bsp/`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/) | Official C-DAC VEGA SDK reference drivers (UART, SPI, Timer, GPIO, Interrupts). |
+| [`skills/ariesv3-porting-workflow/SKILL.md`](skills/ariesv3-porting-workflow/SKILL.md) | **Authoritative workflow skill** containing build commands, toolchain paths, and HAL rules. |
+| [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | Full 8-Phase Architectural Plan covering registers, pins, risks, and roadmap. |
+| [`HAL_PROGRESS.md`](HAL_PROGRESS.md) | **Living progress log** with problems, solutions, and binary metrics for every phase. |
+| [`TEST_PLAN.md`](TEST_PLAN.md) | **Master Test & Validation Plan** covering electrical/mechanical safety, 5-layer software plan, oscilloscope bench tests, and 12-point sign-off matrix. |
+| [`SOFTWARE_TEST_PLAN.md`](SOFTWARE_TEST_PLAN.md) | **Low-level software test specifications** with GDB register assertions, unit tests, and automated test runner script. |
+| [`RISK_ASSESMENT.md`](RISK_ASSESMENT.md) | **Risk matrix & failure modes** with empirical Renode validation findings and mitigations. |
+| [`COMPILATION_GUIDE.md`](COMPILATION_GUIDE.md) | Step-by-step flashing guide (OpenOCD, JTAG, VEGA Flasher) and CLI verification. |
+| [`PORT_GUIDE.md`](PORT_GUIDE.md) | Architectural roadmap, hardware pinout diagram, and soft-float CLI tuning. |
+| [`src/platform/ARIES/`](src/platform/ARIES/) | Core target directory containing all ARIES v3.0 platform source files. |
+| [`lib/vega-sdk/vega-sdk/bsp/`](lib/vega-sdk/vega-sdk/bsp/) | Official C-DAC VEGA SDK reference drivers (UART, SPI, Timer, GPIO, Interrupts). |
 
 ---
 
@@ -109,10 +111,10 @@ make TARGET=ARIESV3 hex
 ### Inspect Output Binary
 ```bash
 # Sizing
-/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/main/betaflight_ARIESV3.elf
+~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/main/betaflight_ARIESV3.elf
 
 # Disassembly check of startup & trap vector
-/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-objdump -d obj/main/betaflight_ARIESV3.elf --start-address=0x20000000 --stop-address=0x20000150
+~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-objdump -d obj/main/betaflight_ARIESV3.elf --start-address=0x20000000 --stop-address=0x20000150
 ```
 
 ---
@@ -122,12 +124,12 @@ make TARGET=ARIESV3 hex
 1. **Start Renode** and load the ARIES v3 platform:
    ```text
    mach create
-   machine LoadPlatformDescription @/home/ivan/ariesv3-sim/ariesv3.repl
+   machine LoadPlatformDescription @../../ariesv3-sim/ariesv3.repl
    ```
    *(Note: Ensure `cpuType` in `ariesv3.repl` is set to `rv32im_zicsr_c` to support compressed instructions).*
 2. **Load ELF and Run**:
    ```text
-   sysbus LoadELF @/home/ivan/Desktop/betaflight/obj/main/betaflight_ARIESV3.elf
+   sysbus LoadELF @obj/main/betaflight_ARIESV3.elf
    start
    ```
 3. **Expected Behavior**:
@@ -164,3 +166,36 @@ picocom -b 115200 /dev/ttyUSB0
 - `set pilot_name = ARIES_PILOT` followed by `save`: Verify flash PG persistence survives power cycling.
 - `motor 0 1100`: Check PWM pulses on Motor 1 (oscilloscope or ESC test without props).
 - Betaflight Configurator: Connect to `/dev/ttyUSB0` at 115200 baud; verify 3D quad model motion in the "Setup" tab and live stick motion in the "Receiver" tab.
+
+---
+
+## 6. Master Test & Validation Plan Overview
+
+The project testing framework is fully detailed across [`TEST_PLAN.md`](TEST_PLAN.md) and [`SOFTWARE_TEST_PLAN.md`](SOFTWARE_TEST_PLAN.md):
+
+### 6.1 Essential Safeguards & Electrical Rules
+- **The Propellers Off Rule:** Mandatory bench testing with bare motor shafts only.
+- **Dedicated 5V Regulated BEC:** The dev board lacks onboard TVS diodes; inductive back-EMF spikes from ESC active braking (>30V on 4S LiPo) will destroy the board without a 5V BEC and a $470\text{--}1000\,\mu\text{F}$ 35V low-ESR capacitor across battery leads.
+- **3.3V Logic Ceiling:** THEJAS32 GPIOs are strictly 3.3V LVCMOS and are not 5V tolerant.
+- **IMU Vibration Soft-Mounting:** External IMU breakouts on Header J1 must be isolated with thick double-sided foam tape (3M VHB) and SPI jumper wires kept under 10 cm to prevent vibrational noise induction.
+
+### 6.2 5-Layer Software Verification
+1. **Layer 1: System Core & Memory:** 16 KB stack watermark check, trap panic telemetry, BSS/data initialization.
+2. **Layer 2: Real-Time Scheduler & Headroom:** Clamped 1.0 kHz loop rate, monotonic timebase across 42.95s rollover, $< 10\,\mu\text{s}$ jitter, and $< 500\,\mu\text{s}$ worst-case execution time (system load $< 50\%$).
+3. **Layer 3: Peripheral & Bus Communication:** MSP streaming over UART0 without CRC errors, SPI0 1.0 kHz burst reads with `Bits.CSAAT` CS retention, and SPI3 NOR flash coherence.
+4. **Layer 4: State Machine & Safety Logic:** Arming prevention flags (`ARMING_DISABLED_*`), Stage 1 & Stage 2 failsafe transitions ($< 1.0\text{s}$ cutoff).
+5. **Layer 5: Control Loop & Mixer Validation:** AHRS complementary filter attitude tracking and 4-motor differential distribution.
+
+### 6.3 Historical Roadblock Watch-Items
+Monitors failure modes discovered during the port:
+- Trap vector `mtvec` routing and `mie.MEIE` external interrupt enable.
+- UART0 100 MHz clock divisor ($54$ at 115200 baud).
+- Timer 0 Synopsys `EOI` register clear (preventing infinite ISR re-entry).
+- SPI `Bits.CSAAT` CS hold (preventing IMU `0x00`/`0xFF` dummy reads).
+- SPI3 NOR Flash 4 KB sector erase blocking stalls.
+- Timer 1 IRQ 8 motor PWM interrupt latency hygiene (no blocking wait loops in critical sections).
+- Soft-float disassembly audit (enforcing zero double-precision routines `__adddf3`/`__muldf3` in PID loops).
+
+### 6.4 Companion Low-Level Test Suite
+For step-by-step register assertions, GDB debugging workflows, unit test specifications, and an automated bash test runner script, refer to:  
+📄 **[`SOFTWARE_TEST_PLAN.md`](SOFTWARE_TEST_PLAN.md)**

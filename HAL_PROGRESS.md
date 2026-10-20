@@ -41,10 +41,10 @@ Establish a clean bare-metal reset sequence, complete machine register initializ
 
 | File Path | Action | Purpose & Technical Summary |
 | :--- | :---: | :--- |
-| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h) | **Created** | Consolidated hardware register structures, peripheral base addresses (`0x10000100` UART, `0x10000A00` Timers, `0x20010000` Interrupt Controller), and IRQ definitions extracted from the official VEGA SDK BSP. |
-| [`src/platform/ARIES/startup.S`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S) | **Modified** | Replaced minimal stub startup with a full assembly reset routine: clears GPRs `x1`–`x31`, initializes `sp` to `_estack` and `gp` to `__global_pointer$`, sets `mtvec` to `trap_entry`, copies `.data`, zeros `.bss`, calls `main()`, and provides a 32-register context save/restore trap entry frame with `mret`. |
-| [`src/platform/ARIES/system.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c) | **Modified** | Implemented `handle_trap(mcause, mepc, sp)` to separate synchronous exceptions from asynchronous interrupts; implemented 32-slot interrupt dispatch table (`interrupt_table[32]`) and peripheral registration APIs (`thejas32_interrupt_register`, `thejas32_interrupt_enable`). |
-| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Updated `__enable_irq()` to enable both Machine External Interrupts (`MEIE` bit 11 in `mie`) and global machine interrupts (`MIE` bit 3 in `mstatus`). |
+| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](src/platform/ARIES/include/platform/bsp_thejas32.h) | **Created** | Consolidated hardware register structures, peripheral base addresses (`0x10000100` UART, `0x10000A00` Timers, `0x20010000` Interrupt Controller), and IRQ definitions extracted from the official VEGA SDK BSP. |
+| [`src/platform/ARIES/startup.S`](src/platform/ARIES/startup.S) | **Modified** | Replaced minimal stub startup with a full assembly reset routine: clears GPRs `x1`–`x31`, initializes `sp` to `_estack` and `gp` to `__global_pointer$`, sets `mtvec` to `trap_entry`, copies `.data`, zeros `.bss`, calls `main()`, and provides a 32-register context save/restore trap entry frame with `mret`. |
+| [`src/platform/ARIES/system.c`](src/platform/ARIES/system.c) | **Modified** | Implemented `handle_trap(mcause, mepc, sp)` to separate synchronous exceptions from asynchronous interrupts; implemented 32-slot interrupt dispatch table (`interrupt_table[32]`) and peripheral registration APIs (`thejas32_interrupt_register`, `thejas32_interrupt_enable`). |
+| [`src/platform/ARIES/include/platform/platform.h`](src/platform/ARIES/include/platform/platform.h) | **Modified** | Updated `__enable_irq()` to enable both Machine External Interrupts (`MEIE` bit 11 in `mie`) and global machine interrupts (`MIE` bit 3 in `mstatus`). |
 
 ---
 
@@ -131,12 +131,12 @@ Implement real hardware-backed UART communications for the C-DAC ARIES v3.0 boar
 
 | File Path | Action | Purpose & Technical Summary |
 | :--- | :---: | :--- |
-| [`src/platform/ARIES/serial_uart_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c) | **Created** | Hardware UART driver for THEJAS32. Implements 16550 divisor baud setting, line control (8N1), FIFO reset/enable, transmit priming, interrupt-driven RX/TX processing (`uartIrqHandler`), and hardware definitions (`uartHardware[UARTDEV_COUNT]`). |
-| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Defined `#define SERIAL_UART_FIRST_INDEX 0` so that `SERIAL_PORT_UART0` maps cleanly to index `0` instead of triggering index offset errors in `serial_post.h`. |
-| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_UART0` and `#define USE_UART1`, with pin allocations set to `NONE` (fixed SoC header/bridge routing). |
-| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/serial_uart_aries.c` to `MCU_COMMON_SRC`. |
-| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy implementations of `serialUART`, `uartReconfigure`, and `uartPinConfigure`; added missing `dmaGetDataLength()` stub. |
-| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added public C prototypes for `thejas32_interrupt_register`, `thejas32_interrupt_enable`, and `thejas32_interrupt_disable`. |
+| [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c) | **Created** | Hardware UART driver for THEJAS32. Implements 16550 divisor baud setting, line control (8N1), FIFO reset/enable, transmit priming, interrupt-driven RX/TX processing (`uartIrqHandler`), and hardware definitions (`uartHardware[UARTDEV_COUNT]`). |
+| [`src/platform/ARIES/include/platform/platform.h`](src/platform/ARIES/include/platform/platform.h) | **Modified** | Defined `#define SERIAL_UART_FIRST_INDEX 0` so that `SERIAL_PORT_UART0` maps cleanly to index `0` instead of triggering index offset errors in `serial_post.h`. |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_UART0` and `#define USE_UART1`, with pin allocations set to `NONE` (fixed SoC header/bridge routing). |
+| [`src/platform/ARIES/mk/ARIES.mk`](src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/serial_uart_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy implementations of `serialUART`, `uartReconfigure`, and `uartPinConfigure`; added missing `dmaGetDataLength()` stub. |
+| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added public C prototypes for `thejas32_interrupt_register`, `thejas32_interrupt_enable`, and `thejas32_interrupt_disable`. |
 
 ---
 
@@ -204,8 +204,8 @@ Replace the naive 32-bit `mcycle` cycle counter based microsecond timebase with 
 
 | File Path | Action | Purpose & Technical Summary |
 | :--- | :---: | :--- |
-| [`src/platform/ARIES/system.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c) | **Modified** | Implemented atomic 64-bit cycle reading `getCycleCounter64()` via `mcycle` and `mcycleh`; implemented hardware Timer 0 driver (`thejas32_timer_init`, `thejas32_timer0_isr`, `timer0GetCurrentValue`, `timer0GetOverflows`, `timer0Micros`); rewritten `micros()`, `millis()`, `delayMicroseconds()`, and `delay()`. |
-| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added `#include "common/time.h"` and declared function prototypes for `thejas32_timer_init`, `thejas32_timer0_isr`, `timer0GetCurrentValue`, `timer0GetOverflows`, `timer0Micros`, and `getCycleCounter64`. |
+| [`src/platform/ARIES/system.c`](src/platform/ARIES/system.c) | **Modified** | Implemented atomic 64-bit cycle reading `getCycleCounter64()` via `mcycle` and `mcycleh`; implemented hardware Timer 0 driver (`thejas32_timer_init`, `thejas32_timer0_isr`, `timer0GetCurrentValue`, `timer0GetOverflows`, `timer0Micros`); rewritten `micros()`, `millis()`, `delayMicroseconds()`, and `delay()`. |
+| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added `#include "common/time.h"` and declared function prototypes for `thejas32_timer_init`, `thejas32_timer0_isr`, `timer0GetCurrentValue`, `timer0GetOverflows`, `timer0Micros`, and `getCycleCounter64`. |
 
 ---
 
@@ -264,13 +264,13 @@ Implement the hardware GPIO driver for C-DAC THEJAS32 / VEGA ET1031 using the of
 
 | File Path | Action | Purpose & Technical Summary |
 | :--- | :---: | :--- |
-| [`src/platform/ARIES/io_def_generated.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_def_generated.h) | **Created** | Defined 32-pin mapping (`PA0` through `PA31`), set `DEFIO_IO_USED_COUNT = 32`, `DEFIO_USED_COUNT = 32`, and configured preprocessor tags and record index bindings. |
-| [`src/platform/ARIES/io_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c) | **Created** | Hardware GPIO driver implementing `IOInitGlobal()`, `IOGetByTag()`, `IOConfigGPIO()`, `IOHi()`, `IOLo()`, `IOToggle()`, `IORead()`, `IOWrite()`, `IO_GPIOPortIdx()`, and `IO_GPIOPinIdx()`. Maps direction registers (`base + 0x40000`) and address-decoded pin access (`base + ((1 << pin) << 2)`). |
-| [`src/platform/ARIES/exti_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/exti_aries.c) | **Created** | External interrupt driver implementing `EXTIInit()`, `EXTIHandlerInit()`, `EXTIConfig()`, `EXTIRelease()`, `EXTIEnable()`, `EXTIDisable()`, and `IO_EXTI_Line()`. Routes Bank 0 (IRQ 10) and Bank 1 (IRQ 11) interrupts into per-pin callback dispatch table. |
-| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Defined `#define DEFIO_PORT_PINS 64` and structured `IO_CONFIG(mode, speed, pupd)` and `IOCFG_*` constants. |
-| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_EXTI` and mapped status LED (`#define LED0_PIN PA22` for onboard Heartbeat LED `LD4`). |
-| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/io_aries.c` and `ARIES/exti_aries.c` to `MCU_COMMON_SRC`. |
-| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy implementations of IO and EXTI routines. |
+| [`src/platform/ARIES/io_def_generated.h`](src/platform/ARIES/io_def_generated.h) | **Created** | Defined 32-pin mapping (`PA0` through `PA31`), set `DEFIO_IO_USED_COUNT = 32`, `DEFIO_USED_COUNT = 32`, and configured preprocessor tags and record index bindings. |
+| [`src/platform/ARIES/io_aries.c`](src/platform/ARIES/io_aries.c) | **Created** | Hardware GPIO driver implementing `IOInitGlobal()`, `IOGetByTag()`, `IOConfigGPIO()`, `IOHi()`, `IOLo()`, `IOToggle()`, `IORead()`, `IOWrite()`, `IO_GPIOPortIdx()`, and `IO_GPIOPinIdx()`. Maps direction registers (`base + 0x40000`) and address-decoded pin access (`base + ((1 << pin) << 2)`). |
+| [`src/platform/ARIES/exti_aries.c`](src/platform/ARIES/exti_aries.c) | **Created** | External interrupt driver implementing `EXTIInit()`, `EXTIHandlerInit()`, `EXTIConfig()`, `EXTIRelease()`, `EXTIEnable()`, `EXTIDisable()`, and `IO_EXTI_Line()`. Routes Bank 0 (IRQ 10) and Bank 1 (IRQ 11) interrupts into per-pin callback dispatch table. |
+| [`src/platform/ARIES/include/platform/platform.h`](src/platform/ARIES/include/platform/platform.h) | **Modified** | Defined `#define DEFIO_PORT_PINS 64` and structured `IO_CONFIG(mode, speed, pupd)` and `IOCFG_*` constants. |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_EXTI` and mapped status LED (`#define LED0_PIN PA22` for onboard Heartbeat LED `LD4`). |
+| [`src/platform/ARIES/mk/ARIES.mk`](src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/io_aries.c` and `ARIES/exti_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy implementations of IO and EXTI routines. |
 
 ---
 
@@ -332,12 +332,12 @@ Implement the hardware SPI master bus driver for C-DAC THEJAS32 / VEGA ET1031 (m
 
 | File Path | Action | Purpose & Technical Summary |
 | :--- | :---: | :--- |
-| [`src/platform/ARIES/bus_spi_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/bus_spi_aries.c) | **Created** | Hardware SPI driver implementing `spiInitDevice()`, `spiPinConfigure()`, `spiProcessSegmentsPolled()`, `spiInternalReadWriteBufPolled()`, and clock prescaler calculations based on the 100 MHz peripheral clock. Mapped SPI control word registers (`Data_control`, `Clock_control`), status polling, and multi-segment transfers. |
-| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added SPI register struct definitions (`thejas32_spi_t`), status register bits (`THEJAS32_SPI_STATUS_*`), control bits (`THEJAS32_SPI_CTRL_*`), and pointer macro `#define SPI1 ((spiResource_t *)THEJAS32_SPI_0_1_BASE)`. |
-| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Included `platform/bsp_thejas32.h` to make `SPI1` visible to `bus_spi.c`. |
-| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_SPI`, `#define USE_SPI_DEVICE_1`, `#define USE_GYRO_SPI_ICM42688P`, `#define USE_GYRO_SPI_BMI270`, `#define USE_ACC_SPI_ICM42688P`, `#define USE_ACC_SPI_BMI270`. Configured pin definitions: `SPI1_SCK_PIN PA5`, `SPI1_SDI_PIN PA6`, `SPI1_SDO_PIN PA7`, `SPI1_MISO_PIN PA6`, `SPI1_MOSI_PIN PA7`, `GYRO_1_CS_PIN PA8`, and `GYRO_1_EXTI_PIN PA0`. |
-| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/bus_spi_aries.c` to `MCU_COMMON_SRC`. |
-| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy SPI fallback stubs (`spiInitDevice`, `spiPinConfigure`, `spiProcessSegmentsPolled`, etc.). |
+| [`src/platform/ARIES/bus_spi_aries.c`](src/platform/ARIES/bus_spi_aries.c) | **Created** | Hardware SPI driver implementing `spiInitDevice()`, `spiPinConfigure()`, `spiProcessSegmentsPolled()`, `spiInternalReadWriteBufPolled()`, and clock prescaler calculations based on the 100 MHz peripheral clock. Mapped SPI control word registers (`Data_control`, `Clock_control`), status polling, and multi-segment transfers. |
+| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added SPI register struct definitions (`thejas32_spi_t`), status register bits (`THEJAS32_SPI_STATUS_*`), control bits (`THEJAS32_SPI_CTRL_*`), and pointer macro `#define SPI1 ((spiResource_t *)THEJAS32_SPI_0_1_BASE)`. |
+| [`src/platform/ARIES/include/platform/platform.h`](src/platform/ARIES/include/platform/platform.h) | **Modified** | Included `platform/bsp_thejas32.h` to make `SPI1` visible to `bus_spi.c`. |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_SPI`, `#define USE_SPI_DEVICE_1`, `#define USE_GYRO_SPI_ICM42688P`, `#define USE_GYRO_SPI_BMI270`, `#define USE_ACC_SPI_ICM42688P`, `#define USE_ACC_SPI_BMI270`. Configured pin definitions: `SPI1_SCK_PIN PA5`, `SPI1_SDI_PIN PA6`, `SPI1_SDO_PIN PA7`, `SPI1_MISO_PIN PA6`, `SPI1_MOSI_PIN PA7`, `GYRO_1_CS_PIN PA8`, and `GYRO_1_EXTI_PIN PA0`. |
+| [`src/platform/ARIES/mk/ARIES.mk`](src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/bus_spi_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy SPI fallback stubs (`spiInitDevice`, `spiPinConfigure`, `spiProcessSegmentsPolled`, etc.). |
 
 ---
 
@@ -395,11 +395,11 @@ Enable non-volatile configuration storage for Betaflight Parameter Groups (PG). 
 
 | File Path | Action | Purpose & Technical Summary |
 | :--- | :---: | :--- |
-| [`src/platform/ARIES/config_flash_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/config_flash_aries.c) | **Created** | Hardware flash configuration driver implementing Betaflight config streamer API: `configFlashInit()`, `configUnlock()`, `configLock()`, `configClearFlags()`, and `configWriteWord()`. Low-level SPI3 driver commands: `thejas32_flash_spi_init`, `thejas32_flash_erase_sector` (4 KB sector erase with 24-bit address), `thejas32_flash_write_page` (Page Program with WIP polling), and memory shadow synchronization. |
-| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Guarded `#ifndef FLASH_CONFIG_BUFFER_TYPE` (`uint32_t`) and defined `#ifndef FLASH_CONFIG_STREAMER_BUFFER_SIZE` (`32`). |
-| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define CONFIG_IN_FLASH`, `#define FLASH_SECTOR_SIZE 4096`, `#define FLASH_PAGE_SIZE 4096`, `#define FLASH_CONFIG_STREAMER_BUFFER_SIZE 32`, `#define FLASH_CONFIG_BUFFER_TYPE uint32_t`, `#define EEPROM_SIZE 8192`, and `#define ENABLE_CONFIG_FLASH_INIT`. |
-| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/config_flash_aries.c` to `MCU_COMMON_SRC`. |
-| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy configuration streamer stubs (`configUnlock`, `configLock`, `configClearFlags`, `configWriteWord`). |
+| [`src/platform/ARIES/config_flash_aries.c`](src/platform/ARIES/config_flash_aries.c) | **Created** | Hardware flash configuration driver implementing Betaflight config streamer API: `configFlashInit()`, `configUnlock()`, `configLock()`, `configClearFlags()`, and `configWriteWord()`. Low-level SPI3 driver commands: `thejas32_flash_spi_init`, `thejas32_flash_erase_sector` (4 KB sector erase with 24-bit address), `thejas32_flash_write_page` (Page Program with WIP polling), and memory shadow synchronization. |
+| [`src/platform/ARIES/include/platform/platform.h`](src/platform/ARIES/include/platform/platform.h) | **Modified** | Guarded `#ifndef FLASH_CONFIG_BUFFER_TYPE` (`uint32_t`) and defined `#ifndef FLASH_CONFIG_STREAMER_BUFFER_SIZE` (`32`). |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define CONFIG_IN_FLASH`, `#define FLASH_SECTOR_SIZE 4096`, `#define FLASH_PAGE_SIZE 4096`, `#define FLASH_CONFIG_STREAMER_BUFFER_SIZE 32`, `#define FLASH_CONFIG_BUFFER_TYPE uint32_t`, `#define EEPROM_SIZE 8192`, and `#define ENABLE_CONFIG_FLASH_INIT`. |
+| [`src/platform/ARIES/mk/ARIES.mk`](src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/config_flash_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy configuration streamer stubs (`configUnlock`, `configLock`, `configClearFlags`, `configWriteWord`). |
 
 ---
 
@@ -455,10 +455,10 @@ Implement the hardware actuator driver and RC receiver pipeline for C-DAC ARIES 
 
 | File Path | Action | Purpose & Technical Summary |
 | :--- | :---: | :--- |
-| [`src/platform/ARIES/pwm_motor_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/pwm_motor_aries.c) | **Created** | Hardware motor PWM driver implementing Betaflight `motorVTable_t`: `motorPwmDevInit()`, `pwmWriteMotor()`, `pwmWriteMotorInt()`, `pwmCompleteMotorUpdate()`, `pwmShutdownPulsesForAllMotors()`, `pwmDisableMotors()`, and non-blocking ISR `thejas32_pwm_timer1_isr()`. Supports Standard PWM (1000–2000 µs at 400 Hz) and OneShot125 (125–250 µs). |
-| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Configured motor pin assignments: `MOTOR1_PIN PA1` (J2_5), `MOTOR2_PIN PA2` (J2_3), `MOTOR3_PIN PA3` (J2_1), `MOTOR4_PIN PA4` (J1_10). Configured UART1 Serial RX pins: `UART1_RX_PIN PA17` (J2_15), `UART1_TX_PIN PA16` (J2_13). Enabled `#define USE_PWM_OUTPUT`, `#define USE_MOTOR`, `#define DEFAULT_MOTOR_PROTOCOL MOTOR_PROTOCOL_PWM`, `#define DEFAULT_MOTOR_PWM_RATE 400`, `#define USE_SERIALRX`, and `#define USE_SERIALRX_CRSF`. |
-| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/pwm_motor_aries.c` to `MCU_COMMON_SRC`. |
-| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy fallback stubs for `motorPwmDevInit()` and `dshotPwmDevInit()`. |
+| [`src/platform/ARIES/pwm_motor_aries.c`](src/platform/ARIES/pwm_motor_aries.c) | **Created** | Hardware motor PWM driver implementing Betaflight `motorVTable_t`: `motorPwmDevInit()`, `pwmWriteMotor()`, `pwmWriteMotorInt()`, `pwmCompleteMotorUpdate()`, `pwmShutdownPulsesForAllMotors()`, `pwmDisableMotors()`, and non-blocking ISR `thejas32_pwm_timer1_isr()`. Supports Standard PWM (1000–2000 µs at 400 Hz) and OneShot125 (125–250 µs). |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Configured motor pin assignments: `MOTOR1_PIN PA1` (J2_5), `MOTOR2_PIN PA2` (J2_3), `MOTOR3_PIN PA3` (J2_1), `MOTOR4_PIN PA4` (J1_10). Configured UART1 Serial RX pins: `UART1_RX_PIN PA17` (J2_15), `UART1_TX_PIN PA16` (J2_13). Enabled `#define USE_PWM_OUTPUT`, `#define USE_MOTOR`, `#define DEFAULT_MOTOR_PROTOCOL MOTOR_PROTOCOL_PWM`, `#define DEFAULT_MOTOR_PWM_RATE 400`, `#define USE_SERIALRX`, and `#define USE_SERIALRX_CRSF`. |
+| [`src/platform/ARIES/mk/ARIES.mk`](src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/pwm_motor_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy fallback stubs for `motorPwmDevInit()` and `dshotPwmDevInit()`. |
 
 ---
 
@@ -517,10 +517,10 @@ Tune and optimize the entire flight control loop for the non-FPU RV32IM core (C-
 
 | File Path | Action | Purpose & Technical Summary |
 | :--- | :---: | :--- |
-| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Appended `-ffast-math -fno-math-errno` to `DEVICE_FLAGS`, enabling GCC to relax strict IEEE 754 compliance (reciprocal approximations, associative arithmetic) and bypass libc `errno` overhead on floating-point operations. |
-| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Configured `#define DEFAULT_PID_PROCESS_DENOM 8`. For standard 8 kHz IMUs (ICM42688P), this decimates the PID loop rate to exactly 1.0 kHz ($8000 / 8 = 1000\,\mu\text{s}$), aligning with `#define TASK_GYROPID_DESIRED_PERIOD 1000` in `platform.h`. Retained lightweight PT1 gyro filter defaults and disabled heavy dynamic notch / RPM filters. |
-| [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md) | **Modified** | Updated milestone tracker table; logged Phase 8 execution, compiler flags, soft-float disassembly audit, and end-to-end project completion checklist. |
-| [`GEMINI.md`](file:///home/ivan/Desktop/betaflight/GEMINI.md) | **Modified** | Updated high-level architecture status reflecting all 8 completed phases and full flight controller deployment instructions. |
+| [`src/platform/ARIES/mk/ARIES.mk`](src/platform/ARIES/mk/ARIES.mk) | **Modified** | Appended `-ffast-math -fno-math-errno` to `DEVICE_FLAGS`, enabling GCC to relax strict IEEE 754 compliance (reciprocal approximations, associative arithmetic) and bypass libc `errno` overhead on floating-point operations. |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Configured `#define DEFAULT_PID_PROCESS_DENOM 8`. For standard 8 kHz IMUs (ICM42688P), this decimates the PID loop rate to exactly 1.0 kHz ($8000 / 8 = 1000\,\mu\text{s}$), aligning with `#define TASK_GYROPID_DESIRED_PERIOD 1000` in `platform.h`. Retained lightweight PT1 gyro filter defaults and disabled heavy dynamic notch / RPM filters. |
+| [`HAL_PROGRESS.md`](HAL_PROGRESS.md) | **Modified** | Updated milestone tracker table; logged Phase 8 execution, compiler flags, soft-float disassembly audit, and end-to-end project completion checklist. |
+| [`GEMINI.md`](GEMINI.md) | **Modified** | Updated high-level architecture status reflecting all 8 completed phases and full flight controller deployment instructions. |
 
 ---
 
