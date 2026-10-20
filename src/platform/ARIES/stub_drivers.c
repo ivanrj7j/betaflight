@@ -60,29 +60,6 @@ void dbgPinLo(int index)
 }
 
 // ----------------------------------------------------------------------------
-// SPI Bus Driver Stubs
-// ----------------------------------------------------------------------------
-void spiPreinit(void)
-{
-}
-
-uint16_t spiCalculateDivider(uint32_t freq)
-{
-    UNUSED(freq);
-    return 0;
-}
-
-void spiPinConfigure(const struct spiPinConfig_s *pConfig)
-{
-    UNUSED(pConfig);
-}
-
-void spiSequenceStart(const extDevice_t *dev)
-{
-    UNUSED(dev);
-}
-
-// ----------------------------------------------------------------------------
 // DMA Driver Stubs
 // ----------------------------------------------------------------------------
 dmaChannelDescriptor_t dmaDescriptors[1];
@@ -169,26 +146,8 @@ void timerEnableInterrupt(const timerHardware_t *timHw)
 }
 
 // ----------------------------------------------------------------------------
-// Configuration Streamer / EEPROM Stubs
+// Configuration Streamer / EEPROM routines implemented in config_flash_aries.c
 // ----------------------------------------------------------------------------
-void configUnlock(void)
-{
-}
-
-void configLock(void)
-{
-}
-
-void configClearFlags(void)
-{
-}
-
-configStreamerResult_e configWriteWord(uintptr_t address, config_streamer_buffer_type_t *buffer)
-{
-    UNUSED(address);
-    UNUSED(buffer);
-    return CONFIG_RESULT_SUCCESS;
-}
 
 // ----------------------------------------------------------------------------
 // Persistent Object Stubs

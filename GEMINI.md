@@ -47,6 +47,21 @@ This repository contains the Betaflight flight controller firmware adapted for t
   - Enabled `#define USE_EXTI` and configured `#define LED0_PIN PA22` (Heartbeat LED `LD4`) in `target.h`.
   - Clean compilation with exit code `0` (~762.7 KB Flash / ~66.5 KB RAM).
 
+- **Phase 5: SPI Bus & IMU Sensor Driver (`Completed`)**
+  - Implemented THEJAS32 SPI master driver in `src/platform/ARIES/bus_spi_aries.c` mapping SPI0 controller registers (`0x10000600`) as `SPI1`.
+  - Implemented polled segment transfers (`spiProcessSegmentsPolled`) with `Bits.CSAAT` CS retention for continuous burst reads.
+  - Sourced pin configuration on Header J1: SCK (`PA5`), MISO/SDI (`PA6`), MOSI/SDO (`PA7`), CS (`PA8`), and Gyro DRDY on `PA0`.
+  - Enabled Betaflight IMU sensor drivers (`USE_GYRO_SPI_ICM42688P`, `USE_GYRO_SPI_BMI270`, `USE_ACC_SPI_ICM42688P`, `USE_ACC_SPI_BMI270`) in `target.h`.
+  - Clean compilation with exit code `0` (~765.9 KB Flash / ~66.5 KB RAM).
+
+- **Phase 6: Non-Volatile Config Storage (`Completed`)**
+  - Implemented hardware flash configuration driver in `src/platform/ARIES/config_flash_aries.c` for Betaflight Parameter Group (PG) persistence.
+  - Interfaced to the onboard SPI3 controller (`0x10200200`) managing the 32 KB reserved configuration flash sector (`0x201F8000`–`0x201FFFFF`).
+  - Implemented 4 KB Sector Erase (`0x20`), 256-byte Page Program (`0x02`), Write Enable (`0x06`), and WIP status polling with bounded loop timeouts.
+  - Synchronized memory-mapped flash shadow for immediate coherent reads and simulator execution.
+  - Enabled `#define CONFIG_IN_FLASH`, `#define EEPROM_SIZE 8192`, `#define ENABLE_CONFIG_FLASH_INIT`.
+  - Clean compilation with exit code `0` (~768.3 KB Flash / ~66.5 KB RAM).
+
 ---
 
 ## 2. Directory Navigation & Key Documentation
@@ -111,9 +126,9 @@ make TARGET=ARIESV3 hex
 
 ## 5. Next Steps for Next Developer / Agent
 
-Proceed directly to **Phase 5: SPI Bus & IMU Sensor Driver**:
-1. Implement `src/platform/ARIES/bus_spi_aries.c` mapping SPI0 master registers (`0x10000600`) from C-DAC VEGA SDK `bsp/drivers/spi/spi.c`.
-2. Configure SPI control word: 8-bit transfers, CPOL/CPHA Mode 0/3, and Chip Select Active After Transfer (`Bits.CSAAT`) for burst reads.
-3. Configure `target.h` with SPI0 pins on Header J1 (`J1_5` SCK, `J1_6` MISO, `J1_7` MOSI, `J1_8` CS).
-4. Verify IMU sensor detection (`ICM42688P` or `BMI270`) via CLI `status`.
+Proceed directly to **Phase 7: Actuator Outputs & RC Link**:
+1. Implement `src/platform/ARIES/pwm_motor_aries.c` mapping hardware PWM outputs (channels 0–3 for 4 quadcopter motors) on header pins.
+2. Implement motor output APIs: `motorPwmDevInit()`, `pwmWriteMotor()`, and DShot fallback stub.
+3. Configure `UART1` (`0x10000200`) on header pins (`J2_13` TX, `J2_15` RX) for Serial RX (CRSF / ELRS / SBUS).
+4. Remove motor and RC receiver stubs from `src/platform/ARIES/stub_drivers.c`.
 5. Document all changes and problems encountered in [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md).

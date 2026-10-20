@@ -94,3 +94,19 @@ uint32_t timer0GetOverflows(void);
 timeUs_t timer0Micros(void);
 uint64_t getCycleCounter64(void);
 
+// -----------------------------------------------------------------------------
+// SPI Controller Registers
+// Base: 0x10000600 (SPI0/SPI1), 0x10200100 (SPI2/SPI3)
+// -----------------------------------------------------------------------------
+typedef struct {
+    volatile uint32_t Control;      // 0x00: Packed bitfield / control word
+    volatile uint32_t Status;       // 0x04: Status reg (Busy, Overrun, RxComplete, TxHoldEmpty)
+    volatile uint32_t Baudrate;     // 0x08: Baud frequency divider
+    volatile uint32_t TxData;       // 0x0C: Transmit data
+    volatile uint32_t RxData;       // 0x10: Receive data
+} thejas32_spi_reg_t;
+
+#define THEJAS32_SPI(n) (*((thejas32_spi_reg_t *)(((n) < 2 ? THEJAS32_SPI_0_1_BASE : THEJAS32_SPI_2_3_BASE) + (((n) % 2) * 0x100))))
+#define SPI1            ((spiResource_t *)THEJAS32_SPI_0_1_BASE)
+
+

@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <stddef.h>
 
+#include "platform/bsp_thejas32.h"
+
 #ifndef __ASM
 #define __ASM __asm__
 #endif
@@ -92,8 +94,13 @@ typedef enum { DISABLE = 0, ENABLE = !DISABLE } FunctionalState;
 #define U_ID_1 0
 #define U_ID_2 0
 
-// Flash config buffer type (used by flash_impl.h)
+// Flash config buffer type and streamer buffer size
+#ifndef FLASH_CONFIG_BUFFER_TYPE
 #define FLASH_CONFIG_BUFFER_TYPE uint32_t
+#endif
+#ifndef FLASH_CONFIG_STREAMER_BUFFER_SIZE
+#define FLASH_CONFIG_STREAMER_BUFFER_SIZE 32
+#endif
 
 // System core clock (defined in system.c, declared here for shared code)
 extern uint32_t SystemCoreClock;

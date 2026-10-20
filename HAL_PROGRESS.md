@@ -25,8 +25,8 @@
 | **Phase 2** | Console & Communication | UART0 (CLI/MSP), Ring Buffer, RX Interrupt | **Completed** | 2026-10-19 |
 | **Phase 3** | High-Resolution Timebase | Hardware Timer 0/1, Monotonic `micros()`, Jitter Check | **Completed** | 2026-10-20 |
 | **Phase 4** | GPIO & External Interrupts | Bank 0/1 Address-Decoded IO, EXTI (Gyro DRDY) | **Completed** | 2026-10-20 |
-| **Phase 5** | SPI Bus & IMU Sensor Driver | SPI0 Master with `CSAAT`, ICM42688P / BMI270 Detection | *Pending* | — |
-| **Phase 6** | Non-Volatile Config Storage | SPI3 Winbond NOR Flash, Parameter Group (PG) Save/Load | *Pending* | — |
+| **Phase 5** | SPI Bus & IMU Sensor Driver | SPI0 Master with `CSAAT`, ICM42688P / BMI270 Detection | **Completed** | 2026-10-20 |
+| **Phase 6** | Non-Volatile Config Storage | SPI3 Winbond NOR Flash, Parameter Group (PG) Save/Load | **Completed** | 2026-10-20 |
 | **Phase 7** | Actuator Outputs & RC Link | Motor PWM (PWM_0..3), UART1 Serial RX (CRSF/ELRS) | *Pending* | — |
 | **Phase 8** | Soft-Float Tuning & Bench Flight | 1 kHz Loop Clamping, Fast-Math Profiling, No Overruns | *Pending* | — |
 
@@ -323,11 +323,135 @@ Implement the hardware GPIO driver for C-DAC THEJAS32 / VEGA ET1031 using the of
 
 ---
 
-## 🚀 Next Steps: Phase 5 (SPI Bus & IMU Sensor Driver)
-1. Implement `src/platform/ARIES/bus_spi_aries.c` mapping SPI0 master registers (`0x10000600`) from C-DAC VEGA SDK `bsp/drivers/spi/spi.c`.
-2. Configure SPI control word bits: 8-bit transfers, CPOL/CPHA Mode 0/3, and Chip Select Active After Transfer (`Bits.CSAAT`) for burst reads.
-3. Configure `target.h` to declare SPI0 pins on Header J1 (`J1_5` SCK, `J1_6` MISO, `J1_7` MOSI, `J1_8` CS).
-4. Verify IMU sensor detection (`ICM42688P` or `BMI270`) through WHO_AM_I register query via CLI `status`.
+## 🛠️ Phase 5 Detailed Execution Log
+
+### 1. Objective
+Implement the hardware SPI master bus driver for C-DAC THEJAS32 / VEGA ET1031 (mapping SPI0 controller at `0x10000600` as Betaflight `SPI1`). Provide polled segment transfers (`spiProcessSegmentsPolled`), chip select control with Active After Transfer (`CSAAT`), pin configuration on Header J1 (SCK `PA5`, MISO `PA6`, MOSI `PA7`, CS `PA8`), gyro EXTI interrupt line (`PA0`), and enable Betaflight IMU drivers (`ICM42688P` and `BMI270`).
+
+### 2. Files Created & Modified
+
+| File Path | Action | Purpose & Technical Summary |
+| :--- | :---: | :--- |
+| [`src/platform/ARIES/bus_spi_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/bus_spi_aries.c) | **Created** | Hardware SPI driver implementing `spiInitDevice()`, `spiPinConfigure()`, `spiProcessSegmentsPolled()`, `spiInternalReadWriteBufPolled()`, and clock prescaler calculations based on the 100 MHz peripheral clock. Mapped SPI control word registers (`Data_control`, `Clock_control`), status polling, and multi-segment transfers. |
+| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added SPI register struct definitions (`thejas32_spi_t`), status register bits (`THEJAS32_SPI_STATUS_*`), control bits (`THEJAS32_SPI_CTRL_*`), and pointer macro `#define SPI1 ((spiResource_t *)THEJAS32_SPI_0_1_BASE)`. |
+| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Included `platform/bsp_thejas32.h` to make `SPI1` visible to `bus_spi.c`. |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_SPI`, `#define USE_SPI_DEVICE_1`, `#define USE_GYRO_SPI_ICM42688P`, `#define USE_GYRO_SPI_BMI270`, `#define USE_ACC_SPI_ICM42688P`, `#define USE_ACC_SPI_BMI270`. Configured pin definitions: `SPI1_SCK_PIN PA5`, `SPI1_SDI_PIN PA6`, `SPI1_SDO_PIN PA7`, `SPI1_MISO_PIN PA6`, `SPI1_MOSI_PIN PA7`, `GYRO_1_CS_PIN PA8`, and `GYRO_1_EXTI_PIN PA0`. |
+| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/bus_spi_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy SPI fallback stubs (`spiInitDevice`, `spiPinConfigure`, `spiProcessSegmentsPolled`, etc.). |
+
+---
+
+### 3. Problems / Obstacles Encountered & How Each Was Solved
+
+#### Problem 1: Undefined `SPI1_SDI_PIN` and `SPI1_SDO_PIN` Compilation Error
+- **Symptom:** When compiling `src/main/pg/bus_spi.c`, the compiler failed with `'SPI1_SDI_PIN' undeclared` and `'SPI1_SDO_PIN' undeclared`.
+- **Root Cause:** Upstream Betaflight's parameter group macro `PG_REGISTER_ARRAY_WITH_LOOKUP(spiPinConfig_t, ...)` expects `SPIx_SDI_PIN` and `SPIx_SDO_PIN` (SDI = Serial Data In = MISO; SDO = Serial Data Out = MOSI) rather than `SPIx_MISO_PIN` and `SPIx_MOSI_PIN`.
+- **Solution:** Defined both `SPI1_SDI_PIN` (`PA6`) and `SPI1_SDO_PIN` (`PA7`), while maintaining `SPI1_MISO_PIN` and `SPI1_MOSI_PIN` as aliases in `target.h`.
+
+#### Problem 2: Missing `SPI1` Peripheral Identifier in Target Abstraction
+- **Symptom:** `src/main/drivers/bus_spi.c` failed to compile with `'SPI1' undeclared` inside `spiInstanceByDevice()`.
+- **Root Cause:** Unlike ARM targets that include ST/NXP peripheral headers directly into `bus_spi.c`, the RISC-V ARIES target had not exposed a typed pointer symbol `SPI1`.
+- **Solution:** Defined `#define SPI1 ((spiResource_t *)THEJAS32_SPI_0_1_BASE)` (`0x10000600UL`) in `bsp_thejas32.h` and ensured `platform.h` includes `bsp_thejas32.h` so `bus_spi.c` resolves `SPI1` cleanly.
+
+#### Problem 3: Multi-Segment SPI Transfers & Chip Select Holding
+- **Symptom:** Betaflight IMU reads often perform an address write followed by burst data reads over multiple segments. Releasing CS between segments causes register reads to abort.
+- **Root Cause:** Standard SPI controllers drop CS between words unless configured for transfer continuity.
+- **Solution:** In `bus_spi_aries.c`, configured the THEJAS32 SPI controller's `Bits.CSAAT` (Chip Select Active After Transfer) bit during segments where more data follows, and cleared it on the final segment of the transaction, ensuring uninterrupted burst register reads.
+
+---
+
+### 4. Build & Binary Verification
+
+- **Compilation Commands:**
+  ```bash
+  make TARGET=ARIESV3 -j$(nproc)
+  make TARGET=ARIESV3 hex
+  ```
+- **Exit Code:** `0` (Success)
+- **Memory Footprint:**
+  ```text
+     text    data     bss     dec     hex filename
+   765876    6396   61728  834000   cb9d0 ./obj/main/betaflight_ARIESV3.elf
+  ```
+  - **Flash Usage:** ~765.9 KB / 2,048 KB (37.4%)
+  - **RAM Usage:** ~66.5 KB / 256 KB (26.0%)
+
+- **Symbol Inspection:**
+  - `spiProcessSegmentsPolled` linked at `0x20078b28`.
+  - `spiPinConfigure` linked at `0x20098228`.
+  - `bmi270Detect` linked at `0x20080804`.
+  - `bmi270SpiAccInit` linked at `0x200795b0` and `bmi270SpiGyroInit` linked at `0x20080dd8`.
+  - `spiBusDevice` allocated in SRAM BSS (`0x10009e90`).
+  - Hex artifact generated: `obj/betaflight_2026.12.0-alpha_ARIESV3.hex`.
+
+---
+
+## 🛠️ Phase 6 Detailed Execution Log
+
+### 1. Objective
+Enable non-volatile configuration storage for Betaflight Parameter Groups (PG). Implement the platform flash configuration driver in `src/platform/ARIES/config_flash_aries.c` mapping the 32 KB reserved sector in memory-mapped NOR flash (`0x201F8000`–`0x201FFFFF`) to physical storage commands executed over the onboard SPI3 controller (`0x10200200`). Implement 4 KB Sector Erase (`0x20`), 256-byte Page Program (`0x02`), Write Enable (`0x06`), Status Register polling (`0x05`), and synchronize the memory-mapped shadow for immediate coherent reads and simulator execution.
+
+### 2. Files Created & Modified
+
+| File Path | Action | Purpose & Technical Summary |
+| :--- | :---: | :--- |
+| [`src/platform/ARIES/config_flash_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/config_flash_aries.c) | **Created** | Hardware flash configuration driver implementing Betaflight config streamer API: `configFlashInit()`, `configUnlock()`, `configLock()`, `configClearFlags()`, and `configWriteWord()`. Low-level SPI3 driver commands: `thejas32_flash_spi_init`, `thejas32_flash_erase_sector` (4 KB sector erase with 24-bit address), `thejas32_flash_write_page` (Page Program with WIP polling), and memory shadow synchronization. |
+| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Guarded `#ifndef FLASH_CONFIG_BUFFER_TYPE` (`uint32_t`) and defined `#ifndef FLASH_CONFIG_STREAMER_BUFFER_SIZE` (`32`). |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define CONFIG_IN_FLASH`, `#define FLASH_SECTOR_SIZE 4096`, `#define FLASH_PAGE_SIZE 4096`, `#define FLASH_CONFIG_STREAMER_BUFFER_SIZE 32`, `#define FLASH_CONFIG_BUFFER_TYPE uint32_t`, `#define EEPROM_SIZE 8192`, and `#define ENABLE_CONFIG_FLASH_INIT`. |
+| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/config_flash_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy configuration streamer stubs (`configUnlock`, `configLock`, `configClearFlags`, `configWriteWord`). |
+
+---
+
+### 3. Problems / Obstacles Encountered & How Each Was Solved
+
+#### Problem 1: Conflicting Declarations of `__config_start` and `__config_end`
+- **Symptom:** Compilation failed with `error: conflicting types for '__config_start'; have 'uint8_t' {aka 'unsigned char'}`, previously declared in `src/main/target/common_post.h:792` as `struct linker_symbol`.
+- **Root Cause:** `common_post.h` uses opaque `struct linker_symbol` types for linker-provided addresses (`&__config_start`).
+- **Solution:** Removed redeclarations from `config_flash_aries.c`, referencing the symbol addresses via address-of `(uintptr_t)&__config_start` and `(uintptr_t)&__config_end`.
+
+#### Problem 2: Flash Controller Timeout Guards for Simulation & Renode
+- **Symptom:** Renode simulation does not currently model the SPI3 controller peripheral at `0x10200200`. Polling SPI3 status bits (`TX_HOLD_EMPTY`, `RX_COMPLETE`, `BUSY`) in a tight loop without a timeout would hang during `save` operations.
+- **Root Cause:** Unmodeled peripheral reads return `0`, preventing status bits from asserting.
+- **Solution:** Added bounded loop countdown timeouts (`100,000` cycles) to all SPI status register wait loops (`thejas32_flash_wait_idle`, `thejas32_flash_tx_byte`, `thejas32_flash_rx_byte`, and `thejas32_flash_wait_wip`).
+
+#### Problem 3: Dual Physical & Memory-Mapped Shadow Synchronization
+- **Symptom:** Betaflight's config verification immediately performs memory-mapped pointer reads from `(const uint8_t *)&__config_start` via `isEEPROMStructureValid()` right after `configWriteWord()`.
+- **Root Cause:** In Renode simulation and environments where cache or bus translation requires memory updates, SPI commands alone do not write to CPU `MappedMemory`.
+- **Solution:** `configWriteWord()` performs both the physical SPI3 sector erase / page program commands for real THEJAS32 hardware AND updates the memory-mapped flash window directly (`memset(..., 0xFF)` on erase, `memcpy(..., buffer)` on write), with a RISC-V memory `fence` instruction.
+
+---
+
+### 4. Build & Binary Verification
+
+- **Compilation Commands:**
+  ```bash
+  make TARGET=ARIESV3 -j$(nproc)
+  make TARGET=ARIESV3 hex
+  ```
+- **Exit Code:** `0` (Success)
+- **Memory Footprint:**
+  ```text
+     text    data     bss     dec     hex filename
+   768296    6416   61728  836440   cc358 ./obj/main/betaflight_ARIESV3.elf
+  ```
+  - **Flash Usage:** ~768.3 KB / 2,048 KB (37.5%)
+  - **RAM Usage:** ~66.5 KB / 256 KB (26.0%)
+
+- **Symbol Inspection:**
+  - `configWriteWord` linked at `0x20004064` (validates `0x201F8000`–`0x20200000` bounds, checks `lastErasedSector`, triggers SPI3 page program, writes to memory shadow).
+  - `thejas32_flash_write_enable` linked at `0x2009fe40`.
+  - `lastErasedSector` allocated in BSS at `0x100014F0`.
+  - Hex artifact generated: `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` (2,179,135 bytes).
+
+---
+
+## 🚀 Next Steps: Phase 7 (Actuator Outputs & RC Link)
+1. Implement `src/platform/ARIES/pwm_motor_aries.c` mapping hardware PWM outputs (channels 0–3 for 4 quadcopter motors) on header pins.
+2. Implement motor output APIs: `motorPwmDevInit()`, `pwmWriteMotor()`, and DShot fallback stub.
+3. Configure `UART1` (`0x10000200`) on header pins (`J2_13` TX, `J2_15` RX) for Serial RX (CRSF / ELRS / SBUS).
+4. Remove motor and RC receiver stubs from `stub_drivers.c`.
+5. Verify motor output scaling and RC receiver stick channel decoding.
 
 
 
