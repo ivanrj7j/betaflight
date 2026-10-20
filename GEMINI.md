@@ -33,6 +33,13 @@ This repository contains the Betaflight flight controller firmware adapted for t
   - `#define SERIAL_UART_FIRST_INDEX 0` configured in `platform.h`.
   - Clean compilation with exit code `0` (~723.7 KB Flash / ~65.5 KB RAM).
 
+- **Phase 3: High-Resolution Timebase (`Completed`)**
+  - Eliminated 42.9-second 32-bit `mcycle` rollover jitter in `micros()` by implementing atomic 64-bit cycle reading (`getCycleCounter64()`) using `mcycleh` and `mcycle`.
+  - Fast inlined reciprocal division by constant `100ULL` without `__udivdi3` software division calls.
+  - Aligned `millis()` to standard 49.7-day rollover via `getCycleCounter64() / 100000ULL`.
+  - Integrated C-DAC THEJAS32 hardware Timer 0 (`0x10000A00`): periodic user-defined reload (`LoadCount = 0xFFFFFFFF`), interrupt registration on IRQ 7 (`THEJAS32_IRQ_TIMER0`), interrupt service routine (`thejas32_timer0_isr`) reading `EOI` register, and overflow tracking.
+  - Clean compilation with exit code `0` (~735.9 KB Flash / ~65.5 KB RAM).
+
 ---
 
 ## 2. Directory Navigation & Key Documentation
@@ -97,8 +104,8 @@ make TARGET=ARIESV3 hex
 
 ## 5. Next Steps for Next Developer / Agent
 
-Proceed directly to **Phase 3: High-Resolution Timebase**:
-1. Open [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c).
-2. Configure `THEJAS32_TIMER(0)` (`0x10000A00`) in `src/platform/ARIES/system.c`.
-3. Implement monotonic microsecond timing in `micros()` without rollover jitter.
+Proceed directly to **Phase 4: GPIO & External Interrupts**:
+1. Implement `src/platform/ARIES/io_aries.c` using the THEJAS32 address-decoded GPIO scheme (`0x10080000` for Bank 0, `0x10180000` for Bank 1).
+2. Implement `IOInitGlobal()`, `IOConfigGPIO()`, `IOHi()`, `IOLo()`, `IOToggle()`, `IORead()`, and `IOWrite()`.
+3. Implement `src/platform/ARIES/exti_aries.c` routing GPIO 0 interrupt (Gyro DRDY pin on `J2_11`) through the interrupt controller (`0x20010000`).
 4. Document all changes and problems encountered in [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md).

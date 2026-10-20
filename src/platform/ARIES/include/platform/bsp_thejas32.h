@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "common/time.h"
 
 #define THEJAS32_RAM_BASE           0x10000000UL
 #define THEJAS32_FLASH_BASE         0x20000000UL
@@ -84,3 +85,12 @@ typedef struct {
 } thejas32_timer_reg_t;
 
 #define THEJAS32_TIMER(n) (*((thejas32_timer_reg_t *)(THEJAS32_TIMER_BASE + ((n) * 0x14))))
+
+// Hardware Timer functions
+void thejas32_timer_init(void);
+void thejas32_timer0_isr(void);
+uint32_t timer0GetCurrentValue(void);
+uint32_t timer0GetOverflows(void);
+timeUs_t timer0Micros(void);
+uint64_t getCycleCounter64(void);
+

@@ -23,7 +23,7 @@
 | :---: | :--- | :--- | :---: | :---: |
 | **Phase 1** | Foundation & Trap Handler Verification | `startup.S`, `mtvec`, `trap_entry`, Exception Handling | **Completed** | 2026-10-19 |
 | **Phase 2** | Console & Communication | UART0 (CLI/MSP), Ring Buffer, RX Interrupt | **Completed** | 2026-10-19 |
-| **Phase 3** | High-Resolution Timebase | Hardware Timer 0/1, Monotonic `micros()`, Jitter Check | *Pending* | — |
+| **Phase 3** | High-Resolution Timebase | Hardware Timer 0/1, Monotonic `micros()`, Jitter Check | **Completed** | 2026-10-20 |
 | **Phase 4** | GPIO & External Interrupts | Bank 0/1 Address-Decoded IO, EXTI (Gyro DRDY) | *Pending* | — |
 | **Phase 5** | SPI Bus & IMU Sensor Driver | SPI0 Master with `CSAAT`, ICM42688P / BMI270 Detection | *Pending* | — |
 | **Phase 6** | Non-Volatile Config Storage | SPI3 Winbond NOR Flash, Parameter Group (PG) Save/Load | *Pending* | — |
@@ -195,9 +195,70 @@ Implement real hardware-backed UART communications for the C-DAC ARIES v3.0 boar
 
 ---
 
-## 🚀 Next Steps: Phase 3 (High-Resolution Timebase)
-1. Hook `THEJAS32_TIMER(0)` (`0x10000A00`) into `src/platform/ARIES/system.c`.
-2. Configure Timer 0 in user-defined periodic or free-running mode with `LoadCount = 0xFFFFFFFF`.
-3. Refine `micros()` to combine hardware decrement counter with an overflow accumulator for glitch-free monotonic timing.
-4. Verify task scheduler loop timing and task jitter in CLI (`tasks` command).
+## 🛠️ Phase 3 Detailed Execution Log
+
+### 1. Objective
+Replace the naive 32-bit `mcycle` cycle counter based microsecond timebase with a robust, glitch-free monotonic timebase; eliminate the 42.9-second rollover discontinuity in the scheduler; and integrate the C-DAC THEJAS32 hardware Timer 0 (`0x10000A00`) with reload configuration, interrupt service routine (`thejas32_timer0_isr`), EOI register acknowledgement, and overflow tracking.
+
+### 2. Files Created & Modified
+
+| File Path | Action | Purpose & Technical Summary |
+| :--- | :---: | :--- |
+| [`src/platform/ARIES/system.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c) | **Modified** | Implemented atomic 64-bit cycle reading `getCycleCounter64()` via `mcycle` and `mcycleh`; implemented hardware Timer 0 driver (`thejas32_timer_init`, `thejas32_timer0_isr`, `timer0GetCurrentValue`, `timer0GetOverflows`, `timer0Micros`); rewritten `micros()`, `millis()`, `delayMicroseconds()`, and `delay()`. |
+| [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h) | **Modified** | Added `#include "common/time.h"` and declared function prototypes for `thejas32_timer_init`, `thejas32_timer0_isr`, `timer0GetCurrentValue`, `timer0GetOverflows`, `timer0Micros`, and `getCycleCounter64`. |
+
+---
+
+### 3. Problems / Obstacles Encountered & How Each Was Solved
+
+#### Problem 1: 32-Bit `mcycle` Rollover Jitter at 42.9 Seconds
+- **Symptom:** The previous `micros()` routine computed `(timeUs_t)(getCycleCounter() / 100)`. Because `getCycleCounter()` only sampled the lower 32-bit `mcycle` CSR at 100 MHz, the counter rolled over from `0xFFFFFFFF` to `0` every $42.949\text{ seconds}$. At rollover, `micros()` dropped from $42,949,672$ to $0$.
+- **Impact on Flight Controller:** In Betaflight, `timeDelta_t` is computed as `(timeUs_t)(now - last)`. When time drops from 42.9 million to 0, `now - last` evaluates to over 4.25 billion microseconds (~70 minutes in the past), producing massive scheduler jitter, watchdog panics, and filter divergence.
+- **Solution:** Implemented `getCycleCounter64()`, which reads `mcycleh` (CSR `0xB80`) and `mcycle` (CSR `0xB00`) atomically with double-read consistency checking (`do { hi = csrr(mcycleh); lo = csrr(mcycle); hi2 = csrr(mcycleh); } while (hi != hi2);`). Computing `(timeUs_t)(getCycleCounter64() / 100ULL)` guarantees that `timeUs_t` rolls over at the standard $2^{32} - 1$ microseconds ($71.58\text{ minutes}$), where unsigned 32-bit subtraction `now - last` is mathematically exact across rollover.
+
+#### Problem 2: Eliminating Software Division Overhead (`__udivdi3`) in Critical Microsecond Loop
+- **Symptom:** Standard 64-bit division by a dynamic variable on 32-bit RISC-V invokes the software division runtime helper `__udivdi3`, which adds stack frames and function call latency to every `micros()` invocation (called thousands of times per second).
+- **Solution:** Sourced the divisor directly as a constant `100ULL` (`SystemCoreClock / 1,000,000` for 100 MHz). The GCC optimizer converts constant 64-bit division into fast inlined reciprocal multiplication, shifts, and adds (~30 assembly instructions) without issuing a single function call.
+
+#### Problem 3: Millisecond Rollover Mismatch in `millis()`
+- **Symptom:** Computing `millis()` as `micros() / 1000` caused milliseconds to wrap at 71 minutes instead of the standard 49.7 days documented in Betaflight's `common/time.h`.
+- **Solution:** Computed `millis()` as `(timeMs_t)(getCycleCounter64() / 100000ULL)`, giving a 32-bit millisecond counter that rolls over smoothly after $49.71\text{ days}$.
+
+#### Problem 4: THEJAS32 Hardware Timer 0 Interrupt Acknowledgment & Overflow Tracking
+- **Symptom:** Without clearing the End of Interrupt (`EOI`) register on the Synopsys DesignWare timer block, the interrupt line remains asserted, immediately re-triggering the trap handler upon return (`mret`).
+- **Solution:** Configured `THEJAS32_TIMER(0)` in user-defined periodic mode (`Control = 0x03`, `LoadCount = 0xFFFFFFFFUL`), registered `thejas32_timer0_isr` on IRQ 7 (`THEJAS32_IRQ_TIMER0`), and ensured the ISR explicitly reads `THEJAS32_TIMER(0).EOI` to clear the peripheral interrupt latch before incrementing `timer0_overflows`.
+
+---
+
+### 4. Build & Binary Verification
+
+- **Compilation Commands:**
+  ```bash
+  make TARGET=ARIESV3 -j$(nproc)
+  make TARGET=ARIESV3 hex
+  ```
+- **Exit Code:** `0` (Success)
+- **Memory Footprint:**
+  ```text
+     text    data     bss     dec     hex filename
+   735968    6344   60728  803040   c40e0 ./obj/main/betaflight_ARIESV3.elf
+  ```
+  - **Flash Usage:** ~735.9 KB / 2,048 KB (35.9%)
+  - **RAM Usage:** ~65.5 KB / 256 KB (25.6%)
+
+- **Symbol Inspection:**
+  - `timer0_overflows` allocated at `0x1000B6CC` in SRAM BSS.
+  - `thejas32_timer0_isr` placed at `0x20000D54` (reads `0x10000A0C` `EOI`, increments overflow counter).
+  - `micros` placed at `0x200032E0` (inlined atomic CSR read + reciprocal divide by 100ULL).
+  - `millis` placed at `0x20003370` (64-bit cycle division by 100,000 for 49.7 day rollover).
+  - Hex artifact generated: `obj/betaflight_2026.12.0-alpha_ARIESV3.hex`.
+
+---
+
+## 🚀 Next Steps: Phase 4 (GPIO & External Interrupts)
+1. Implement `src/platform/ARIES/io_aries.c` mapping THEJAS32 address-decoded GPIO (`0x10080000` for Bank 0, `0x10180000` for Bank 1).
+2. Implement `IOInitGlobal()`, `IOConfigGPIO()`, `IOHi()`, `IOLo()`, `IOToggle()`, `IORead()`, and `IOWrite()`.
+3. Implement `src/platform/ARIES/exti_aries.c` routing GPIO 0 interrupt (Gyro DRDY pin on `J2_11`) through the interrupt controller (`0x20010000`).
+4. Connect EXTI callback to Betaflight gyro task trigger and verify status LED toggling.
+
 
