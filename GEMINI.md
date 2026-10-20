@@ -40,6 +40,13 @@ This repository contains the Betaflight flight controller firmware adapted for t
   - Integrated C-DAC THEJAS32 hardware Timer 0 (`0x10000A00`): periodic user-defined reload (`LoadCount = 0xFFFFFFFF`), interrupt registration on IRQ 7 (`THEJAS32_IRQ_TIMER0`), interrupt service routine (`thejas32_timer0_isr`) reading `EOI` register, and overflow tracking.
   - Clean compilation with exit code `0` (~735.9 KB Flash / ~65.5 KB RAM).
 
+- **Phase 4: GPIO & External Interrupts (`Completed`)**
+  - Implemented THEJAS32 address-decoded GPIO driver in `src/platform/ARIES/io_aries.c` for Bank 0 (`0x10080000`, pins 0–15) and Bank 1 (`0x10180000`, pins 16–31).
+  - Populated `src/platform/ARIES/io_def_generated.h` mapping 32 pins (`PA0` through `PA31`) with `#define DEFIO_PORT_PINS 64`.
+  - Implemented external interrupt driver in `src/platform/ARIES/exti_aries.c` routing Bank 0 (IRQ 10) and Bank 1 (IRQ 11) interrupts into per-pin callback records (`extiChannels[32]`).
+  - Enabled `#define USE_EXTI` and configured `#define LED0_PIN PA22` (Heartbeat LED `LD4`) in `target.h`.
+  - Clean compilation with exit code `0` (~762.7 KB Flash / ~66.5 KB RAM).
+
 ---
 
 ## 2. Directory Navigation & Key Documentation
@@ -104,8 +111,9 @@ make TARGET=ARIESV3 hex
 
 ## 5. Next Steps for Next Developer / Agent
 
-Proceed directly to **Phase 4: GPIO & External Interrupts**:
-1. Implement `src/platform/ARIES/io_aries.c` using the THEJAS32 address-decoded GPIO scheme (`0x10080000` for Bank 0, `0x10180000` for Bank 1).
-2. Implement `IOInitGlobal()`, `IOConfigGPIO()`, `IOHi()`, `IOLo()`, `IOToggle()`, `IORead()`, and `IOWrite()`.
-3. Implement `src/platform/ARIES/exti_aries.c` routing GPIO 0 interrupt (Gyro DRDY pin on `J2_11`) through the interrupt controller (`0x20010000`).
-4. Document all changes and problems encountered in [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md).
+Proceed directly to **Phase 5: SPI Bus & IMU Sensor Driver**:
+1. Implement `src/platform/ARIES/bus_spi_aries.c` mapping SPI0 master registers (`0x10000600`) from C-DAC VEGA SDK `bsp/drivers/spi/spi.c`.
+2. Configure SPI control word: 8-bit transfers, CPOL/CPHA Mode 0/3, and Chip Select Active After Transfer (`Bits.CSAAT`) for burst reads.
+3. Configure `target.h` with SPI0 pins on Header J1 (`J1_5` SCK, `J1_6` MISO, `J1_7` MOSI, `J1_8` CS).
+4. Verify IMU sensor detection (`ICM42688P` or `BMI270`) via CLI `status`.
+5. Document all changes and problems encountered in [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md).

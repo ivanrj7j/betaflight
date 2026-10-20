@@ -42,7 +42,7 @@
 #undef USE_ESC_SENSOR
 #undef USE_ESC_SENSOR_INFO
 #undef USE_ESC_SENSOR_TELEMETRY
-#undef USE_EXTI
+#define USE_EXTI
 #undef USE_OCTOSPI
 #undef USE_QUADSPI
 #undef USE_FLASH
@@ -61,7 +61,8 @@
 #define FAST_MATH
 
 // Stubs for pin assignments
-#define LED0_PIN                NONE
+// Status LED LD4 on GPIO 22 (Header pin Bank 1 pin 6)
+#define LED0_PIN                PA22
 #define BEEPER_PIN              NONE
 
 #define USE_UART0

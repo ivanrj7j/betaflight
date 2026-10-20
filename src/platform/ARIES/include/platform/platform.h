@@ -47,17 +47,27 @@ __attribute__((always_inline)) static inline void __enable_irq(void) {
 #define FAST_DATA_ZERO_INIT
 #define FAST_DATA
 
-// GPIO Configuration macros
-#define IOCFG_OUT_PP                0
-#define IOCFG_OUT_OD                0
-#define IOCFG_AF_PP                 0
-#define IOCFG_AF_OD                 0
-#define IOCFG_IPD                   0
-#define IOCFG_IPU                   0
-#define IOCFG_IN_FLOATING           0
+// GPIO Configuration mode constants
+#define THEJAS32_GPIO_MODE_INPUT     0
+#define THEJAS32_GPIO_MODE_OUTPUT    1
+#define THEJAS32_GPIO_MODE_OUTPUT_OD 2
+#define THEJAS32_GPIO_PULLUP         1
+#define THEJAS32_GPIO_PULLDOWN       2
+
+#define IO_CONFIG(mode, speed, pupd) ((mode) | ((speed) << 2) | ((pupd) << 5))
+
+#define IOCFG_OUT_PP                IO_CONFIG(THEJAS32_GPIO_MODE_OUTPUT, 0, 0)
+#define IOCFG_OUT_OD                IO_CONFIG(THEJAS32_GPIO_MODE_OUTPUT_OD, 0, 0)
+#define IOCFG_AF_PP                 IO_CONFIG(THEJAS32_GPIO_MODE_OUTPUT, 0, 0)
+#define IOCFG_AF_OD                 IO_CONFIG(THEJAS32_GPIO_MODE_OUTPUT_OD, 0, 0)
+#define IOCFG_IPD                   IO_CONFIG(THEJAS32_GPIO_MODE_INPUT, 0, THEJAS32_GPIO_PULLDOWN)
+#define IOCFG_IPU                   IO_CONFIG(THEJAS32_GPIO_MODE_INPUT, 0, THEJAS32_GPIO_PULLUP)
+#define IOCFG_IN_FLOATING           IO_CONFIG(THEJAS32_GPIO_MODE_INPUT, 0, 0)
 
 #define GPIO_PIN_RESET              0
 #define GPIO_PIN_SET                1
+
+#define DEFIO_PORT_PINS             64
 
 #define SPI_IO_CS_CFG               IOCFG_OUT_PP
 

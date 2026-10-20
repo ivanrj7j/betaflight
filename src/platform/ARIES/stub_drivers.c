@@ -39,63 +39,8 @@ unsigned int __atomic_fetch_add_4(volatile void *ptr, unsigned int val, int memo
 }
 
 // ----------------------------------------------------------------------------
-// IO / GPIO Driver Stubs
+// IO / GPIO Helper Stubs
 // ----------------------------------------------------------------------------
-void IOInitGlobal(void)
-{
-}
-
-IO_t IOGetByTag(ioTag_t tag)
-{
-    UNUSED(tag);
-    return NULL;
-}
-
-void IOConfigGPIO(IO_t io, ioConfig_t cfg)
-{
-    UNUSED(io);
-    UNUSED(cfg);
-}
-
-void IOHi(IO_t io)
-{
-    UNUSED(io);
-}
-
-void IOLo(IO_t io)
-{
-    UNUSED(io);
-}
-
-void IOToggle(IO_t io)
-{
-    UNUSED(io);
-}
-
-bool IORead(IO_t io)
-{
-    UNUSED(io);
-    return false;
-}
-
-void IOWrite(IO_t io, bool hi)
-{
-    UNUSED(io);
-    UNUSED(hi);
-}
-
-int IO_GPIOPortIdx(IO_t io)
-{
-    UNUSED(io);
-    return 0;
-}
-
-int IO_GPIOPinIdx(IO_t io)
-{
-    UNUSED(io);
-    return 0;
-}
-
 void unusedPinsInit(void)
 {
 }
@@ -221,43 +166,6 @@ void timerEnable(const timerHardware_t *timHw)
 void timerEnableInterrupt(const timerHardware_t *timHw)
 {
     UNUSED(timHw);
-}
-
-// ----------------------------------------------------------------------------
-// EXTI (External Interrupt) Driver Stubs
-// ----------------------------------------------------------------------------
-void EXTIInit(void)
-{
-}
-
-void EXTIHandlerInit(extiCallbackRec_t *cb, extiHandlerCallback *fn)
-{
-    UNUSED(cb);
-    UNUSED(fn);
-}
-
-void EXTIConfig(IO_t io, extiCallbackRec_t *cb, int irqPriority, ioConfig_t config, extiTrigger_t trigger)
-{
-    UNUSED(io);
-    UNUSED(cb);
-    UNUSED(irqPriority);
-    UNUSED(config);
-    UNUSED(trigger);
-}
-
-void EXTIRelease(IO_t io)
-{
-    UNUSED(io);
-}
-
-void EXTIEnable(IO_t io)
-{
-    UNUSED(io);
-}
-
-void EXTIDisable(IO_t io)
-{
-    UNUSED(io);
 }
 
 // ----------------------------------------------------------------------------

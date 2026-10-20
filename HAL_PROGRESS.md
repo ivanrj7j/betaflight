@@ -24,7 +24,7 @@
 | **Phase 1** | Foundation & Trap Handler Verification | `startup.S`, `mtvec`, `trap_entry`, Exception Handling | **Completed** | 2026-10-19 |
 | **Phase 2** | Console & Communication | UART0 (CLI/MSP), Ring Buffer, RX Interrupt | **Completed** | 2026-10-19 |
 | **Phase 3** | High-Resolution Timebase | Hardware Timer 0/1, Monotonic `micros()`, Jitter Check | **Completed** | 2026-10-20 |
-| **Phase 4** | GPIO & External Interrupts | Bank 0/1 Address-Decoded IO, EXTI (Gyro DRDY) | *Pending* | — |
+| **Phase 4** | GPIO & External Interrupts | Bank 0/1 Address-Decoded IO, EXTI (Gyro DRDY) | **Completed** | 2026-10-20 |
 | **Phase 5** | SPI Bus & IMU Sensor Driver | SPI0 Master with `CSAAT`, ICM42688P / BMI270 Detection | *Pending* | — |
 | **Phase 6** | Non-Volatile Config Storage | SPI3 Winbond NOR Flash, Parameter Group (PG) Save/Load | *Pending* | — |
 | **Phase 7** | Actuator Outputs & RC Link | Motor PWM (PWM_0..3), UART1 Serial RX (CRSF/ELRS) | *Pending* | — |
@@ -255,10 +255,79 @@ Replace the naive 32-bit `mcycle` cycle counter based microsecond timebase with 
 
 ---
 
-## 🚀 Next Steps: Phase 4 (GPIO & External Interrupts)
-1. Implement `src/platform/ARIES/io_aries.c` mapping THEJAS32 address-decoded GPIO (`0x10080000` for Bank 0, `0x10180000` for Bank 1).
-2. Implement `IOInitGlobal()`, `IOConfigGPIO()`, `IOHi()`, `IOLo()`, `IOToggle()`, `IORead()`, and `IOWrite()`.
-3. Implement `src/platform/ARIES/exti_aries.c` routing GPIO 0 interrupt (Gyro DRDY pin on `J2_11`) through the interrupt controller (`0x20010000`).
-4. Connect EXTI callback to Betaflight gyro task trigger and verify status LED toggling.
+## 🛠️ Phase 4 Detailed Execution Log
+
+### 1. Objective
+Implement the hardware GPIO driver for C-DAC THEJAS32 / VEGA ET1031 using the official BSP address-decoded bit-shift register access scheme across Bank 0 (`0x10080000`, pins 0–15) and Bank 1 (`0x10180000`, pins 16–31). Implement external interrupt dispatching (`exti_aries.c`) connected to the THEJAS32 interrupt controller (IRQ 10 for Bank 0, IRQ 11 for Bank 1) to support sensor Data Ready (DRDY) event handling and flight loop triggering.
+
+### 2. Files Created & Modified
+
+| File Path | Action | Purpose & Technical Summary |
+| :--- | :---: | :--- |
+| [`src/platform/ARIES/io_def_generated.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_def_generated.h) | **Created** | Defined 32-pin mapping (`PA0` through `PA31`), set `DEFIO_IO_USED_COUNT = 32`, `DEFIO_USED_COUNT = 32`, and configured preprocessor tags and record index bindings. |
+| [`src/platform/ARIES/io_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c) | **Created** | Hardware GPIO driver implementing `IOInitGlobal()`, `IOGetByTag()`, `IOConfigGPIO()`, `IOHi()`, `IOLo()`, `IOToggle()`, `IORead()`, `IOWrite()`, `IO_GPIOPortIdx()`, and `IO_GPIOPinIdx()`. Maps direction registers (`base + 0x40000`) and address-decoded pin access (`base + ((1 << pin) << 2)`). |
+| [`src/platform/ARIES/exti_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/exti_aries.c) | **Created** | External interrupt driver implementing `EXTIInit()`, `EXTIHandlerInit()`, `EXTIConfig()`, `EXTIRelease()`, `EXTIEnable()`, `EXTIDisable()`, and `IO_EXTI_Line()`. Routes Bank 0 (IRQ 10) and Bank 1 (IRQ 11) interrupts into per-pin callback dispatch table. |
+| [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h) | **Modified** | Defined `#define DEFIO_PORT_PINS 64` and structured `IO_CONFIG(mode, speed, pupd)` and `IOCFG_*` constants. |
+| [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h) | **Modified** | Enabled `#define USE_EXTI` and mapped status LED (`#define LED0_PIN PA22` for onboard Heartbeat LED `LD4`). |
+| [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk) | **Modified** | Added `ARIES/io_aries.c` and `ARIES/exti_aries.c` to `MCU_COMMON_SRC`. |
+| [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c) | **Modified** | Removed dummy implementations of IO and EXTI routines. |
+
+---
+
+### 3. Problems / Obstacles Encountered & How Each Was Solved
+
+#### Problem 1: `duplicate case value` in `IOConfigGPIO` from Zero-Initialized `IOCFG_` Macros
+- **Symptom:** During compilation of `io_aries.c`, the compiler failed with `error: duplicate case value 'case IOCFG_OUT_OD:' previously used here 'case IOCFG_OUT_PP:'`.
+- **Root Cause:** In the initial target setup, all `IOCFG_*` macros in `platform.h` were temporarily defined as constant `0`, making all switch cases identical.
+- **Solution:** Replaced static 0 definitions with the canonical Betaflight `IO_CONFIG(mode, speed, pupd)` bitfield packing scheme in `platform.h`. In `io_aries.c`, replaced the switch statement with direct mode extraction `uint8_t mode = cfg & 0x03` to cleanly distinguish outputs (`THEJAS32_GPIO_MODE_OUTPUT` / `THEJAS32_GPIO_MODE_OUTPUT_OD`) from inputs without duplicate case collisions.
+
+#### Problem 2: Out-of-Bounds `ioRecs` Allocation due to `DEFIO_IO_USED_COUNT 0`
+- **Symptom:** `src/main/drivers/io.c` allocated `ioRecs` with size 1 when `DEFIO_IO_USED_COUNT` was 0, causing `IOInitGlobal()` and pin index access to access unallocated memory.
+- **Root Cause:** ARIES target lacked a populated `io_def_generated.h`.
+- **Solution:** Configured `#define DEFIO_PORT_PINS 64` in `platform.h` (matching the pattern used by ESP32 and RP2350 ports), and authored `src/platform/ARIES/io_def_generated.h` defining 32 pins (`PA0` through `PA31`), setting `DEFIO_IO_USED_COUNT = 32` and `DEFIO_USED_COUNT = 32`.
+
+#### Problem 3: Multi-Bank GPIO Interrupt Routing and EXTI Callback Dispatch
+- **Symptom:** THEJAS32 SoC routes GPIO interrupts as two distinct interrupt lines from the interrupt controller: IRQ 10 (`THEJAS32_IRQ_GPIO0` for Bank 0, pins 0–15) and IRQ 11 (`THEJAS32_IRQ_GPIO1` for Bank 1, pins 16–31). Betaflight's `EXTIConfig` API expects a unified pin abstraction.
+- **Root Cause:** A single monolithic EXTI handler would miss bank separation in the interrupt controller.
+- **Solution:** Implemented `thejas32_gpio0_isr()` and `thejas32_gpio1_isr()`, registered to IRQ 10 and 11 via `thejas32_interrupt_register`. In `EXTIConfig()`, determined the bank from the pin index (`pin < 16 ? THEJAS32_IRQ_GPIO0 : THEJAS32_IRQ_GPIO1`), enabled the appropriate IRQ line, and stored the callback in `extiChannels[pin]`.
+
+---
+
+### 4. Build & Binary Verification
+
+- **Compilation Commands:**
+  ```bash
+  make TARGET=ARIESV3 -j$(nproc)
+  make TARGET=ARIESV3 hex
+  ```
+- **Exit Code:** `0` (Success)
+- **Memory Footprint:**
+  ```text
+     text    data     bss     dec     hex filename
+   762701    6396   61664  830761   cad29 ./obj/main/betaflight_ARIESV3.elf
+  ```
+  - **Flash Usage:** ~762.7 KB / 2,048 KB (37.2%)
+  - **RAM Usage:** ~66.5 KB / 256 KB (26.0%)
+
+- **Symbol Inspection:**
+  - `ioRecs` allocated with 32 records (`32 * 12 bytes = 384 bytes`) in BSS (`0x1000BC30`).
+  - `extiChannels` allocated in BSS (`0x10001C78`).
+  - `thejas32_gpio0_isr` linked at `0x2000113C`.
+  - `thejas32_gpio1_isr` linked at `0x20001198`.
+  - `IOInitGlobal` linked at `0x200010F8`.
+  - `IOConfigGPIO` linked at `0x2000395C`.
+  - `IOHi` linked at `0x200039D4` and `IOLo` linked at `0x20003A94`.
+  - `IORead` linked at `0x20003B30`.
+  - `EXTIConfig` linked at `0x2009EE30`.
+  - Hex artifact generated: `obj/betaflight_2026.12.0-alpha_ARIESV3.hex`.
+
+---
+
+## 🚀 Next Steps: Phase 5 (SPI Bus & IMU Sensor Driver)
+1. Implement `src/platform/ARIES/bus_spi_aries.c` mapping SPI0 master registers (`0x10000600`) from C-DAC VEGA SDK `bsp/drivers/spi/spi.c`.
+2. Configure SPI control word bits: 8-bit transfers, CPOL/CPHA Mode 0/3, and Chip Select Active After Transfer (`Bits.CSAAT`) for burst reads.
+3. Configure `target.h` to declare SPI0 pins on Header J1 (`J1_5` SCK, `J1_6` MISO, `J1_7` MOSI, `J1_8` CS).
+4. Verify IMU sensor detection (`ICM42688P` or `BMI270`) through WHO_AM_I register query via CLI `status`.
+
 
 
