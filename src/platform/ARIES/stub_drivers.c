@@ -175,24 +175,9 @@ void persistentObjectWrite(persistentObjectId_e id, uint32_t value)
 // ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
-// Motor, Servo, DShot & Sensor Stubs
+// Motor driver implemented in pwm_motor_aries.c
 // ----------------------------------------------------------------------------
 bool useDshotTelemetry = false;
-
-bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig)
-{
-    UNUSED(device);
-    UNUSED(motorConfig);
-    return false;
-}
-
-bool motorPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorDevConfig, uint16_t idlePulse)
-{
-    UNUSED(device);
-    UNUSED(motorDevConfig);
-    UNUSED(idlePulse);
-    return false;
-}
 
 void servoDevInit(const servoDevConfig_t *servoDevConfig)
 {

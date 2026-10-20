@@ -24,6 +24,7 @@ MCU_COMMON_SRC := \
     ARIES/exti_aries.c \
     ARIES/bus_spi_aries.c \
     ARIES/config_flash_aries.c \
+    ARIES/pwm_motor_aries.c \
     ARIES/stub_drivers.c \
     drivers/serial_pinconfig.c
 

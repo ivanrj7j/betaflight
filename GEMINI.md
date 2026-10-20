@@ -62,6 +62,13 @@ This repository contains the Betaflight flight controller firmware adapted for t
   - Enabled `#define CONFIG_IN_FLASH`, `#define EEPROM_SIZE 8192`, `#define ENABLE_CONFIG_FLASH_INIT`.
   - Clean compilation with exit code `0` (~768.3 KB Flash / ~66.5 KB RAM).
 
+- **Phase 7: Actuator Outputs & RC Link (`Completed`)**
+  - Implemented hardware motor PWM driver in `src/platform/ARIES/pwm_motor_aries.c` mapping 4 quadcopter motors to Header J2 & J1: Motor 1 `PA1` (`J2_5`), Motor 2 `PA2` (`J2_3`), Motor 3 `PA3` (`J2_1`), Motor 4 `PA4` (`J1_10`).
+  - Integrated hardware Timer 1 (`0x10000A14`) on IRQ 8 for non-blocking sub-microsecond pulse scheduling (Standard PWM 400 Hz and OneShot125).
+  - Configured `UART1` (`0x10000200`) on Header J2 (`PA16` TX, `PA17` RX) for Serial RX (CRSF / ExpressLRS / SBUS).
+  - Removed motor and DShot stubs from `src/platform/ARIES/stub_drivers.c`.
+  - Clean compilation with exit code `0` (~770.7 KB Flash / ~66.8 KB RAM).
+
 ---
 
 ## 2. Directory Navigation & Key Documentation
@@ -127,9 +134,9 @@ make TARGET=ARIESV3 hex
 
 ## 5. Next Steps for Next Developer / Agent
 
-Proceed directly to **Phase 7: Actuator Outputs & RC Link**:
-1. Implement `src/platform/ARIES/pwm_motor_aries.c` mapping hardware PWM outputs (channels 0–3 for 4 quadcopter motors) on header pins.
-2. Implement motor output APIs: `motorPwmDevInit()`, `pwmWriteMotor()`, and DShot fallback stub.
-3. Configure `UART1` (`0x10000200`) on header pins (`J2_13` TX, `J2_15` RX) for Serial RX (CRSF / ELRS / SBUS).
-4. Remove motor and RC receiver stubs from `src/platform/ARIES/stub_drivers.c`.
-5. Document all changes and problems encountered in [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md).
+Proceed directly to **Phase 8: Soft-Float Tuning & Flight Loop Optimization**:
+1. Clamp the main flight loop rate to 1.0 kHz (`TASK_GYROPID_DESIRED_PERIOD 1000`).
+2. Verify soft-float compiler flags (`-ffast-math`) and ensure zero double-precision operations in PID routines.
+3. Profile task execution and jitter using the CLI `tasks` command.
+4. Complete end-to-end flight readiness verification checklist across all 8 phases.
+5. Document all changes and benchmarks in [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md).

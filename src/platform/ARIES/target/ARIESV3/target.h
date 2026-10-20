@@ -96,5 +96,20 @@
 #define UART0_TX_PIN            NONE
 
 #define USE_UART1
-#define UART1_RX_PIN            NONE
-#define UART1_TX_PIN            NONE
+#define UART1_RX_PIN            PA17 // Header J2_15 (Serial RX)
+#define UART1_TX_PIN            PA16 // Header J2_13 (Telemetry TX)
+
+// Actuator Outputs (Motor 1..4 on Header J2 & J1)
+#define USE_PWM_OUTPUT
+#define USE_MOTOR
+#define DEFAULT_MOTOR_PROTOCOL  MOTOR_PROTOCOL_PWM
+#define DEFAULT_MOTOR_PWM_RATE  400
+#define MOTOR1_PIN              PA1  // Header J2_5 (Motor 1 - Rear Right)
+#define MOTOR2_PIN              PA2  // Header J2_3 (Motor 2 - Front Right)
+#define MOTOR3_PIN              PA3  // Header J2_1 (Motor 3 - Rear Left)
+#define MOTOR4_PIN              PA4  // Header J1_10 (Motor 4 - Front Left)
+
+// Serial Receiver (CRSF / ELRS on UART1)
+#define USE_SERIALRX
+#define USE_SERIALRX_CRSF
+#define SERIALRX_PROVIDER       SERIALRX_CRSF
