@@ -179,3 +179,41 @@ Once flashed, the board will boot Betaflight from Flash `0x20000000`:
 
 ### Q: Can I flash this with the Betaflight Configurator GUI?
 **A:** Once the UART0 driver is connected to Betaflight's MSP protocol (Phase 3), the Betaflight Configurator can connect to `/dev/ttyUSB0` to configure PIDs, rates, and sensors. Direct USB DFU flashing is not supported because THEJAS32 does not have an on-chip USB peripheral; firmware updates are performed via JTAG or serial bootloader.
+
+
+---
+
+## 7. Automated Build & Benchmarking Script (`buildAndBenchmark.sh`)
+
+For fast building, memory footprint analysis, and soft-float disassembly audits, an interactive shell script is provided in the repository root: [`buildAndBenchmark.sh`](buildAndBenchmark.sh).
+
+### 7.1 How to Run the Script
+Make sure the script is executable and launch it:
+```bash
+chmod +x buildAndBenchmark.sh
+./buildAndBenchmark.sh
+```
+
+You can select from the interactive menu:
+1. **Compile & Build Project:** Runs `make TARGET=ARIESV3 clean` and `make TARGET=ARIESV3 -j$(nproc) hex`.
+2. **Memory & Disk Usage:** Computes exact Flash and SRAM utilization percentages and displays binary artifact sizes.
+3. **Soft-Float Disassembly Audit:** Checks `subTaskPidController` to guarantee 0 double-precision operations in real-time control loops.
+4. **Full Live Demo:** Runs compile, benchmark, and audit back-to-back.
+
+You can also run non-interactive subcommands directly:
+```bash
+./buildAndBenchmark.sh compile    # Build only
+./buildAndBenchmark.sh benchmark  # Footprint report only
+./buildAndBenchmark.sh audit      # Soft-float 0-double check only
+./buildAndBenchmark.sh all        # Run complete suite
+```
+
+> [!IMPORTANT]
+> **Agent & Developer Fallback Protocol:**  
+> Autonomous agents and developers should prefer using [`buildAndBenchmark.sh`](buildAndBenchmark.sh) for compilation and memory inspection. However, **if `buildAndBenchmark.sh` fails, encounters environment issues, or is interrupted, directly fall back to the standard manual commands**:
+> ```bash
+> make TARGET=ARIESV3 clean
+> make TARGET=ARIESV3 -j$(nproc)
+> make TARGET=ARIESV3 hex
+> ~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/main/betaflight_ARIESV3.elf
+> ```

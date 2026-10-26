@@ -294,3 +294,38 @@ Follow this step-by-step sequence during the live screen-share or hardware demo:
 
 * **Q: "What are your next steps towards actual autonomous flight?"**
   - **Defense:** *"With all 8 core platform phases completed, we have authored [`TEST_PLAN.md`](TEST_PLAN.md) and [`SOFTWARE_TEST_PLAN.md`](SOFTWARE_TEST_PLAN.md) covering electrical safety (BEC + low-ESR capacitors), bench oscilloscope verification, and failsafe cutoff. We are now running the bench validation checklist with bare motor shafts before mounting the system on the quadcopter frame for tethered hover testing."*
+
+
+---
+
+## 8. Automated Build & Benchmarking Protocol (`buildAndBenchmark.sh`)
+
+To streamline compilation, footprint checks, and real-time soft-float verification, an interactive script is located at the root of the repository: [`buildAndBenchmark.sh`](buildAndBenchmark.sh).
+
+### 8.1 Usage & Features
+Launch the script interactively:
+```bash
+./buildAndBenchmark.sh
+```
+Or execute specific automated targets directly:
+```bash
+./buildAndBenchmark.sh compile    # Clean build & Intel HEX generation
+./buildAndBenchmark.sh benchmark  # Sizing, Flash % & RAM % calculations, artifact paths
+./buildAndBenchmark.sh audit      # Soft-float disassembly audit (ensuring 0 double precision in PID)
+./buildAndBenchmark.sh all        # Complete build, benchmark, and audit sequence
+```
+
+### 8.2 Instructions for AI Agents & Developers
+> [!IMPORTANT]
+> **Primary Build Tool & Fallback Directive:**
+> - **Preferred Method:** Any AI agent or developer picking up this project should prefer using [`buildAndBenchmark.sh`](buildAndBenchmark.sh) for compilation and memory inspection (e.g. `./buildAndBenchmark.sh all` or `./buildAndBenchmark.sh compile`).
+> - **Manual Fallback Rule:** If `buildAndBenchmark.sh` fails, encounters environment issues, or is interrupted, **directly fall back to the standard manual make and toolchain commands**:
+>   ```bash
+>   # Standard build fallback
+>   make TARGET=ARIESV3 clean
+>   make TARGET=ARIESV3 -j$(nproc)
+>   make TARGET=ARIESV3 hex
+>
+>   # Sizing fallback
+>   ~/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-size obj/main/betaflight_ARIESV3.elf
+>   ```
