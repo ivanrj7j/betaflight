@@ -1,0 +1,35 @@
+# ==============================================================================
+# Renode Script: C-DAC ARIES v3.0 (THEJAS32 / VEGA ET1031 RISC-V) Betaflight
+# ==============================================================================
+#
+# Interactive Monitor Commands (if running manually inside Renode):
+#   mach create "ARIES_v3"
+#   machine LoadPlatformDescription $CWD/simulation/ariesv3.repl
+#   sysbus LoadELF $CWD/obj/main/betaflight_ARIESV3.elf
+#   sysbus.cpu PC 0x20000000
+#   cpu Step 2000
+#   sysbus.cpu PC
+#   sysbus.cpu SP
+#   sysbus.cpu MTVEC
+#   start
+#   pause
+#   quit
+# ==============================================================================
+
+mach create "ARIES_v3"
+machine LoadPlatformDescription $CWD/simulation/ariesv3.repl
+sysbus LoadELF $CWD/obj/main/betaflight_ARIESV3.elf
+sysbus.cpu PC 0x20000000
+
+echo "=============================================================================="
+echo "   🚀 C-DAC ARIES v3.0 (THEJAS32 RISC-V) Headless Renode Simulation"
+echo "=============================================================================="
+
+cpu Step 2000
+
+echo "------------------------------------------------------------------------------"
+echo "CPU Register Verification State:"
+sysbus.cpu PC
+sysbus.cpu SP
+sysbus.cpu MTVEC
+echo "------------------------------------------------------------------------------"
