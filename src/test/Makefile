@@ -105,6 +105,14 @@ aries_infra_unittest_INCLUDE_DIRS := \
 		$(TEST_DIR) \
 		$(TEST_DIR)/aries
 
+aries_system_unittest_SRC := \
+		$(ARIES_MOCK_SRC) \
+		$(TEST_DIR)/aries_system_testable.c
+
+aries_system_unittest_INCLUDE_DIRS := \
+		$(TEST_DIR) \
+		$(TEST_DIR)/aries
+
 atomic_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c \
 		$(TEST_DIR)/atomic_unittest_c.c
