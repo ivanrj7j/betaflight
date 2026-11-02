@@ -89,6 +89,22 @@ arming_prevention_unittest_SRC := \
 arming_prevention_unittest_DEFINES := \
             USE_GPS_RESCUE=
 
+# ==============================================================================
+# C-DAC ARIES v3.0 (THEJAS32 RISC-V) Unit Tests & Mock Infrastructure
+# ==============================================================================
+ARIES_MOCK_SRC := \
+		$(TEST_DIR)/aries/mock_mmio.c \
+		$(TEST_DIR)/aries/mock_csr.c \
+		$(TEST_DIR)/aries/mock_thejas32.c \
+		$(TEST_DIR)/aries/test_helpers.c
+
+aries_infra_unittest_SRC := \
+		$(ARIES_MOCK_SRC)
+
+aries_infra_unittest_INCLUDE_DIRS := \
+		$(TEST_DIR) \
+		$(TEST_DIR)/aries
+
 atomic_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c \
 		$(TEST_DIR)/atomic_unittest_c.c
@@ -1030,9 +1046,15 @@ GTEST_DIR = ../../lib/test/gtest
 CC  := clang-18
 CXX := clang++-18
 ifeq ($(and $(shell which $(CC) 2>/dev/null), $(shell which $(CXX) 2>/dev/null)),)
+ifeq ($(and $(shell which clang 2>/dev/null), $(shell which clang++ 2>/dev/null)),)
+$(info Falling back to 'gcc')
+CC  := gcc
+CXX := g++
+else
 $(info Falling back to 'clang')
 CC  := clang
 CXX := clang++
+endif
 endif
 
 OPTIMIZE = -O0
