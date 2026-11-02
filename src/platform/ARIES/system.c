@@ -10,7 +10,7 @@
 
 uint32_t SystemCoreClock = 100000000;
 
-FAST_CODE uint64_t getCycleCounter64(void)
+static inline void getCycleCounterWords(uint32_t *hi_out, uint32_t *lo_out)
 {
     uint32_t hi, lo, hi2;
     do {
@@ -18,6 +18,14 @@ FAST_CODE uint64_t getCycleCounter64(void)
         __asm__ __volatile__("csrr %0, mcycle" : "=r"(lo));
         __asm__ __volatile__("csrr %0, mcycleh" : "=r"(hi2));
     } while (hi != hi2);
+    *hi_out = hi;
+    *lo_out = lo;
+}
+
+FAST_CODE uint64_t getCycleCounter64(void)
+{
+    uint32_t hi, lo;
+    getCycleCounterWords(&hi, &lo);
     return ((uint64_t)hi << 32) | (uint64_t)lo;
 }
 
@@ -89,8 +97,13 @@ FAST_CODE timeUs_t timer0Micros(void)
         ovf++;
     }
 
-    uint64_t total_cycles = ((uint64_t)ovf * 0x100000000ULL) + (THEJAS32_TIMER0_LOAD_VALUE - cur);
-    return (timeUs_t)(total_cycles / 100ULL);
+    uint32_t elapsed = THEJAS32_TIMER0_LOAD_VALUE - cur;
+    uint32_t r_ovf = ovf % 100U;
+    uint32_t add = r_ovf * 96U;
+    uint32_t lo_sum = elapsed + add;
+    uint32_t carry = (lo_sum < elapsed) ? 1U : 0U;
+    uint32_t q = (carry * 42949672U) + ((carry * 96U + lo_sum) / 100U);
+    return (r_ovf * 42949672U) + q;
 }
 
 // -----------------------------------------------------------------------------
@@ -98,14 +111,31 @@ FAST_CODE timeUs_t timer0Micros(void)
 // -----------------------------------------------------------------------------
 FAST_CODE timeUs_t micros(void)
 {
-    // 64-bit cycle counter guarantees monotonic microsecond time without 42.9-second 32-bit rollover jitter
-    return (timeUs_t)(getCycleCounter64() / 100ULL);
+    // Fast 32-bit modular reciprocal division: avoids __udivdi3 software division calls
+    uint32_t hi, lo;
+    getCycleCounterWords(&hi, &lo);
+
+    uint32_t r_hi = hi % 100U;
+    uint32_t add = r_hi * 96U;
+    uint32_t lo_sum = lo + add;
+    uint32_t carry = (lo_sum < lo) ? 1U : 0U;
+    uint32_t q = (carry * 42949672U) + ((carry * 96U + lo_sum) / 100U);
+    return (r_hi * 42949672U) + q;
 }
 
 timeMs_t millis(void)
 {
-    // 49.7 day rollover matching Betaflight standard
-    return (timeMs_t)(getCycleCounter64() / 100000ULL);
+    // 49.7 day rollover matching Betaflight standard without 64-bit software division
+    uint32_t hi, lo;
+    getCycleCounterWords(&hi, &lo);
+
+    uint32_t r_hi = hi % 100000U;
+    uint64_t add = (uint64_t)r_hi * 67296ULL;
+    uint64_t rem = add + lo;
+    uint32_t carry = (uint32_t)(rem >> 32);
+    uint32_t lo_sum = (uint32_t)rem;
+    uint32_t q_rem = (carry * 42949U) + (uint32_t)((carry * 67296U + lo_sum) / 100000U);
+    return (r_hi * 42949U) + q_rem;
 }
 
 FAST_CODE timeUs_t microsISR(void)

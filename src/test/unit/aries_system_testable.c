@@ -79,12 +79,31 @@ void cycleCounterInit(void)
 
 timeUs_t micros(void)
 {
-    return (timeUs_t)(getCycleCounter64() / 100ULL);
+    uint64_t cycles = getCycleCounter64();
+    uint32_t hi = (uint32_t)(cycles >> 32);
+    uint32_t lo = (uint32_t)cycles;
+
+    uint32_t r_hi = hi % 100U;
+    uint32_t add = r_hi * 96U;
+    uint32_t lo_sum = lo + add;
+    uint32_t carry = (lo_sum < lo) ? 1U : 0U;
+    uint32_t q = (carry * 42949672U) + ((carry * 96U + lo_sum) / 100U);
+    return (r_hi * 42949672U) + q;
 }
 
 timeMs_t millis(void)
 {
-    return (timeMs_t)(getCycleCounter64() / 100000ULL);
+    uint64_t cycles = getCycleCounter64();
+    uint32_t hi = (uint32_t)(cycles >> 32);
+    uint32_t lo = (uint32_t)cycles;
+
+    uint32_t r_hi = hi % 100000U;
+    uint64_t add = (uint64_t)r_hi * 67296ULL;
+    uint64_t rem = add + lo;
+    uint32_t carry = (uint32_t)(rem >> 32);
+    uint32_t lo_sum = (uint32_t)rem;
+    uint32_t q_rem = (carry * 42949U) + (uint32_t)((carry * 67296U + lo_sum) / 100000U);
+    return (r_hi * 42949U) + q_rem;
 }
 
 timeUs_t microsISR(void)
@@ -158,8 +177,13 @@ timeUs_t timer0Micros(void)
         ovf++;
     }
 
-    uint64_t total_cycles = ((uint64_t)ovf * 0x100000000ULL) + (THEJAS32_TIMER0_LOAD_VALUE - cur);
-    return (timeUs_t)(total_cycles / 100ULL);
+    uint32_t elapsed = THEJAS32_TIMER0_LOAD_VALUE - cur;
+    uint32_t r_ovf = ovf % 100U;
+    uint32_t add = r_ovf * 96U;
+    uint32_t lo_sum = elapsed + add;
+    uint32_t carry = (lo_sum < elapsed) ? 1U : 0U;
+    uint32_t q = (carry * 42949672U) + ((carry * 96U + lo_sum) / 100U);
+    return (r_ovf * 42949672U) + q;
 }
 
 // -----------------------------------------------------------------------------
