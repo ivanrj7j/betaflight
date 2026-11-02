@@ -129,6 +129,53 @@ aries_spi_unittest_INCLUDE_DIRS := \
 		$(TEST_DIR) \
 		$(TEST_DIR)/aries
 
+aries_gpio_unittest_SRC := \
+		$(ARIES_MOCK_SRC) \
+		$(TEST_DIR)/aries_gpio_testable.c
+
+aries_gpio_unittest_INCLUDE_DIRS := \
+		$(TEST_DIR) \
+		$(TEST_DIR)/aries
+
+aries_exti_unittest_SRC := \
+		$(ARIES_MOCK_SRC) \
+		$(TEST_DIR)/aries_gpio_testable.c \
+		$(TEST_DIR)/aries_exti_testable.c
+
+aries_exti_unittest_INCLUDE_DIRS := \
+		$(TEST_DIR) \
+		$(TEST_DIR)/aries
+
+aries_flash_unittest_SRC := \
+		$(ARIES_MOCK_SRC) \
+		$(TEST_DIR)/aries_flash_testable.c
+
+aries_flash_unittest_INCLUDE_DIRS := \
+		$(TEST_DIR) \
+		$(TEST_DIR)/aries
+
+aries_motor_unittest_SRC := \
+		$(ARIES_MOCK_SRC) \
+		$(TEST_DIR)/aries_gpio_testable.c \
+		$(TEST_DIR)/aries_motor_testable.c
+
+aries_motor_unittest_INCLUDE_DIRS := \
+		$(TEST_DIR) \
+		$(TEST_DIR)/aries
+
+aries_integration_unittest_SRC := \
+		$(ARIES_MOCK_SRC) \
+		$(TEST_DIR)/aries_system_testable.c \
+		$(TEST_DIR)/aries_uart_testable.c \
+		$(TEST_DIR)/aries_gpio_testable.c \
+		$(TEST_DIR)/aries_exti_testable.c \
+		$(TEST_DIR)/aries_flash_testable.c \
+		$(TEST_DIR)/aries_motor_testable.c
+
+aries_integration_unittest_INCLUDE_DIRS := \
+		$(TEST_DIR) \
+		$(TEST_DIR)/aries
+
 atomic_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c \
 		$(TEST_DIR)/atomic_unittest_c.c

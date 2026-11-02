@@ -21,7 +21,7 @@ typedef struct {
 
 #define MOCK_UART(ch) (*((thejas32_mock_uart_reg_t *)&mock_periph_mem[0x100 + ((ch) * 0x100)]))
 
-uint32_t SystemCoreClock = 100000000;
+uint32_t SystemCoreClock __attribute__((weak)) = 100000000;
 
 uint8_t test_uartGetIndex(uint32_t reg_addr)
 {

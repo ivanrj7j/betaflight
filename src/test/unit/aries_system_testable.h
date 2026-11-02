@@ -35,6 +35,7 @@ timeUs_t timer0Micros(void);
 
 // Interrupt Controller & Trap Handling
 typedef void (*thejas32_irq_handler_t)(void);
+extern thejas32_irq_handler_t interrupt_table[32];
 void thejas32_interrupt_register(uint8_t irq_number, thejas32_irq_handler_t handler);
 void thejas32_interrupt_enable(uint8_t irq_number);
 void thejas32_interrupt_disable(uint8_t irq_number);

@@ -37,7 +37,7 @@ static uint32_t usTicks = 100;
 static float usTicksInv = 0.01f;
 
 static volatile uint32_t timer0_overflows = 0;
-static thejas32_irq_handler_t interrupt_table[32];
+thejas32_irq_handler_t interrupt_table[32];
 
 static int panic_count = 0;
 static uint32_t last_panic_mcause = 0;

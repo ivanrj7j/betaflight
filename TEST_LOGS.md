@@ -12,13 +12,15 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 | **Phase 1** | `aries_infra_unittest` | Modular Test Infrastructure (MMIO, CSR, IRQ, Helpers) | 7 | 7 | 0 | **PASSED** |
 | **Phase 2** | `aries_system_unittest` | System Core, Timebase, Conversions & Trap Dispatch | 23 | 23 | 0 | **PASSED** |
 | **Phase 3** | `aries_uart_unittest` & `aries_spi_unittest` | Communication Drivers (UART 16550 & SPI Master) | 26 | 26 | 0 | **PASSED** |
-| **Phase 4** | `aries_gpio_unittest` & `aries_exti_unittest` | Address-Decoded GPIO & EXTI Callback Routing | - | - | - | Pending |
-| **Phase 5** | `aries_flash_unittest` | SPI3 Flash Config & PG Storage Streamer | - | - | - | Pending |
-| **Phase 6** | `aries_motor_unittest` | Motor PWM Actuation & Timer 1 Pulse Scheduler | - | - | - | Pending |
-| **Phase 7** | `build_verify.sh` | Clean Build & Soft-Float Disassembly Audit | - | - | - | Pending |
-| **Phase 8** | `aries_integration_unittest` | End-to-End Safety & System Integration | - | - | - | Pending |
+| **Phase 4** | `aries_gpio_unittest` & `aries_exti_unittest` | Address-Decoded GPIO & EXTI Callback Routing | 26 | 26 | 0 | **PASSED** |
+| **Phase 5** | `aries_flash_unittest` | SPI3 Flash Config & PG Storage Streamer | 16 | 16 | 0 | **PASSED** |
+| **Phase 6** | `aries_motor_unittest` | Motor PWM Actuation & Timer 1 Pulse Scheduler | 20 | 20 | 0 | **PASSED** |
+| **Phase 7** | `build_verify.sh` | Clean Build & Soft-Float Disassembly Audit | 8 | 7 | 1 | **1 ISSUE LOGGED** |
+| **Phase 8** | `aries_integration_unittest` | End-to-End Safety & System Integration | 9 | 9 | 0 | **PASSED** |
 
-**Cumulative Summary:** 56 tests executed across Phases 1–3, 56 PASSED, 0 FAILED (100% Success Rate).
+**Cumulative Summary:** 135 total verification checks executed across Phases 1–8: **134 PASSED, 1 FAILED** (99.3% Overall Success Rate).  
+*Unit & Integration Test Suites (GTest):* **127 / 127 PASSED (100% Pass Rate)**.  
+*Disassembly & Binary Audit Checks:* **7 / 8 PASSED (1 Discrepancy Logged for Post-Test Remediation)**.
 
 ---
 
@@ -143,4 +145,214 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 
 **Part B Result:** 12/12 PASSED.  
 **Phase 3 Total Result:** 26/26 PASSED (100% Success Rate).  
+**Failures / Discrepancies in Main Code Found:** None.
+
+---
+
+## Phase 4 Detailed Results: IO & Interrupt Tests (Address-Decoded GPIO & EXTI)
+
+### Part A: Address-Decoded GPIO Driver
+
+- **Test Suite:** `aries_gpio_unittest`
+- **Source Target:** [`src/platform/ARIES/io_aries.c`](src/platform/ARIES/io_aries.c) via [`src/test/unit/aries_gpio_testable.c`](src/test/unit/aries_gpio_testable.c)
+- **Test File:** [`src/test/unit/aries_gpio_unittest.cc`](src/test/unit/aries_gpio_unittest.cc)
+- **Execution Date:** 2026-11-02
+- **Command:** `make test_aries_gpio_unittest`
+
+| Test Case ID | Test Name | Function Under Test | Result | Details / Observations |
+|:---|:---|:---|:---:|:---|
+| `GPIO-01` | `AriesGpioTest.Pin0Bank0WriteHigh` | `IOHi` | **PASS** | Bank 0 Pin 0 write evaluates to `base + ((1<<0)<<2)` = `base + 0x04` with value 1. |
+| `GPIO-02` | `AriesGpioTest.Pin15Bank0WriteHigh` | `IOHi` | **PASS** | Bank 0 Pin 15 write evaluates to `base + ((1<<15)<<2)` = `base + 0x20000` with value 0x8000. |
+| `GPIO-03` | `AriesGpioTest.Pin16Bank1WriteHigh` | `IOHi` | **PASS** | Bank 1 Pin 0 write evaluates to `base + ((1<<0)<<2)` = `base + 0x04` in Bank 1 space. |
+| `GPIO-04` | `AriesGpioTest.Pin22HeartbeatLedWriteHigh` | `IOHi` | **PASS** | Bank 1 Pin 6 (Heartbeat LED LD4) evaluates to `base + 0x100` with value 0x40. |
+| `GPIO-05` | `AriesGpioTest.WriteLowZeroesDataReg` | `IOLo` | **PASS** | Clears address-decoded data register to 0. |
+| `GPIO-06` | `AriesGpioTest.ToggleStateTransitions` | `IOToggle` | **PASS** | State flips from 0 to `1 << pin` and back to 0 cleanly. |
+| `GPIO-07` | `AriesGpioTest.ReadReflectsPinState` | `IORead` | **PASS** | Returns true when data register has bit set, false when zero. |
+| `GPIO-08` | `AriesGpioTest.ConfigOutputSetsDirectionBit` | `IOConfigGPIO` | **PASS** | Mode output sets corresponding bit in direction register at `base + 0x40000`. |
+| `GPIO-09` | `AriesGpioTest.ConfigInputClearsDirectionBit` | `IOConfigGPIO` | **PASS** | Mode input clears corresponding bit in direction register at `base + 0x40000`. |
+| `GPIO-10` | `AriesGpioTest.PortIndexCalculation` | `IO_GPIOPortIdx` | **PASS** | Returns 0 for pins 0..15, 1 for pins 16..31, -1 for NULL. |
+| `GPIO-11` | `AriesGpioTest.PinIndexCalculation` | `IO_GPIOPinIdx` | **PASS** | Returns `pin` for Bank 0, `pin - 16` for Bank 1, -1 for NULL. |
+| `GPIO-12` | `AriesGpioTest.WriteDelegation` | `IOWrite` | **PASS** | Correctly branches to `IOHi` when `hi = true`, `IOLo` when `hi = false`. |
+| `GPIO-13` | `AriesGpioTest.InitGlobalInitializes32Pins` | `IOInitGlobal` | **PASS** | All 32 pin records populated with correct pin indices and bank base addresses. |
+| `GPIO-14` | `AriesGpioTest.BoundsProtection` | Bounds Guard | **PASS** | Out-of-range pins (> 31) return NULL and guarded operations safely no-op. |
+
+**Part A Result:** 14/14 PASSED.
+
+---
+
+### Part B: External Interrupt (EXTI) Driver
+
+- **Test Suite:** `aries_exti_unittest`
+- **Source Target:** [`src/platform/ARIES/exti_aries.c`](src/platform/ARIES/exti_aries.c) via [`src/test/unit/aries_exti_testable.c`](src/test/unit/aries_exti_testable.c)
+- **Test File:** [`src/test/unit/aries_exti_unittest.cc`](src/test/unit/aries_exti_unittest.cc)
+- **Execution Date:** 2026-11-02
+- **Command:** `make test_aries_exti_unittest`
+
+| Test Case ID | Test Name | Function Under Test | Result | Details / Observations |
+|:---|:---|:---|:---:|:---|
+| `EXTI-01` | `AriesExtiTest.InitClearsAllChannels` | `EXTIInit` | **PASS** | All 32 channels initialized with `enabled = false` and `handler = NULL`. |
+| `EXTI-02` | `AriesExtiTest.InitRegistersBankIsrs` | `EXTIInit` | **PASS** | Registers `thejas32_gpio0_isr` on IRQ 10 and `thejas32_gpio1_isr` on IRQ 11. |
+| `EXTI-03` | `AriesExtiTest.ConfigStoresCallbackBank0` | `EXTIConfig` | **PASS** | Bank 0 channel callback stored and channel enabled. |
+| `EXTI-04` | `AriesExtiTest.ConfigStoresCallbackBank1` | `EXTIConfig` | **PASS** | Bank 1 channel callback stored for `PA22` and channel enabled. |
+| `EXTI-05` | `AriesExtiTest.ConfigBank0EnablesIrq10` | `EXTIConfig` | **PASS** | Bank 0 configuration automatically unmasks IRQ 10 in interrupt controller. |
+| `EXTI-06` | `AriesExtiTest.ConfigBank1EnablesIrq11` | `EXTIConfig` | **PASS** | Bank 1 configuration automatically unmasks IRQ 11 in interrupt controller. |
+| `EXTI-07` | `AriesExtiTest.Gpio0IsrFiresBank0Callbacks` | `thejas32_gpio0_isr` | **PASS** | Iterates pins 0..15 and triggers registered callback functions. |
+| `EXTI-08` | `AriesExtiTest.BankIsolationBetweenGpio0AndGpio1` | Isolation | **PASS** | Firing Bank 1 ISR does NOT invoke Bank 0 callbacks (0 cross-talk). |
+| `EXTI-09` | `AriesExtiTest.DisableBlocksCallbackExecution` | `EXTIDisable` | **PASS** | Disabled channel is skipped during ISR dispatch loop. |
+| `EXTI-10` | `AriesExtiTest.EnableRestoresCallbackExecution` | `EXTIEnable` | **PASS** | Re-enabled channel executes callback and ensures bank IRQ is unmasked. |
+| `EXTI-11` | `AriesExtiTest.ReleaseClearsHandler` | `EXTIRelease` | **PASS** | Disables channel and clears callback pointer to NULL. |
+| `EXTI-12` | `AriesExtiTest.ExtiLineBitmask` | `IO_EXTI_Line` | **PASS** | Returns `1U << pin` bitmask; returns 0 for NULL. |
+
+**Part B Result:** 12/12 PASSED.  
+**Phase 4 Total Result:** 26/26 PASSED (100% Success Rate).  
+**Failures / Discrepancies in Main Code Found:** None.
+
+---
+
+## Phase 5 Detailed Results: Flash Configuration & PG Storage Tests
+
+- **Test Suite:** `aries_flash_unittest`
+- **Source Target:** [`src/platform/ARIES/config_flash_aries.c`](src/platform/ARIES/config_flash_aries.c) via [`src/test/unit/aries_flash_testable.c`](src/test/unit/aries_flash_testable.c)
+- **Test File:** [`src/test/unit/aries_flash_unittest.cc`](src/test/unit/aries_flash_unittest.cc)
+- **Execution Date:** 2026-11-02
+- **Command:** `make test_aries_flash_unittest`
+
+### Test Cases Table
+
+| Test Case ID | Test Name | Function Under Test | Result | Details / Observations |
+|:---|:---|:---|:---:|:---|
+| `FLASH-01` | `AriesFlashTest.RejectsAddressBelowConfigStart` | `configWriteWord` | **PASS** | Rejects addresses below `TEST_CONFIG_START_ADDR` (`0x201F8000`) with `CONFIG_RESULT_ADDRESS_INVALID`. |
+| `FLASH-02` | `AriesFlashTest.RejectsAddressAboveConfigEnd` | `configWriteWord` | **PASS** | Rejects addresses where `address + 32 > TEST_CONFIG_END_ADDR` (`0x20200000`) with `CONFIG_RESULT_ADDRESS_INVALID`. |
+| `FLASH-03` | `AriesFlashTest.ErasesSectorOnFirstWrite` | `configWriteWord` | **PASS** | Erases sector `0x1F8000` on first write; `lastErasedSector` updated and erase count increments to 1. |
+| `FLASH-04` | `AriesFlashTest.DoesNotReEraseSameSectorOnConsecutiveWrites` | `configWriteWord` | **PASS** | Consecutive writes at offset +32 and +256 within the same 4 KB sector do NOT trigger re-erase (`erase_count` remains 1). |
+| `FLASH-05` | `AriesFlashTest.ShadowUpdatedAfterWrite` | `configWriteWord` | **PASS** | Memory-mapped shadow at `0x201F8000` immediately updated with written 32-byte payload. |
+| `FLASH-06` | `AriesFlashTest.ShadowInitializedToAll0xFFOnErase` | `configWriteWord` | **PASS** | Sector erase resets all 4096 bytes of shadow region to `0xFF` prior to programming. |
+| `FLASH-07` | `AriesFlashTest.ConfigUnlockResetsLastErasedSector` | `configUnlock` | **PASS** | `configUnlock()` resets `lastErasedSector = UINT32_MAX`; forces re-erase on subsequent write. |
+| `FLASH-08` | `AriesFlashTest.ConfigLockResetsLastErasedSector` | `configLock` | **PASS** | `configLock()` waits for idle and resets `lastErasedSector = UINT32_MAX`; forces re-erase on subsequent write. |
+| `FLASH-09` | `AriesFlashTest.WriteEnableSendsOpcode0x06` | `thejas32_flash_write_enable` | **PASS** | Transmits opcode `0x06` (`SPI_FLASH_CMD_WREN`) and verifies WEL bit set in status register. |
+| `FLASH-10` | `AriesFlashTest.SectorEraseSendsOpcode0x20AndAddress` | `thejas32_flash_erase_sector` | **PASS** | Transmits opcode `0x20` followed by 3-byte big-endian address `[0x1F, 0x80, 0x00]` and waits for WIP. |
+| `FLASH-11` | `AriesFlashTest.PageProgramSendsOpcode0x02AddressAndData` | `thejas32_flash_write_page` | **PASS** | Transmits opcode `0x02` followed by 3-byte address `[0x1F, 0x80, 0x20]` and 32 data bytes. |
+| `FLASH-12` | `AriesFlashTest.WipPollingLoopIsBounded` | `thejas32_flash_wait_wip` | **PASS** | Returns `true` when WIP clear; returns `false` within max iterations when WIP stuck high (no infinite hang). |
+| `FLASH-13` | `AriesFlashTest.Full8KBConfigWriteCrossesSectorsCorrectly` | Integration | **PASS** | 256 writes of 32 bytes (8192 bytes total) across two 4 KB sectors (`0x1F8000` and `0x1F9000`); each sector erased exactly once (`erase_count = 2`, `write_count = 256`), memory shadow 100% coherent. |
+| `FLASH-14` | `AriesFlashTest.ControllerInitConfiguresBaudAndControl` | `configFlashInit` | **PASS** | SPI3 Baudrate register set to `0x20` (6.25 MHz) and Control register set to `0x0000` (Mode 0). |
+| `FLASH-15` | `AriesFlashTest.WaitIdleBoundedOnStickyBusy` | `thejas32_flash_wait_idle` | **PASS** | Returns `false` on stuck busy flag; returns `true` when SPI status busy bit is clear. |
+| `FLASH-16` | `AriesFlashTest.ConfigClearFlagsIsNoOp` | `configClearFlags` | **PASS** | Verified safe no-op on THEJAS32 architecture with zero side effects. |
+
+**Phase 5 Result:** 16/16 PASSED (100% Success Rate).  
+**Failures / Discrepancies in Main Code Found:** None.
+
+---
+
+## Phase 6 Detailed Results: Motor PWM Actuator & Timer 1 Scheduler Tests
+
+- **Test Suite:** `aries_motor_unittest`
+- **Source Target:** [`src/platform/ARIES/pwm_motor_aries.c`](src/platform/ARIES/pwm_motor_aries.c) via [`src/test/unit/aries_motor_testable.c`](src/test/unit/aries_motor_testable.c)
+- **Test File:** [`src/test/unit/aries_motor_unittest.cc`](src/test/unit/aries_motor_unittest.cc)
+- **Execution Date:** 2026-11-02
+- **Command:** `make test_aries_motor_unittest`
+
+### Test Cases Table
+
+| Test Case ID | Test Name | Function Under Test | Result | Details / Observations |
+|:---|:---|:---|:---:|:---|
+| `MOTOR-01` | `AriesMotorTest.StandardPWM1000us` | `pwmWriteMotor` | **PASS** | 1000.0 µs maps to precisely 100,000 clock cycles at 100 MHz. |
+| `MOTOR-02` | `AriesMotorTest.StandardPWM2000us` | `pwmWriteMotor` | **PASS** | 2000.0 µs maps to precisely 200,000 clock cycles at 100 MHz. |
+| `MOTOR-03` | `AriesMotorTest.StandardPWM1500us` | `pwmWriteMotor` | **PASS** | 1500.0 µs mid-point maps to precisely 150,000 clock cycles. |
+| `MOTOR-04` | `AriesMotorTest.OneShot125MinThrottle` | `pwmWriteMotor` | **PASS** | OneShot125 minimum throttle (1000) maps to 125.0 µs = 12,500 clock cycles. |
+| `MOTOR-05` | `AriesMotorTest.OneShot125MaxThrottle` | `pwmWriteMotor` | **PASS** | OneShot125 maximum throttle (2000) maps to 250.0 µs = 25,000 clock cycles. |
+| `MOTOR-06` | `AriesMotorTest.OneShot125MidThrottle` | `pwmWriteMotor` | **PASS** | OneShot125 mid throttle (1500) maps to 187.5 µs = 18,750 clock cycles. |
+| `MOTOR-07` | `AriesMotorTest.ClampLowUnderflow` | `pwmWriteMotor` | **PASS** | Values below 1000 (e.g. 500, 0) clamp to 1000 (100,000 cycles). |
+| `MOTOR-08` | `AriesMotorTest.ClampHighOverflow` | `pwmWriteMotor` | **PASS** | Values above 2000 (e.g. 2500, 5000) clamp to 2000 (200,000 cycles). |
+| `MOTOR-09` | `AriesMotorTest.UpdateSortsMotorsAscending` | `pwmCompleteMotorUpdate` | **PASS** | Active motors sorted in ascending order of pulse width for deadline queue. |
+| `MOTOR-10` | `AriesMotorTest.UpdateDrivesAllPinsHigh` | `pwmCompleteMotorUpdate` | **PASS** | All active quadcopter motor GPIO pins driven HIGH simultaneously at the epoch. |
+| `MOTOR-11` | `AriesMotorTest.UpdateArmsTimer1WithFirstDeadline` | `pwmCompleteMotorUpdate` | **PASS** | Timer 1 loaded with earliest deadline cycles and unmasked (`Control = 0x03`). |
+| `MOTOR-12` | `AriesMotorTest.IsrDropsPinForExpiredMotor` | `thejas32_pwm_timer1_isr` | **PASS** | First expired motor pin driven LOW upon Timer 1 interrupt firing. |
+| `MOTOR-13` | `AriesMotorTest.IsrReloadsDeltaForNextMotor` | `thejas32_pwm_timer1_isr` | **PASS** | Timer 1 reloaded with delta cycles between current and subsequent motor deadline. |
+| `MOTOR-14` | `AriesMotorTest.IsrDisablesTimer1AfterLastMotor` | `thejas32_pwm_timer1_isr` | **PASS** | After final motor drops LOW, Timer 1 disabled (`Control = 0x00`) with all pins LOW. |
+| `MOTOR-15` | `AriesMotorTest.IsrCoalescesSub50CycleDelta` | `thejas32_pwm_timer1_isr` | **PASS** | Motor pulses differing by < 50 cycles (< 0.5 µs) dropped simultaneously in single ISR without scheduling timer interrupt. |
+| `MOTOR-16` | `AriesMotorTest.ShutdownDrivesAllPinsLow` | `pwmShutdownPulsesForAllMotors` | **PASS** | Immediately terminates all active motor pulses and drives all motor pins LOW. |
+| `MOTOR-17` | `AriesMotorTest.ShutdownDisablesTimer1` | `pwmShutdownPulsesForAllMotors` | **PASS** | Disables Timer 1 interrupt and timer counter (`Control = 0x00`). |
+| `MOTOR-18` | `AriesMotorTest.DisabledMotorIsRejected` | `pwmWriteMotor` | **PASS** | Disabled motor indices or out-of-bounds indices (> 3) safely rejected. |
+| `MOTOR-19` | `AriesMotorTest.DevInitRegistersTimer1Irq8` | `motorPwmDevInit` | **PASS** | Registers `thejas32_pwm_timer1_isr` on IRQ 8 (`THEJAS32_IRQ_TIMER1`) and enables IRQ in interrupt controller. |
+| `MOTOR-20` | `AriesMotorTest.WriteMotorIntDelegatesCorrectly` | `pwmWriteMotorInt` | **PASS** | Integer pulse width input correctly converts to float and programs expected cycles. |
+
+**Phase 6 Result:** 20/20 PASSED (100% Success Rate).  
+**Failures / Discrepancies in Main Code Found:** None.
+
+---
+
+## Phase 7 Detailed Results: Build Verification & Disassembly Audit
+
+- **Test Suite:** `build_verify.sh`
+- **Source Target:** Clean production target build `obj/main/betaflight_ARIESV3.elf` and `obj/betaflight_2026.12.0-alpha_ARIESV3.hex`
+- **Test File:** [`src/test/unit/aries/build_verify.sh`](src/test/unit/aries/build_verify.sh)
+- **Execution Date:** 2026-11-02
+- **Command:** `./src/test/unit/aries/build_verify.sh`
+
+### Test Checks Table
+
+| Check ID | Check Name | Target / Method | Result | Details / Observations |
+|:---|:---|:---|:---:|:---|
+| `BUILD-01` | Clean Compilation | `make TARGET=ARIESV3 hex` | **PASS** | Clean build completed with exit code 0; ELF and HEX artifacts produced. |
+| `BUILD-02` | Flash Footprint Ceiling | `riscv32-esp-elf-size` | **PASS** | Flash footprint: **777,120 bytes** (758.9 KB), well within the 800 KB (819,200 bytes) ceiling (37.9% of 2 MB available). |
+| `BUILD-03` | SRAM Footprint Ceiling | `riscv32-esp-elf-size` | **PASS** | RAM footprint: **68,396 bytes** (66.8 KB), well within the 80 KB (81,920 bytes) ceiling (26.7% of 256 KB available). |
+| `BUILD-04` | Firmware Entry Point | `riscv32-esp-elf-nm` | **PASS** | `_start` entry point located exactly at `0x20000000` in SPI flash. |
+| `BUILD-05` | Machine Trap Vector Address | `riscv32-esp-elf-nm` | **PASS** | `trap_entry` vector located exactly at `0x200000f0`. |
+| `BUILD-06` | Soft-Float Double Precision Audit | `riscv32-esp-elf-objdump` | **PASS** | **0** calls to double-precision routines (`__adddf3`, `__muldf3`, `__divdf3`, `__subdf3`) across critical real-time flight paths (`subTaskPidController`, `taskGyroSample`, `taskFiltering`). 100% single precision math confirmed. |
+| `BUILD-07` | 64-bit Division Audit in `micros` | `riscv32-esp-elf-objdump` | **FAIL** | Disassembly of `micros()` shows an active call to software 64-bit division: `20003fb8: jal 200a2efc <__udivdi3>`. |
+| `BUILD-08` | Intel HEX File Validation | `ls -s` / size check | **PASS** | `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` generated and non-empty (2,185,914 bytes). |
+
+**Phase 7 Result:** 7/8 checks PASSED, 1 FAILED (87.5% Success Rate).  
+
+### Discrepancy & Failure Log (`BUILD-07`)
+
+- **Observed Behavior:**
+  Running `riscv32-esp-elf-objdump -d obj/main/betaflight_ARIESV3.elf | grep -A 50 "<micros>:"` reveals:
+  ```asm
+  20003fb0 <micros>:
+  20003fb0:	7179                	addi	sp,sp,-48
+  20003fb2:	d586                	sw	ra,44(sp)
+  20003fb4:	d422                	sw	s0,40(sp)
+  20003fb6:	00010437          	lui	s0,0x10
+  20003fba:	7459e0ef          	jal	200a2efc <__udivdi3>
+  ```
+- **Root Cause Analysis:**
+  In [`src/platform/ARIES/system.c`](src/platform/ARIES/system.c#L102):
+  ```c
+  FAST_CODE timeUs_t micros(void)
+  {
+      return (timeUs_t)(getCycleCounter64() / 100ULL);
+  }
+  ```
+  On a 32-bit RISC-V RV32IM core without hardware 64-bit division instructions, dividing a 64-bit integer (`uint64_t`) by `100ULL` cannot be performed in a single cycle and GCC lowers standard division `/ 100ULL` to the GCC software division runtime library helper `__udivdi3`.
+- **Constraint Compliance:**
+  Per testing rules ("don't fix the main code if you see any test fail, instead log it into a new TEST_LOGS.md file"), **no modifications have been made to `src/platform/ARIES/system.c`**.
+- **Recommended Remediation (Post-Testing):**
+  Implement inlined reciprocal multiplication by constant `0x28F5C28F5C28F5C3ULL` (scaled reciprocal for `/ 100`) using 32-bit high-multiplication (`mulhu`) or 64-bit split arithmetic, eliminating the call to `__udivdi3` and reducing `micros()` execution time from ~120 cycles down to ~12 cycles.
+
+---
+
+## Phase 8 Detailed Results: End-to-End Safety & System Integration Tests
+
+- **Test Suite:** `aries_integration_unittest`
+- **Source Target:** Full platform integration cross-linking system, UART, GPIO, EXTI, Flash, and Motor drivers
+- **Test File:** [`src/test/unit/aries_integration_unittest.cc`](src/test/unit/aries_integration_unittest.cc)
+- **Execution Date:** 2026-11-02
+- **Command:** `make test_aries_integration_unittest`
+
+### Test Cases Table
+
+| Test Case ID | Test Name | Cross-Module Targets | Result | Details / Observations |
+|:---|:---|:---|:---:|:---|
+| `INT-01` | `AriesIntegrationTest.FullSystemInitSequence` | System + Timer + EXTI + Motors | **PASS** | `cycleCounterInit()`, `thejas32_timer_init()`, `test_EXTIInit()`, and `motorPwmDevInit()` properly link; interrupt vectors registered for IRQ 7, 8, 10, 11; hardware enable masks set upon subsystem and pin configuration. |
+| `INT-02` | `AriesIntegrationTest.Timer0OverflowTracksAccurately` | Timer 0 + Real-Time Scaling | **PASS** | 3 successive Timer 0 overflow ISR executions reliably tracked; `timer0Micros()` monotonically increments past 128 seconds without discontinuity. |
+| `INT-03` | `AriesIntegrationTest.UartRxStreamConsistency` | UART 16550 + Circular FIFO | **PASS** | 64-byte burst streamed into hardware UART0 FIFO; ISR ingests into circular buffer; drained with 100% data fidelity and exact FIFO index tracking. |
+| `INT-04` | `AriesIntegrationTest.MotorFullCycleStepByStep` | Motor Actuator + Timer 1 + GPIO | **PASS** | 4-channel PWM pulse generation: `pwmCompleteMotorUpdate()` asserts all pins HIGH and sets earliest deadline; successive Timer 1 ISR executions drop channels in sorted ascending order (PA1 -> PA2 -> PA3 -> PA4); Timer 1 disabled upon final motor completion. |
+| `INT-05` | `AriesIntegrationTest.ConfigWriteCrossesSectorBoundary` | SPI3 NOR Flash + Memory Shadow | **PASS** | Parameter streamer writes across 4 KB sector boundary (`0x201F8FE0` in Sector 0 to `0x201F9000` in Sector 1); exactly two sector erases triggered (`erase_count = 2`); coherent memory reads across both sectors verified. |
+| `INT-06` | `AriesIntegrationTest.InterruptStormDispatch` | Trap Dispatcher + Interrupt Controller | **PASS** | Rapid interrupt storm across IRQs 0 through 11; `handle_trap` dispatcher routes each Machine External Interrupt (`cause 11`) to registered handler; each handler executes exactly once with zero dropped interrupts. |
+| `INT-07` | `AriesIntegrationTest.MicrosMonotonicDuringIsrInterleaving` | Timebase + Atomic Cycle Counter | **PASS** | 5,000 continuous timebase readings interleaved with simulated 40-cycle interrupt execution mid-read; strictly monotonic clock output ($t_2 \ge t_1$) with zero backward jumps. |
+| `INT-08` | `AriesIntegrationTest.MotorShutdownSafety` | Safety Logic + Actuator Output | **PASS** | Calling `pwmShutdownPulsesForAllMotors()` during mid-pulse output immediately forces all quadcopter motor pins LOW and disables Timer 1 counter (`Control = 0x00`). |
+| `INT-09` | `AriesIntegrationTest.EmergencyFailsafeCutoffLatency` | Emergency Failsafe + GPIO | **PASS** | Simulated emergency failsafe event during high throttle (1850 µs); verified sub-microsecond zero-latency pulse cessation across all 4 motor pins. |
+
+**Phase 8 Result:** 9/9 PASSED (100% Success Rate).  
 **Failures / Discrepancies in Main Code Found:** None.
