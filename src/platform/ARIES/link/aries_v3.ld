@@ -66,7 +66,7 @@ SECTIONS
     .stack (NOLOAD) : {
         . = ALIGN(16);
         _sstack = .;
-        . = . + 0x1800; /* 6 KB Stack (plenty for bare-metal Betaflight < 2 KB stack watermark) */
+        . = . + 0x1400; /* 5 KB Stack (ample margin for Betaflight < 2 KB stack watermark) */
         _estack = .;
     } > RAM
 

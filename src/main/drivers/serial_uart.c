@@ -364,6 +364,12 @@ static uint32_t uartTotalRxBytesWaiting(const serialPort_t *instance)
 {
     const uartPort_t *uartPort = (const uartPort_t*)instance;
 
+#ifdef THEJAS32
+    if (uartPort && uartPort->USARTx && uartPort->port.rxBuffer && uartPort->port.rxBufferSize > 0) {
+        uartIrqHandler((uartPort_t *)uartPort);
+    }
+#endif
+
 #ifdef USE_DMA
     if (uartPort->rxDMAResource) {
         uint32_t rxDMAHead = dmaGetDataLength(uartPort->rxDMAResource);
@@ -425,6 +431,11 @@ static uint32_t uartTotalTxBytesFree(const serialPort_t *instance)
 static bool isUartTransmitBufferEmpty(const serialPort_t *instance)
 {
     const uartPort_t *uartPort = (const uartPort_t *)instance;
+#ifdef THEJAS32
+    if (uartPort && uartPort->USARTx && uartPort->port.txBuffer && uartPort->port.txBufferSize > 0) {
+        uartIrqHandler((uartPort_t *)uartPort);
+    }
+#endif
 #ifdef USE_DMA
     if (uartPort->txDMAResource) {
         return uartPort->txDMAEmpty;

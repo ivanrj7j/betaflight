@@ -153,15 +153,18 @@ void uartReconfigure(uartPort_t *uartPort)
 // -----------------------------------------------------------------------------
 void uartEnableTxInterrupt(uartPort_t *uartPort)
 {
+    if (!uartPort || !uartPort->USARTx || !uartPort->port.txBuffer || uartPort->port.txBufferSize == 0) {
+        return;
+    }
+
     uint8_t ch = uartGetIndex(uartPort->USARTx);
 
-    // If there is data waiting to be sent, enable THRE interrupt (bit 1 of UART_IE)
+    // If there is data waiting to be sent, enable THRE interrupt and stream directly while holding reg is empty
     if (uartPort->port.txBufferTail != uartPort->port.txBufferHead) {
         THEJAS32_UART(ch).UART_IE |= 0x02;
         __asm__ __volatile__ ("fence");
 
-        // If transmitter is currently empty, prime the transmit loop immediately
-        if (THEJAS32_UART(ch).UART_LSR & 0x20) {
+        while ((THEJAS32_UART(ch).UART_LSR & 0x20) && (uartPort->port.txBufferTail != uartPort->port.txBufferHead)) {
             uint8_t byte = uartPort->port.txBuffer[uartPort->port.txBufferTail];
             THEJAS32_UART(ch).UART_DR = byte;
             uartPort->port.txBufferTail = (uartPort->port.txBufferTail + 1) % uartPort->port.txBufferSize;
@@ -172,6 +175,10 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
 
 FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
 {
+    if (!s || !s->USARTx || !s->port.rxBuffer || s->port.rxBufferSize == 0) {
+        return;
+    }
+
     uint8_t ch = uartGetIndex(s->USARTx);
 
     // Read Line Status Register
@@ -190,18 +197,20 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
     }
 
     // 2. Check if transmitter holding register is empty (LSR Bit 5: THRE)
-    if (lsr & 0x20) {
-        if (s->port.txBufferTail != s->port.txBufferHead) {
+    if (s->port.txBuffer && s->port.txBufferSize > 0) {
+        while ((lsr & 0x20) && (s->port.txBufferTail != s->port.txBufferHead)) {
             uint8_t txChar = s->port.txBuffer[s->port.txBufferTail];
             THEJAS32_UART(ch).UART_DR = txChar;
             s->port.txBufferTail = (s->port.txBufferTail + 1) % s->port.txBufferSize;
-            __asm__ __volatile__ ("fence");
-        } else {
+            lsr = THEJAS32_UART(ch).UART_LSR;
+        }
+
+        if (s->port.txBufferTail == s->port.txBufferHead) {
             // No more data to transmit: disable TX interrupt
             THEJAS32_UART(ch).UART_IE &= ~0x02;
-            __asm__ __volatile__ ("fence");
         }
     }
+    __asm__ __volatile__ ("fence");
 }
 
 // ISR Callback wrappers for THEJAS32 interrupt controller
