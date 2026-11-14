@@ -613,5 +613,55 @@ With the completion of **Phase 8**, all 8 phases of the **C-DAC ARIES v3.0 (THEJ
    - `motor 0 1100`: Safely verify Motor 1 pulse actuation (props off!).
    - `save`: Confirm non-volatile parameter persistence across power cycles.
 
+---
+
+## 🚨 Critical Hardware Architectural Finding: Execution Topology & In-SRAM Boot Protocol
+
+> [!IMPORTANT]
+> **Must-Read for All Future Agents & Developers:**
+> During physical hardware flashing and bench testing of the ARIES v3.0 board with the official C-DAC `flasher.bat` tool, empirical serial bootloader logs and an audit of the official C-DAC VEGA BSP (`lib/vega-bsp`) revealed a critical hardware architectural specification that supersedes previous assumptions based on Renode simulation:
+
+### 1. Empirical Hardware Bootloader Observations
+When flashing `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` onto the physical ARIES v3.0 board (jumper J12 `BOOT-SEL` shorted), the on-chip ROM bootloader outputted the following serial telemetry at 115200 baud on UART-0:
+```text
+Copying from FLASH to IRAM
+[INFO] Flash ID: ... Flash initialized
+[INFO] Copying 250KB from address: 0x000000.
+Starting program ...
+```
+After outputting the C-DAC VEGA banner, the processor halted without establishing communication with Betaflight Configurator or CLI.
+
+### 2. Root Cause Analysis & Hardware Memory Reality
+1. **No External Flash Execute-In-Place (XIP):**
+   - The THEJAS32 SoC (VEGA ET1031) **does not feature a hardware memory-mapped XIP controller** for the external Winbond SPI Flash.
+   - The 2 MB SPI flash is strictly an offline storage device connected to the SPI3 controller (`0x10200200`).
+2. **Mandatory Load-and-Run SRAM Architecture:**
+   - On reset, the internal ROM bootloader uses SPI3 to copy at most **248 KB – 250 KB** of raw machine code from SPI Flash offset `0x000000` into **internal SRAM at address `0x00202000`**.
+   - The bootloader hands over execution via `jalr a5` directly to `0x00202000` (confirmed by disassembling `lib/vega-bsp/bootloaders/arduflasher/flasher_arduino.bin` at instruction `0x117c`).
+3. **Internal SRAM Address Map (256 KB Total):**
+   - **`0x00200000` – `0x00201FFF` (8 KB):** Reserved for ROM bootloader variables and scratchpad.
+   - **`0x00202000` – `0x0023FFFF` (248 KB):** Usable internal application memory for `.text`, `.rodata`, `.data`, `.bss`, and the downward-growing `.stack`.
+   - **`0x10000000` Bracket:** This is memory-mapped **peripheral register space** (UART0 is at `0x10000100`), **not SRAM**.
+4. **Why Initial Firmware Halted:**
+   - **Address Mismatch:** The initial `aries_v3.ld` linked `.text` to ORIGIN `0x20000000` and RAM to `0x10000000`. When the bootloader jumped to `0x00202000`, the PC encountered code compiled with invalid absolute addresses, writing stack into peripheral register space (`_estack = 0x1000FEF0`) and crashing immediately.
+   - **Size Truncation:** Because `MCU_FLASH_SIZE := 2048` was set, optional subsystems (graphical OSD fonts, Blackbox filesystem, GPS navigation, 15+ serial RX protocols) bloated the binary to 760 KB. The ROM bootloader copied only the first 250 KB into SRAM and jumped into an incomplete, truncated binary.
+
+### 3. Required Remediation Protocol
+To achieve clean native execution on physical ARIES v3 hardware:
+1. **Linker Script (`aries_v3.ld`):** Update `MEMORY` block to match official C-DAC `link1.lds`:
+   ```ld
+   MEMORY
+   {
+       ram (wxa!ri) : ORIGIN = 0x00202000, LENGTH = 248K
+   }
+   ```
+2. **Startup Sequence (`startup.S`):**
+   - Align stack pointer `_estack` to the top of internal SRAM (e.g., `0x0023FE00`).
+   - Align trap vector `trap_entry` within valid SRAM space.
+3. **Footprint Clamping (< 240 KB Combined Budget):**
+   - Prune non-flight-critical bloat (disable full OSD graphical engine, Blackbox flashfs, GPS rescue, unused serial RX drivers).
+   - Retain core flight capabilities: PID controller (1 kHz), RV32IM soft-float filter pipeline, ICM42688P/BMI270 gyro drivers, 4-motor PWM scheduler, CRSF/ELRS receiver on UART1, parameter group persistence, and CP2102N USB-UART CLI/MSP.
+
+
 
 

@@ -352,3 +352,37 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 
 **Phase 8 Result:** 9/9 PASSED (100% Success Rate).  
 **Failures / Discrepancies in Main Code Found:** None.
+
+---
+
+## Hardware In-System Bench Validation & Physical Architecture Reality Check
+
+- **Target Hardware:** Physical C-DAC ARIES v3.0 Development Board (THEJAS32 SoC, VEGA ET1031 @ 100 MHz)
+- **Flashing Tool:** Official C-DAC `flasher.bat` (via Arduino VEGA 1.1.13 BSP) over UART-0 (CP2102N USB Bridge)
+- **Hardware Mode:** Jumper J12 (`BOOT-SEL`) shorted
+- **Firmware Artifact Flashed:** `obj/betaflight_2026.12.0-alpha_ARIESV3.hex`
+- **Execution Date:** 2026-11-14
+
+### Observation & Findings
+
+1. **Successful Flash Burning:**
+   - `flasher.bat` successfully connected to UART-0, erased sectors, and wrote the Intel HEX image into onboard Winbond SPI Flash.
+2. **Bootloader Output on Serial Console (115200 baud):**
+   ```text
+   Copying from FLASH to IRAM
+   [INFO] Flash ID: ... Flash initialized
+   [INFO] Copying 250KB from address: 0x000000.
+   Starting program ...
+   ```
+3. **Execution Failure (Hang after VEGA logo):**
+   - After `Starting program ...`, the processor printed the C-DAC VEGA text banner and halted. No serial output or MSP handshake was established.
+4. **Architectural Diagnosis (Reference: `lib/vega-bsp/thejas32/link1.lds`):**
+   - **Finding 1:** THEJAS32 lacks hardware SPI Flash Execute-In-Place (XIP). Code cannot run directly off external flash.
+   - **Finding 2:** ROM bootloader copies at most 248 KB – 250 KB from flash into internal SRAM starting at `0x00202000` and executes `jalr 0x00202000`.
+   - **Finding 3:** The initial build linked `.text` to ORIGIN `0x20000000` with data/stack at `0x10000000` (peripheral memory), causing an immediate exception trap upon entering `_start` at `0x00202000`.
+   - **Finding 4:** Total binary size was 760 KB (truncated by bootloader to 250 KB). All code, constants, data, BSS, and stack must fit within the 248 KB internal SRAM boundary.
+
+### Status & Next Steps
+- Documented in `HAL_PROGRESS.md` and `TEST_LOGS.md`.
+- Next step: Retarget `aries_v3.ld` to `ORIGIN = 0x00202000, LENGTH = 248K`, update `startup.S` stack pointer to `0x0023FE00`, and configure build flags to prune optional modules to fit the complete flight controller stack within < 240 KB.
+

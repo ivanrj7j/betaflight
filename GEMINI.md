@@ -83,6 +83,15 @@ This project directly addresses **Mission 3 (VEGAPilot Track)** of the **NIDAR (
   - Audited compiled ELF assembly: confirmed 100% single-precision arithmetic in real-time control paths (`subTaskPidController`, `taskGyroSample`, `taskFiltering`) with **zero** double-precision operations (`__adddf3`, `__muldf3`, `__divdf3`).
   - Clean compilation with exit code `0` (~770.7 KB Flash / ~66.8 KB RAM). Fresh Intel HEX artifact generated: `obj/betaflight_2026.12.0-alpha_ARIESV3.hex`.
 
+> [!IMPORTANT]
+> **Physical Hardware Execution Reality (THEJAS32 Memory Architecture):**
+> Bench testing on physical ARIES v3 silicon and analysis of the official C-DAC VEGA BSP (`lib/vega-bsp`) revealed that the THEJAS32 SoC **does not support Execute-In-Place (XIP) directly over SPI flash**.
+> 1. The on-chip ROM bootloader copies the application binary from SPI Flash into **internal SRAM at `0x00202000`** (up to a 248 KB – 250 KB hardware limit) and jumps directly to `0x00202000`.
+> 2. Total internal SRAM is 256 KB (`0x00200000`–`0x00240000`). The first 8 KB is reserved by the bootloader; the remaining 248 KB (`0x00202000`–`0x0023FFFF`) holds the entire application image (`.text`, `.rodata`, `.data`, `.bss`, and downward-growing `.stack`).
+> 3. The `0x10000000` memory range is peripheral memory-mapped IO (UART0 is at `0x10000100`), not SRAM.
+> 4. All code and runtime memory must be linked to `0x00202000` with a combined footprint `< 240 KB` (see [`HAL_PROGRESS.md`](HAL_PROGRESS.md) and [`TEST_LOGS.md`](TEST_LOGS.md) for full details).
+
+
 ---
 
 ## 2. Directory Navigation & Key Documentation
