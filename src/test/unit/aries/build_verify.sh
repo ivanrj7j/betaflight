@@ -17,7 +17,7 @@ echo "==========================================================================
 echo "Running Module T8: ARIES v3.0 Build Verification & Binary Disassembly Audit"
 echo "=============================================================================="
 
-TOTAL_TESTS=8
+TOTAL_TESTS=10
 PASSED_TESTS=0
 FAILED_TESTS=0
 
@@ -117,6 +117,32 @@ if [ -s "$HEX" ]; then
     report_pass "T8-08" "Intel HEX artifact exists and is non-empty ($HEX_BYTES bytes)"
 else
     report_fail "T8-08" "Intel HEX artifact exists and is non-empty" "HEX file missing or 0 bytes"
+fi
+
+# T8-09: Exactly zero 16-bit compressed instructions (RVC) in executable code
+ETEXT_ADDR=$("$NM" "$ELF" 2>/dev/null | grep -w "_etext" | awk '{print $1}')
+if [ -n "$ETEXT_ADDR" ]; then
+    RVC_COUNT=$("$OBJDUMP" -d "$ELF" --stop-address=0x"$ETEXT_ADDR" 2>/dev/null | grep -E "^\s*[0-9a-f]+:\s+[0-9a-f]{4}\s+" | wc -l)
+    if [ "$RVC_COUNT" -eq 0 ]; then
+        report_pass "T8-09" "Zero 16-bit compressed instructions in executable code (RV32IM pure 32-bit)"
+    else
+        report_fail "T8-09" "Zero 16-bit compressed instructions in executable code" "Found $RVC_COUNT compressed opcodes"
+    fi
+else
+    report_fail "T8-09" "Zero 16-bit compressed instructions" "_etext symbol not found"
+fi
+
+# T8-10: Raw binary artifact exists and fits within 248 KB physical limit
+BIN="obj/betaflight_2026.12.0-alpha_ARIESV3.bin"
+if [ -s "$BIN" ]; then
+    BIN_BYTES=$(wc -c < "$BIN")
+    if [ "$BIN_BYTES" -le 253952 ]; then
+        report_pass "T8-10" "Raw binary artifact exists and is under 248 KB ($BIN_BYTES bytes / 253,952 bytes)"
+    else
+        report_fail "T8-10" "Raw binary artifact exceeds 248 KB" "$BIN_BYTES bytes exceeds 253952"
+    fi
+else
+    report_fail "T8-10" "Raw binary artifact exists" "BIN file missing or 0 bytes"
 fi
 
 echo "=============================================================================="

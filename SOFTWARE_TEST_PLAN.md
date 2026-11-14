@@ -150,7 +150,59 @@ Tests are categorized across three execution environments:
   3. In GDB or via CLI diagnostic command, scan from `_sstack` upward to find the first address where `0xA5A5A5A5` was overwritten.
 * **Expected Result:**
   - Minimum 4 KB of virgin `0xA5A5A5A5` bytes remaining between the lowest stack point and `_sstack`.
-* **Pass/Fail Criteria:** PASS if stack usage is $< 12\text{ KB}$ out of $16\text{ KB}$.
+* **Pass/Fail Criteria:** PASS if stack usage is $< 2\text{ KB}$ out of allocated $6\text{ KB}$.
+
+---
+
+### Test Case SW-BOOT-08: Pure 32-bit RV32I Bare-Metal Memory Routines (memset, memcpy, memmove)
+* **Environment:** Host Unit Test (`aries_system_unittest`) & Physical Target Hardware
+* **Target Files:** [`src/platform/ARIES/system.c`](src/platform/ARIES/system.c), [`src/platform/ARIES/mk/ARIES.mk`](src/platform/ARIES/mk/ARIES.mk)
+* **Objective:** Ensure standard memory manipulation functions do not pull in toolchain `libc.a` routines containing 16-bit RVC opcodes or infinite loop self-recursion.
+* **Execution Steps:**
+  1. Execute unit tests `T1-24` (memset), `T1-25` (memcpy), `T1-26` (memmove) on forward and backward overlapping buffers.
+  2. Audit disassembly of `memset`, `memcpy`, `memmove` in `betaflight_ARIESV3.elf`.
+* **Expected Result:**
+  - `memset()`, `memcpy()`, and `memmove()` execute with 100% 32-bit aligned instructions (zero 16-bit opcodes).
+  - Loop pattern distribution is suppressed (`-fno-builtin-*` and `no-tree-loop-distribute-patterns`), preventing recursive `jal memset` calls.
+* **Pass/Fail Criteria:** 100% pass on unit tests and zero 16-bit opcodes in memory routines.
+
+---
+
+### Test Case SW-BOOT-09: Toolchain Multilib RVC Exclusion Audit
+* **Environment:** Host Disassembly Audit (`build_verify.sh`)
+* **Target Files:** [`src/platform/ARIES/mk/ARIES.mk`](src/platform/ARIES/mk/ARIES.mk), [`src/platform/ARIES/link/aries_v3.ld`](src/platform/ARIES/link/aries_v3.ld)
+* **Objective:** Enforce zero 16-bit compressed instructions (RVC) across all executable code (`0x00202000` to `_etext`).
+* **Execution Steps:**
+  1. Link with explicit `-L` flags directing `libc.a`, `libm.a`, `libgcc.a` to the toolchain's `rv32i_zicsr_zifencei/ilp32` multilib.
+  2. Execute `build_verify.sh` check `T8-09`.
+* **Expected Result:** Number of 16-bit compressed opcodes in executable code is strictly zero.
+* **Pass/Fail Criteria:** `RVC_COUNT == 0`.
+
+---
+
+### Test Case SW-BOOT-10: Early UART Telemetry Bounded Timeout & Non-Allocating Hex Print
+* **Environment:** Host Unit Test (`aries_system_unittest`) & Physical Target Hardware
+* **Target Files:** [`src/platform/ARIES/system.c`](src/platform/ARIES/system.c)
+* **Objective:** Ensure early UART transmission does not permanently hang the core if CP2102 FIFO saturates and does not invoke stack `memcpy`.
+* **Execution Steps:**
+  1. Run unit test `T1-27` with mock `UART_LSR` THRE bit held low.
+  2. Run unit test `T1-28` with diverse 32-bit test vectors (`0x0`, `0x2F`, `0xCAFEBABE`, `0xFFFFFFFF`).
+* **Expected Result:**
+  - `thejas32_early_uart_putc()` exits after 50,000 cycles if FIFO is not ready, preventing CPU lockup.
+  - `thejas32_early_uart_print_hex()` executes purely via register ALU bit-shifts without stack allocations.
+* **Pass/Fail Criteria:** 100% pass on unit tests `T1-27` and `T1-28`.
+
+---
+
+### Test Case SW-BOOT-11: Physical In-SRAM Execution Limit (< 248 KB) Enforcement
+* **Environment:** Build Verification Script (`build_verify.sh`)
+* **Target Files:** [`src/platform/ARIES/link/aries_v3.ld`](src/platform/ARIES/link/aries_v3.ld)
+* **Objective:** Ensure total flash binary size strictly respects the 248 KB physical SRAM bootloader boundary (`253,952 bytes`).
+* **Execution Steps:**
+  1. Build firmware with `make TARGET=ARIESV3 hex`.
+  2. Execute `build_verify.sh` check `T8-10`.
+* **Expected Result:** Binary size $\le 253,952$ bytes.
+* **Pass/Fail Criteria:** Pass.
 
 ---
 

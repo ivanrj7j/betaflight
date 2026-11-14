@@ -139,6 +139,9 @@ int main(int argc, char * argv[])
 #endif
 
     // Launch the scheduler
+#ifdef THEJAS32
+    thejas32_early_uart_puts("[MAIN] Launching scheduler loop...\r\n");
+#endif
     run();
 
     return 0;

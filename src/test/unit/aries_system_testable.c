@@ -238,3 +238,66 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
         return mepc + 4;
     }
 }
+
+// -----------------------------------------------------------------------------
+// Bare-Metal Memory Routines
+// -----------------------------------------------------------------------------
+void *thejas32_memset(void *dest, int c, size_t n)
+{
+    uint8_t *p = (uint8_t *)dest;
+    uint8_t val = (uint8_t)c;
+    while (n--) {
+        *p++ = val;
+    }
+    return dest;
+}
+
+void *thejas32_memcpy(void *dest, const void *src, size_t n)
+{
+    uint8_t *d = (uint8_t *)dest;
+    const uint8_t *s = (const uint8_t *)src;
+    while (n--) {
+        *d++ = *s++;
+    }
+    return dest;
+}
+
+void *thejas32_memmove(void *dest, const void *src, size_t n)
+{
+    uint8_t *d = (uint8_t *)dest;
+    const uint8_t *s = (const uint8_t *)src;
+    if (d < s) {
+        while (n--) {
+            *d++ = *s++;
+        }
+    } else if (d > s) {
+        d += n;
+        s += n;
+        while (n--) {
+            *--d = *--s;
+        }
+    }
+    return dest;
+}
+
+void test_early_uart_putc_timeout(char c, uint32_t mock_lsr_val, uint32_t *cycles_spun)
+{
+    (void)c;
+    uint32_t timeout = 50000;
+    uint32_t count = 0;
+    while (!(mock_lsr_val & 0x20) && --timeout) {
+        count++;
+    }
+    if (cycles_spun) {
+        *cycles_spun = count;
+    }
+}
+
+void test_early_uart_print_hex(uint32_t val, char *out_str)
+{
+    for (int i = 7; i >= 0; i--) {
+        uint8_t n = (val >> (i * 4)) & 0xF;
+        out_str[7 - i] = n < 10 ? ('0' + n) : ('A' + n - 10);
+    }
+    out_str[8] = '\0';
+}

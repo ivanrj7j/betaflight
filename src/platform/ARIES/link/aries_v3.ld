@@ -19,10 +19,11 @@ SECTIONS
         . = ALIGN(4);
         *(.text.startup*)
         *(.text*)
+        . = ALIGN(4);
+        _etext = .;
         *(.rodata*)
         *(.srodata*)
         . = ALIGN(4);
-        _etext = .;
     } > RAM
 
     .pg_registry : {

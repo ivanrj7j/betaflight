@@ -312,3 +312,82 @@ TEST_F(AriesSystemTest, CycleCounterInit100MHzConfiguration)
     EXPECT_EQ(clockCyclesToMicros(100), 1);
     EXPECT_FLOAT_EQ(clockCyclesToMicrosf(100), 1.0f);
 }
+
+// T1-24: Bare-Metal thejas32_memset fills memory and handles zero size
+TEST_F(AriesSystemTest, MemsetBasicAndZeroSize)
+{
+    uint8_t buffer[64];
+    for (size_t i = 0; i < sizeof(buffer); i++) buffer[i] = 0xAA;
+
+    void *ret = thejas32_memset(buffer, 0x55, 32);
+    EXPECT_EQ(ret, buffer);
+
+    for (size_t i = 0; i < 32; i++) EXPECT_EQ(buffer[i], 0x55);
+    for (size_t i = 32; i < 64; i++) EXPECT_EQ(buffer[i], 0xAA);
+
+    // Zero size test
+    ret = thejas32_memset(buffer, 0xFF, 0);
+    EXPECT_EQ(ret, buffer);
+    EXPECT_EQ(buffer[0], 0x55);
+}
+
+// T1-25: Bare-Metal thejas32_memcpy copies memory accurately and handles zero size
+TEST_F(AriesSystemTest, MemcpyBasicAndZeroSize)
+{
+    uint8_t src[32];
+    uint8_t dst[32];
+    for (size_t i = 0; i < sizeof(src); i++) src[i] = (uint8_t)(i + 1);
+    for (size_t i = 0; i < sizeof(dst); i++) dst[i] = 0;
+
+    void *ret = thejas32_memcpy(dst, src, 32);
+    EXPECT_EQ(ret, dst);
+    for (size_t i = 0; i < 32; i++) EXPECT_EQ(dst[i], (uint8_t)(i + 1));
+
+    // Zero size test
+    ret = thejas32_memcpy(dst, src, 0);
+    EXPECT_EQ(ret, dst);
+}
+
+// T1-26: Bare-Metal thejas32_memmove handles forward and backward overlapping copies
+TEST_F(AriesSystemTest, MemmoveOverlappingForwardAndBackward)
+{
+    char str1[32] = "1234567890abcdef";
+    // Forward overlap (dst > src): shift right by 2
+    thejas32_memmove(str1 + 2, str1, 10);
+    EXPECT_EQ(memcmp(str1, "121234567890cdef", 16), 0);
+
+    char str2[32] = "1234567890abcdef";
+    // Backward overlap (dst < src): shift left by 2
+    thejas32_memmove(str2, str2 + 2, 10);
+    EXPECT_EQ(memcmp(str2, "34567890ababcdef", 16), 0);
+}
+
+// T1-27: Early UART putc bounded timeout prevents infinite spin when UART_LSR is not ready
+TEST_F(AriesSystemTest, EarlyUartPutcBoundedTimeout)
+{
+    uint32_t cycles = 0;
+    test_early_uart_putc_timeout('X', 0x00, &cycles);
+    // Verified: looped exactly 49,999 times and exited safely without hanging
+    EXPECT_EQ(cycles, 49999U);
+
+    // If THRE is ready (0x20), it should exit immediately on 0 cycles
+    test_early_uart_putc_timeout('X', 0x20, &cycles);
+    EXPECT_EQ(cycles, 0U);
+}
+
+// T1-28: Early UART print hex accurately formats 32-bit values via pure ALU math
+TEST_F(AriesSystemTest, EarlyUartPrintHexPureAlu)
+{
+    char hex[16];
+    test_early_uart_print_hex(0x00000000, hex);
+    EXPECT_STREQ(hex, "00000000");
+
+    test_early_uart_print_hex(0x0000002F, hex);
+    EXPECT_STREQ(hex, "0000002F");
+
+    test_early_uart_print_hex(0xCAFEBABE, hex);
+    EXPECT_STREQ(hex, "CAFEBABE");
+
+    test_early_uart_print_hex(0xFFFFFFFF, hex);
+    EXPECT_STREQ(hex, "FFFFFFFF");
+}

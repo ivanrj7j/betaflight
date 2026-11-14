@@ -223,6 +223,8 @@ Because the VEGA ET1031 is a 100 MHz soft-float core, the following Betaflight f
 | **TST-10** | Arming Prevention Checks | Rejects arming on CLI/throttle/no gyro | | | [ ] PASS |
 | **TST-11** | IMU Mechanical Soft-Mount | Foam tape isolation, wires $< 10\text{ cm}$ | | | [ ] PASS |
 | **TST-12** | Atomics Latency Hygiene | No wait loops in critical sections | | | [ ] PASS |
+| **TST-13** | Zero RVC Instructions Audit | 0 compressed 16-bit opcodes in code | | | [x] PASS |
+| **TST-14** | In-SRAM Execution & Memory Safety | Size $\le 248\text{ KB}$, pure 32-bit `memset` | | | [x] PASS |
 
 ---
 

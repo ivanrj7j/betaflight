@@ -41,6 +41,15 @@ void thejas32_interrupt_enable(uint8_t irq_number);
 void thejas32_interrupt_disable(uint8_t irq_number);
 uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp);
 
+// Bare-metal memory routines for C-DAC THEJAS32 (VEGA ET1031)
+void *thejas32_memset(void *dest, int c, size_t n);
+void *thejas32_memcpy(void *dest, const void *src, size_t n);
+void *thejas32_memmove(void *dest, const void *src, size_t n);
+
+// Early UART routines
+void test_early_uart_putc_timeout(char c, uint32_t mock_lsr_val, uint32_t *cycles_spun);
+void test_early_uart_print_hex(uint32_t val, char *out_str);
+
 // Test diagnostic hooks
 int test_system_get_panic_count(void);
 uint32_t test_system_get_last_panic_mcause(void);

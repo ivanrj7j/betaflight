@@ -566,11 +566,14 @@ void initPhase2(void)
     uartPinConfigure(serialPinConfig());
 #endif
 
+    THEJAS_LOG("[INIT] 7a. serialInit...\r\n");
     serialInit(featureIsEnabled(FEATURE_SOFTSERIAL));
 
+    THEJAS_LOG("[INIT] 7b. mixerInit...\r\n");
     mixerInit(mixerConfig()->mixerMode);
 
 #ifdef USE_MOTOR
+    THEJAS_LOG("[INIT] 7c. motorDevInit...\r\n");
     /* Motors needs to be initialized soon as posible because hardware initialization
      * may send spurious pulses to esc's causing their early initialization. Also ppm
      * receiver may share timer with motors so motors MUST be initialized here. */
@@ -607,6 +610,7 @@ void initPhase2(void)
 
 #else
 
+    THEJAS_LOG("[INIT] 7d. configureSPIBusses...\r\n");
     // Depending on compilation options SPI/QSPI/OSPI initialisation may already be done.
     if (!(initFlags & SPI_BUSSES_INIT_ATTEMPTED)) {
         configureSPIBusses();
@@ -623,6 +627,7 @@ void initPhase2(void)
     sdioPinConfigure();
     sdioInitialize();
 #endif
+    THEJAS_LOG("[INIT] 7e. initPhase2 done!\r\n");
 }
 
 #ifdef USE_USB_MSC
@@ -670,6 +675,7 @@ void initMsc(void)
 
 void initPhase3(void)
 {
+    THEJAS_LOG("[INIT] 8. Entering initPhase3...\r\n");
 #ifdef USE_PERSISTENT_MSC_RTC
     // if we didn't enter MSC mode then clear the persistent RTC value
     persistentObjectWrite(PERSISTENT_OBJECT_RTC_HIGH, 0);
@@ -727,6 +733,7 @@ void initPhase3(void)
 
     initBoardAlignment(boardAlignment());
 
+    THEJAS_LOG("[INIT] 8a. sensorsAutodetect...\r\n");
     if (!sensorsAutodetect()) {
         // if gyro was not detected due to whatever reason, notify and don't arm.
         if (isSystemConfigured()) {
@@ -736,6 +743,7 @@ void initPhase3(void)
     }
 
     systemState |= SYSTEM_STATE_SENSORS_READY;
+    THEJAS_LOG("[INIT] 8b. sensors ready\r\n");
 
     // Set the targetLooptime based on the detected gyro sampleRateHz and pid_process_denom
     gyroSetTargetLooptime(pidConfig()->pid_process_denom);
@@ -936,6 +944,7 @@ void initPhase3(void)
     statsInit();
 #endif
 
+    THEJAS_LOG("[INIT] 8c. mspInit & mspSerialInit...\r\n");
     // Initialize MSP
     mspInit();
     mspSerialInit();
@@ -1095,7 +1104,9 @@ void initPhase3(void)
     unusedPinsInit();
 #endif
 
+    THEJAS_LOG("[INIT] 8d. tasksInit...\r\n");
     tasksInit();
 
     systemState |= SYSTEM_STATE_READY;
+    THEJAS_LOG("[INIT] 8e. initPhase3 complete! System ready.\r\n");
 }

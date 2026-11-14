@@ -452,5 +452,35 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 - **Unit & Integration Test Suites:** **130 / 130 PASSED**.
 - **Cumulative Pass Rate:** **138 / 138 checks PASSED (100.0%)**.
 
+---
+
+## [2026-11-14] - Toolchain Multilib RVC Elimination & Bare-Metal Memory Routines (H12 & H13)
+
+### Observation & Root Cause
+- Firmware flashed successfully, but physical ARIES v3 silicon entered an infinite reset loop at `[PG] reset #00000000 pgn=0x0000002F ...`.
+- Analysis revealed that the C-DAC THEJAS32 SoC (VEGA ET1031) is an **RV32IM** core without RISC-V Compressed Instructions (RVC / 'C' extension) or hardware floating point ('F' extension).
+- The Espressif GCC toolchain lacked an `rv32im` multilib, causing GCC to fall back to the root multilib `.` when linking `libc.a`, `libm.a`, and `libgcc.a`. This injected 7,247 compressed 16-bit instructions into the binary.
+- On invoking `memset()` in `pgResetInstance()`, physical ET1031 silicon triggered an Illegal Instruction hardware trap and rebooted into ROM bootloader.
+
+### Engineering Mitigations
+1. **Toolchain Multilib Direct Link:** Configured `LD_FLAGS` in `ARIES.mk` to explicitly search `/rv32i_zicsr_zifencei/ilp32` for `libc.a`, `libm.a`, and `libgcc.a`, eliminating all 16-bit instructions from external libraries.
+2. **Bare-Metal Memory Overrides:** Implemented pure 32-bit RV32I `memset()`, `memcpy()`, and `memmove()` in `src/platform/ARIES/system.c` with loop-pattern distribution suppressed (`no-tree-loop-distribute-patterns`) and memory barriers.
+3. **Early UART Non-Blocking Protection:** Added a 50,000-cycle bounded timeout to `thejas32_early_uart_putc()` and converted `thejas32_early_uart_print_hex()` to pure register ALU nibble math.
+
+### New Test Cases Added
+- **T1-24: `MemsetBasicAndZeroSize`:** Verifies memory filling, boundary limits, and zero-size handling.
+- **T1-25: `MemcpyBasicAndZeroSize`:** Verifies forward buffer copying, pointers, and zero-size safety.
+- **T1-26: `MemmoveOverlappingForwardAndBackward`:** Verifies handling of both forward ($dest > src$) and backward ($dest < src$) overlapping buffers without data clobbering.
+- **T1-27: `EarlyUartPutcBoundedTimeout`:** Validates non-blocking timeout escape when UART LSR THRE bit is unready.
+- **T1-28: `EarlyUartPrintHexPureAlu`:** Validates pure ALU nibble math formatting for full 32-bit values without stack allocations.
+- **T8-09: `Zero 16-bit compressed instructions in executable code`:** Automated disassembly audit ensuring exactly 0 compressed opcodes in `.text`.
+- **T8-10: `Raw binary artifact under 248 KB limit`:** Asserts binary footprint $\le 253,952$ bytes.
+
+### Verification Results
+- **Binary Footprint:** Raw binary is **217 KB** (`221,800 bytes`), total SRAM is **253,312 bytes** (fits within 248 KB limit).
+- **Automated Verification:** `build_verify.sh` **10 / 10 PASSED** (100%).
+- **Unit & Integration Test Suites:** **135 / 135 PASSED** (100%).
+- **Cumulative Pass Rate:** **145 / 145 checks PASSED (100.0%)**.
+
 
 
