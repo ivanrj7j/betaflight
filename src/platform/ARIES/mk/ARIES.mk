@@ -56,6 +56,9 @@ MCU_EXCLUDES = \
     io/rcdevice.c \
     io/rcdevice_cam.c \
     drivers/serial_escserial.c \
+    io/serial_4way.c \
+    io/serial_4way_stk500v2.c \
+    io/serial_4way_avrootloader.c \
     cms/cms_menu_main.c \
     cms/cms_menu_misc.c \
     cms/cms_menu_osd.c \

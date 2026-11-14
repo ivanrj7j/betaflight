@@ -25,6 +25,13 @@
 
 #include "platform.h"
 
+#ifdef THEJAS32
+void thejas32_early_uart_puts(const char *s);
+#define THEJAS_LOG(s) thejas32_early_uart_puts(s)
+#else
+#define THEJAS_LOG(s) ((void)0)
+#endif
+
 #include "blackbox/blackbox.h"
 
 #include "build/build_config.h"
@@ -405,20 +412,27 @@ void initPhase1(void)
 
 #endif // CONFIG_IN_EXTERNAL_FLASH || CONFIG_IN_MEMORY_MAPPED_FLASH
 
+    THEJAS_LOG("[INIT] 1. Starting initEEPROM...\r\n");
     initEEPROM();
 
+    THEJAS_LOG("[INIT] 2. Checking EEPROM structure...\r\n");
     ensureEEPROMStructureIsValid();
 
+    THEJAS_LOG("[INIT] 3. Reading EEPROM...\r\n");
     bool readSuccess = readEEPROM();
 
 #if defined(USE_BOARD_INFO)
+    THEJAS_LOG("[INIT] 4. initBoardInformation...\r\n");
     initBoardInformation();
 #endif
 
     if (!readSuccess || !isEEPROMVersionValid() || strncasecmp(systemConfig()->boardIdentifier, TARGET_BOARD_IDENTIFIER, sizeof(TARGET_BOARD_IDENTIFIER))) {
+        THEJAS_LOG("[INIT] 5. Resetting EEPROM to defaults...\r\n");
         resetEEPROM();
+        THEJAS_LOG("[INIT] 5. EEPROM reset complete!\r\n");
     }
 
+    THEJAS_LOG("[INIT] 6. Config marked LOADED\r\n");
     systemState |= SYSTEM_STATE_CONFIG_LOADED;
 
 #ifdef USE_DEBUG_PIN
@@ -444,6 +458,7 @@ void initPhase1(void)
 
 void initPhase2(void)
 {
+    THEJAS_LOG("[INIT] 7. Entering initPhase2...\r\n");
 #if defined(USE_BUTTONS)
 
     buttonsInit();

@@ -98,7 +98,9 @@ int pgStore(const pgRegistry_t* reg, void *to, int size)
 
 void pgResetAll(void)
 {
+    THEJAS_LOG("[PG] pgResetAll: start\r\n");
     PG_FOREACH(reg) {
         pgReset(reg);
     }
+    THEJAS_LOG("[PG] pgResetAll: complete\r\n");
 }

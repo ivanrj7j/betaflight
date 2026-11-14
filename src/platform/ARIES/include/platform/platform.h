@@ -116,4 +116,11 @@ extern uint32_t SystemCoreClock;
 #define UART_RX_BUFFER_ATTRIBUTE
 #define SERIAL_TRAIT_PIN_CONFIG         1
 
+// Early Hardware UART0 Diagnostic Telemetry (115200 baud, polled, non-blocking)
+void thejas32_early_uart_init(void);
+void thejas32_early_uart_putc(char c);
+void thejas32_early_uart_puts(const char *s);
+void thejas32_early_uart_print_hex(uint32_t val);
+#define THEJAS_LOG(s) thejas32_early_uart_puts(s)
+
 

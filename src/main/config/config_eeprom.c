@@ -338,10 +338,12 @@ bool isEEPROMVersionValid(void)
 // Scan the EEPROM config. Returns true if the config is valid.
 bool isEEPROMStructureValid(void)
 {
+    THEJAS_LOG("[EEPROM] isEEPROMStructureValid: enter\r\n");
     const uint8_t *p = (const uint8_t*)&__config_start;
     const configHeader_t *header = (const configHeader_t *)p;
 
     if (header->magic_be != 0xBE) {
+        THEJAS_LOG("[EEPROM] isEEPROMStructureValid: magic_be != 0xBE (empty/invalid)\r\n");
         return false;
     }
 
@@ -450,6 +452,7 @@ bool loadEEPROM(void)
 
 static bool writeSettingsToEEPROM(void)
 {
+    THEJAS_LOG("[EEPROM] writeSettingsToEEPROM: enter\r\n");
     bool dirtyConfig = !isEEPROMVersionValid() || !isEEPROMStructureValid();
 
     configHeader_t header = {
@@ -465,6 +468,7 @@ static bool writeSettingsToEEPROM(void)
 
     // Only write the config if it has changed
     if (dirtyConfig) {
+        THEJAS_LOG("[EEPROM] writeSettingsToEEPROM: streamer start\r\n");
         config_streamer_t streamer;
         config_streamer_init(&streamer);
 
@@ -500,19 +504,24 @@ static bool writeSettingsToEEPROM(void)
         const uint16_t invertedBigEndianCrc = ~(((crc & 0xFF) << 8) | (crc >> 8));
         config_streamer_write(&streamer, (uint8_t *)&invertedBigEndianCrc, sizeof(crc));
 
+        THEJAS_LOG("[EEPROM] writeSettingsToEEPROM: streamer flush\r\n");
         config_streamer_flush(&streamer);
 
+        THEJAS_LOG("[EEPROM] writeSettingsToEEPROM: streamer finish\r\n");
         return (config_streamer_finish(&streamer) == 0);
     } else {
+        THEJAS_LOG("[EEPROM] writeSettingsToEEPROM: clean config, nothing to write\r\n");
         return true;
     }
 }
 
 void writeConfigToEEPROM(void)
 {
+    THEJAS_LOG("[EEPROM] writeConfigToEEPROM: enter\r\n");
     bool success = false;
     // write it
     for (int attempt = 0; attempt < 3 && !success; attempt++) {
+        THEJAS_LOG("[EEPROM] writeConfigToEEPROM: attempt calling writeSettingsToEEPROM\r\n");
         if (writeSettingsToEEPROM() && isEEPROMVersionValid() && isEEPROMStructureValid()) {
             success = true;
 

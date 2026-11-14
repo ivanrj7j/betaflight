@@ -147,11 +147,14 @@
 #undef USE_RCDEVICE
 #undef USE_ESCSERIAL
 #undef USE_ESCSERIAL_SIMONK
+#undef USE_MSP_DISPLAYPORT
+#undef USE_SERIAL_4WAY_BLHELI_INTERFACE
+#undef USE_SERIAL_4WAY_BLHELI_BOOTLOADER
+#undef USE_SERIAL_4WAY_SK_BOOTLOADER
 
 // Enable core flight features
 #define TARGET_PREINIT
 #define USE_SPI
-#define TARGET_PREINIT
 #define USE_SPI_DEVICE_1
 #define SPI1_SCK_PIN            PA5
 #define SPI1_SDI_PIN            PA6
@@ -183,7 +186,7 @@
 
 // Parameter Group / Configuration persistence in RAM for in-SRAM execution
 #define CONFIG_IN_RAM
-#define EEPROM_SIZE                     4096
+#define EEPROM_SIZE                     8192
 #undef CONFIG_IN_FLASH
 #undef ENABLE_CONFIG_FLASH_INIT
 

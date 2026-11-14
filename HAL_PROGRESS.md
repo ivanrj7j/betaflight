@@ -733,13 +733,13 @@ Exhaustive disassembly of `lib/vega-flasher-windows/vega-flasher.exe`, `lib/vega
 ### 4. Verification & Final Artifact Metrics
 - **Compilation:** Clean exit code `0`.
 - **Memory Footprint:**
-  - Text: 219,996 bytes
-  - Data: 664 bytes
-  - BSS: 31,608 bytes (includes `eepromData[4096]` and `tasks`)
-  - **Total SRAM Occupancy:** 252,268 bytes / 253,952 bytes (1,684 bytes free headroom).
+  - Text: 215,828 bytes
+  - Data: 660 bytes
+  - BSS: 33,560 bytes (includes `eepromData[8192]` and `tasks`)
+  - **Total SRAM Occupancy:** 250,048 bytes / 253,952 bytes (3,904 bytes free headroom).
 - **Flash Artifacts:**
-  - Raw Binary (`betaflight_2026.12.0-alpha_ARIESV3.bin`): **216 KB** (fits cleanly within 248 KB limit).
-  - Intel HEX (`betaflight_2026.12.0-alpha_ARIESV3.hex`): **607 KB**.
+  - Raw Binary (`betaflight_2026.12.0-alpha_ARIESV3.bin`): **212 KB** (fits cleanly within 248 KB limit).
+  - Intel HEX (`betaflight_2026.12.0-alpha_ARIESV3.hex`): **595 KB**.
 - **Test Suite Results:**
   - `build_verify.sh`: **8 / 8 checks PASSED**.
   - Google Test Unit & Integration: **127 / 127 PASSED**.
@@ -759,6 +759,9 @@ Exhaustive disassembly of `lib/vega-flasher-windows/vega-flasher.exe`, `lib/vega
 | **H6** | **Synchronous Load Fault on Unmapped Config Address** | Code loaded into SRAM halted before UART0 opened; terminal remained dead. | `CONFIG_IN_FLASH` pointed `__config_start` to `0x201F8000`. In `initPhase1()`, `readEEPROM()` executed `lb a0, 0(0x201F8000)`. Without XIP hardware, dereferencing `0x201F8000` triggered an immediate Load Access Fault (`mcause = 5`). | Migrated config storage to `CONFIG_IN_RAM` (`EEPROM_SIZE 4096`). Placed `eepromData` in `.bss` at `0x0023B640`. Removed `0x201F8000` from `aries_v3.ld`. Zero bus faults occur. |
 | **H7** | **Silent Trap Panics (Zero Telemetry)** | Any CPU exception resulted in an uncommunicative freeze; no error message was displayed. | `handle_trap_panic()` in `system.c` was an empty `while (1);` loop. | Implemented a polled, zero-interrupt early UART0 driver in `system.c` running at 115200 baud immediately in `systemInit()`. Configured `handle_trap_panic()` to report `[TRAP PANIC] mcause=0x... mepc=0x... sp=0x...` over UART0 on any fault. |
 | **H8** | **SRAM Headroom Pressure with `eepromData[4096]`** | Adding 4 KB `eepromData` buffer to `.bss` threatened to breach the 248 KB ceiling. | Total SRAM capacity is strictly 248 KB (253,952 bytes). | Pruned unused non-flight peripheral drivers: `USE_RCDEVICE` (RunCam protocol - 2.3 KB) and `USE_ESCSERIAL` (BLHeli pass-through - 2.1 KB). Reduced raw binary to **216 KB**, leaving 1,684 bytes of free SRAM headroom. |
+| **H9** | **The 4 KB EEPROM Overflow Trap (`FAILURE_CONFIG_STORE_FAILURE`)** | Early boot banner printed `Clocks & Timer0 Initialized`, but halted before `EEPROM & Config Initialized Successfully!`. | Compiled Betaflight Parameter Groups (PGs) exceed 4,096 bytes (VTX tables, PID profiles, motor configurations). During `initPhase1()`, `resetEEPROM()` attempted to serialize PGs into `eepromData[4096]`, overflowing the buffer and corrupting the next-PG size field. `isEEPROMStructureValid()` failed, causing `writeConfigToEEPROM()` to call `failureMode(FAILURE_CONFIG_STORE_FAILURE)` which halted in `while(1);`. | Increased `EEPROM_SIZE` from 4096 to 8192 (`8 KiB`), aligning with the RAM config sizing in `STM32H562/target.h`. Undefined `USE_MSP_DISPLAYPORT` (reducing `UART_TX_BUFFER_SIZE` from 1280 to 256 bytes for both UART0 and UART1, saving 2,048 bytes of RAM) and pruned `serial_4way`, bringing total SRAM occupancy to 250,048 bytes (3,904 bytes free headroom). |
+| **H10** | **Linker Failure on Orphaned `esc4way` Bootloader Symbols** | Pruning `io/serial_4way.c` resulted in link failure: `undefined reference to esc4wayInit and esc4wayProcess` in `msp.c`. | `target/common_post.h` automatically re-defines `USE_SERIAL_4WAY_BLHELI_INTERFACE` if `USE_SERIAL_4WAY_BLHELI_BOOTLOADER` or `USE_SERIAL_4WAY_SK_BOOTLOADER` is defined (set by default in `common_pre.h`). | Added `#undef USE_SERIAL_4WAY_BLHELI_BOOTLOADER` and `#undef USE_SERIAL_4WAY_SK_BOOTLOADER` to `src/platform/ARIES/target/ARIESV3/target.h`. Linker succeeds cleanly with exit code 0. |
+| **H11** | **Sub-Function Execution Halt in `ensureEEPROMStructureIsValid`** | Serial monitor printed `[INIT] 2. Checking EEPROM structure...` and froze before milestone 3. | The call sequence between `[INIT] 2` and `[INIT] 3` involves `isEEPROMStructureValid()`, `pgResetAll()`, `validateAndFixConfig()`, and `writeConfigToEEPROM()`. An unhandled non-external interrupt or unmonitored sub-function freeze held the core without telemetry. | Added deep instrumentation across `config.c`, `config_eeprom.c`, and `pg.c` with sequenced telemetry (`[CONFIG] 2a`..`2l`, `[PG]`, `[EEPROM]`). Upgraded `handle_trap` in `system.c` to report and mask any unexpected interrupts (`mcause != 11`). Generated fresh 214 KB binary (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`). |
 
 
 

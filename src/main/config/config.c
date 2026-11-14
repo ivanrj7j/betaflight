@@ -157,7 +157,9 @@ uint8_t getCurrentBatteryProfileIndex(void)
 
 void resetConfig(void)
 {
+    THEJAS_LOG("[CONFIG] 2h. resetConfig: calling pgResetAll...\r\n");
     pgResetAll();
+    THEJAS_LOG("[CONFIG] 2i. resetConfig: pgResetAll finished\r\n");
 
 #if defined(USE_TARGET_CONFIG)
     targetConfiguration();
@@ -788,14 +790,17 @@ bool readEEPROM(void)
 
 void writeUnmodifiedConfigToEEPROM(void)
 {
+    THEJAS_LOG("[CONFIG] 2j. writeUnmodified: validateAndFixConfig...\r\n");
     validateAndFixConfig();
 
+    THEJAS_LOG("[CONFIG] 2k. writeUnmodified: calling writeConfigToEEPROM...\r\n");
     suspendRxSignal();
     eepromWriteInProgress = true;
     writeConfigToEEPROM();
     eepromWriteInProgress = false;
     resumeRxSignal();
     configIsDirty = false;
+    THEJAS_LOG("[CONFIG] 2l. writeUnmodified: writeConfigToEEPROM finished\r\n");
 }
 
 void writeEEPROM(void)
@@ -810,19 +815,26 @@ void writeEEPROM(void)
 
 bool resetEEPROM(void)
 {
+    THEJAS_LOG("[CONFIG] 2e. resetEEPROM: calling resetConfig...\r\n");
     resetConfig();
 
+    THEJAS_LOG("[CONFIG] 2f. resetEEPROM: calling writeUnmodifiedConfigToEEPROM...\r\n");
     writeUnmodifiedConfigToEEPROM();
+    THEJAS_LOG("[CONFIG] 2g. resetEEPROM: writeUnmodifiedConfigToEEPROM finished\r\n");
 
     return true;
 }
 
 void ensureEEPROMStructureIsValid(void)
 {
+    THEJAS_LOG("[CONFIG] 2a. ensureEEPROMStructureIsValid: calling isEEPROMStructureValid...\r\n");
     if (isEEPROMStructureValid()) {
+        THEJAS_LOG("[CONFIG] 2b. isEEPROMStructureValid returned true\r\n");
         return;
     }
+    THEJAS_LOG("[CONFIG] 2c. isEEPROMStructureValid returned false, calling resetEEPROM...\r\n");
     resetEEPROM();
+    THEJAS_LOG("[CONFIG] 2d. resetEEPROM finished\r\n");
 }
 
 void saveConfigAndNotify(void)

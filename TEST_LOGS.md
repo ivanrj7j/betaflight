@@ -407,17 +407,38 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
    - In `initPhase1()`, `readEEPROM()` -> `isEEPROMStructureValid()` executed a load instruction from `0x201F8000`.
    - Because THEJAS32 lacks hardware XIP memory-mapping for the SPI3 controller, dereferencing `0x201F8000` caused an immediate synchronous exception (`mcause = 5`), trapping into `handle_trap_panic()` which was a silent `while(1);` loop before `initPhase2()` could open UART0.
    - **Resolution:** Switched to `CONFIG_IN_RAM` (`EEPROM_SIZE 4096`), placing `eepromData` in `.bss` at `0x0023B640`. No access to `0x201F8000` occurs.
+3. **The 4 KB EEPROM Overflow Trap (`FAILURE_CONFIG_STORE_FAILURE`):**
+   - Boot banner reached `[ARIES v3] Clocks & Timer0 Initialized` but halted before `[ARIES v3] EEPROM & Config Initialized Successfully!`.
+   - In `initPhase1()`, `resetEEPROM()` attempted to serialize compiled Parameter Groups (PGs) into `eepromData[4096]`. Because default PGs exceed 4 KB, writing overran the buffer, causing `isEEPROMStructureValid()` to fail.
+   - `writeConfigToEEPROM()` triggered `failureMode(FAILURE_CONFIG_STORE_FAILURE)`, which halted the core in `while(1);`.
+   - **Resolution:** Increased `EEPROM_SIZE` to 8192 (`8 KiB`), undefined `USE_MSP_DISPLAYPORT` (reducing UART TX buffers from 1280 to 256 bytes, saving 2 KB RAM), and undefined `serial_4way` bootloader flags.
+   - Enhanced `failureMode()` in `system.c` to output `[FAILURE MODE] Code: 0x...` over early UART0, and added sequential milestone tags `[INIT] 1..7` in `initPhase1()` / `initPhase2()`.
 
 ### Fixes & Diagnostic Additions
 - **Early Hardware UART0 Driver:** Implemented polled `thejas32_early_uart_puts()` and `thejas32_early_uart_print_hex()` in `system.c`.
 - **Boot Telemetry:** Configured UART0 at 115200 baud immediately in `systemInit()`, printing boot banner and milestones on board reset.
-- **Panic Reporting:** `handle_trap_panic()` now outputs `[TRAP PANIC] mcause=0x... mepc=0x... sp=0x...` over UART0 on any exception.
-- **Footprint Pruning:** Undefined `USE_RCDEVICE` and `USE_ESCSERIAL` to save 4.5 KB.
+- **Panic & Failure Reporting:** `handle_trap_panic()` outputs `[TRAP PANIC] mcause=0x... mepc=0x... sp=0x...` and `failureMode()` outputs `[FAILURE MODE] Code: 0x...` over UART0.
+- **Footprint Pruning:** Undefined `USE_RCDEVICE`, `USE_ESCSERIAL`, `USE_MSP_DISPLAYPORT`, and `USE_SERIAL_4WAY_*` to fit comfortably inside 248 KB SRAM with `EEPROM_SIZE 8192`.
 
 ### Verification Results
-- **Binary Footprint:** Raw binary is **216 KB** (fits in 248 KB SRAM limit with 1,684 bytes headroom).
+- **Binary Footprint:** Raw binary is **214 KB** (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`), total SRAM is 251,712 bytes with 2,240 bytes free headroom below 248 KB.
 - **Automated Verification:** `build_verify.sh` **8 / 8 PASSED**.
 - **Unit & Integration Test Suites:** **127 / 127 PASSED**.
 - **Cumulative Pass Rate:** **135 / 135 checks PASSED (100.0%)**.
+
+---
+
+## [2026-11-14] - Deep EEPROM Sub-Function Telemetry & Trap Shielding (H11)
+
+### Observation & Analysis
+- On physical hardware, the boot banner progressed through:
+  ```text
+  [INIT] 1. Starting initEEPROM...
+  [INIT] 2. Checking EEPROM structure...
+  ```
+  and halted before `[INIT] 3. Reading EEPROM...` without displaying an exception trap or failure code.
+- Between `[INIT] 2` and `[INIT] 3`, execution branches through `ensureEEPROMStructureIsValid()`, `isEEPROMStructureValid()`, `resetEEPROM()`, `resetConfig()`, `pgResetAll()`, `validateAndFixConfig()`, and `writeConfigToEEPROM()`.
+- To pinpoint the exact assembly instruction or sub-call where CPU execution stops, deep step-by-step early UART logging was injected into every sub-function.
+- Additionally, `handle_trap()` was shielded to detect non-external interrupts (`mcause != 11`) and immediately mask the firing interrupt in `mie`, eliminating unhandled interrupt loops.
 
 

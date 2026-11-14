@@ -228,7 +228,7 @@ void thejas32_early_uart_puts(const char *s)
     }
 }
 
-static void thejas32_early_uart_print_hex(uint32_t val)
+void thejas32_early_uart_print_hex(uint32_t val)
 {
     const char hex_chars[] = "0123456789ABCDEF";
     for (int i = 7; i >= 0; i--) {
@@ -295,6 +295,12 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
                     }
                 }
             }
+        } else {
+            thejas32_early_uart_puts("\r\n[TRAP INTR] Unexpected interrupt mcause=0x");
+            thejas32_early_uart_print_hex(mcause);
+            thejas32_early_uart_puts("\r\n");
+            // Mask the unexpected interrupt in mie to prevent an unhandled interrupt loop
+            __asm__ volatile ("csrc mie, %0" : : "r"(1UL << cause_num));
         }
         return mepc;
     } else {
@@ -339,7 +345,9 @@ void indicateFailure(failureMode_e mode, int repeatCount)
 
 void failureMode(failureMode_e mode)
 {
-    (void)mode;
+    thejas32_early_uart_puts("\r\n[FAILURE MODE] Code: 0x");
+    thejas32_early_uart_print_hex((uint32_t)mode);
+    thejas32_early_uart_puts("\r\n");
     while (1);
 }
 

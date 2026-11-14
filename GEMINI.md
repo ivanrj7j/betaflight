@@ -91,7 +91,7 @@ This project directly addresses **Mission 3 (VEGAPilot Track)** of the **NIDAR (
 > 3. The `0x10000000` memory range is peripheral memory-mapped IO (UART0 is at `0x10000100`), not SRAM.
 > 4. All code and runtime memory must be linked to `0x00202000` with a combined footprint `< 240 KB` (see [`HAL_PROGRESS.md`](HAL_PROGRESS.md) and [`TEST_LOGS.md`](TEST_LOGS.md) for full details).
 > 5. **Flashing File Format Requirement:** The official flashing script `flasher.bat` (`vega-flasher.exe` / `xmodemflasher`) uses raw 128-byte XMODEM packet streaming and strictly expects a raw binary file (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`). Passing a `.hex` file flashes ASCII text into memory, causing immediate CPU fault on boot.
-> 6. **Config Storage (`CONFIG_IN_RAM`):** Because external SPI flash is not memory-mapped, config parameters must be kept in RAM via `#define CONFIG_IN_RAM` (`EEPROM_SIZE 4096`). Any direct memory dereference to `0x201F8000` (`CONFIG_IN_FLASH`) results in an immediate synchronous Load Access Fault (`mcause = 5`).
+> 6. **Config Storage (`CONFIG_IN_RAM`):** Because external SPI flash is not memory-mapped, config parameters must be kept in RAM via `#define CONFIG_IN_RAM` (`EEPROM_SIZE 8192`). Any direct memory dereference to `0x201F8000` (`CONFIG_IN_FLASH`) results in an immediate synchronous Load Access Fault (`mcause = 5`). `EEPROM_SIZE` must be 8192 (8 KiB) because Betaflight's compiled Parameter Groups exceed 4,096 bytes; an undersized 4 KB buffer causes `writeConfigToEEPROM()` to trigger `failureMode(FAILURE_CONFIG_STORE_FAILURE)`. UART TX buffers were reduced (`#undef USE_MSP_DISPLAYPORT`) to keep total SRAM footprint at ~250 KB (< 248 KB limit).
 
 
 ---
