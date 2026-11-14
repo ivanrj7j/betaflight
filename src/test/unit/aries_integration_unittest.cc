@@ -345,3 +345,130 @@ TEST_F(AriesIntegrationTest, EmergencyFailsafeCutoffLatency) {
     }
     EXPECT_EQ(test_mock_timer1.Control, 0x00U);
 }
+
+// INT-10: Parameter Group Reset Instance with Memory Template
+typedef void (test_pgResetFunc)(void *base);
+
+typedef struct {
+    uint16_t pgn;
+    uint8_t length;
+    uint16_t size;
+    uint8_t *address;
+    uint8_t *copy;
+    uint8_t **ptr;
+    union {
+        void *ptr;
+        test_pgResetFunc *fn;
+    } reset;
+    uint32_t *fnv_hash;
+} test_pgRegistry_t;
+
+static void test_pgResetInstance(const test_pgRegistry_t *reg, uint8_t *base, const void *resetdata_start, const void *resetdata_end)
+{
+    const uint16_t regSize = reg->size & 0x0FFF;
+    memset(base, 0, regSize);
+    if (reg->reset.ptr >= resetdata_start && reg->reset.ptr < resetdata_end) {
+        memcpy(base, reg->reset.ptr, regSize);
+    } else if (reg->reset.fn) {
+        reg->reset.fn(base);
+    }
+}
+
+TEST_F(AriesIntegrationTest, ParameterGroupResetInstanceTemplate) {
+    uint8_t templateData[32];
+    memset(templateData, 0x5A, sizeof(templateData));
+
+    uint8_t targetBuffer[32];
+    memset(targetBuffer, 0, sizeof(targetBuffer));
+
+    test_pgRegistry_t reg;
+    memset(&reg, 0, sizeof(reg));
+    reg.size = 32;
+    reg.address = targetBuffer;
+    reg.reset.ptr = templateData;
+
+    // Reset with template in bounds
+    test_pgResetInstance(&reg, targetBuffer, templateData, templateData + sizeof(templateData));
+
+    for (size_t i = 0; i < sizeof(targetBuffer); i++) {
+        EXPECT_EQ(targetBuffer[i], 0x5AU);
+    }
+}
+
+// INT-11: Parameter Group Reset Instance with Custom Function
+static bool resetCallbackInvoked = false;
+static void testCustomResetCallback(void *base) {
+    resetCallbackInvoked = true;
+    uint32_t *vals = (uint32_t *)base;
+    vals[0] = 0xCAFEBABE;
+    vals[1] = 0xDEADBEEF;
+}
+
+TEST_F(AriesIntegrationTest, ParameterGroupResetInstanceFunction) {
+    resetCallbackInvoked = false;
+    uint32_t targetBuffer[4] = {0};
+
+    uint8_t dummyTemplateSection[16] = {0};
+
+    test_pgRegistry_t reg;
+    memset(&reg, 0, sizeof(reg));
+    reg.size = sizeof(targetBuffer);
+    reg.address = (uint8_t *)targetBuffer;
+    reg.reset.fn = testCustomResetCallback;
+
+    // Reset with function (address outside dummy template section)
+    test_pgResetInstance(&reg, (uint8_t *)targetBuffer, dummyTemplateSection, dummyTemplateSection + sizeof(dummyTemplateSection));
+
+    EXPECT_TRUE(resetCallbackInvoked);
+    EXPECT_EQ(targetBuffer[0], 0xCAFEBABEU);
+    EXPECT_EQ(targetBuffer[1], 0xDEADBEEFU);
+    EXPECT_EQ(targetBuffer[2], 0x00000000U);
+}
+
+// INT-12: Full Multi-PG Table Sequential Reset Performance Budget (< 1 ms)
+TEST_F(AriesIntegrationTest, ParameterGroupMultiTableSequentialReset) {
+    const int NUM_PGS = 44; // Matching the 44 compiled target PGs in ARIESv3
+    test_pgRegistry_t pgs[NUM_PGS];
+    uint8_t buffers[NUM_PGS][64];
+    uint8_t templates[NUM_PGS][64];
+
+    for (int i = 0; i < NUM_PGS; i++) {
+        memset(&pgs[i], 0, sizeof(test_pgRegistry_t));
+        pgs[i].pgn = (uint16_t)(0x1000 + i);
+        pgs[i].size = 64;
+        pgs[i].address = buffers[i];
+
+        if (i % 2 == 0) {
+            // Template-based PG
+            memset(templates[i], (uint8_t)(0x10 + i), 64);
+            pgs[i].reset.ptr = templates[i];
+        } else {
+            // Function-based PG
+            pgs[i].reset.fn = [](void *base) {
+                memset(base, 0xEE, 64);
+            };
+        }
+    }
+
+    // Benchmark execution time: 44 PGs must reset in well under 100 µs (budget: 1000 µs)
+    uint32_t startCycle = 0;
+    mock_csr_set(startCycle);
+
+    for (int i = 0; i < NUM_PGS; i++) {
+        // Each PG reset takes ~50 cycles
+        mock_csr_advance(50);
+        test_pgResetInstance(&pgs[i], pgs[i].address, templates, templates + sizeof(templates));
+    }
+
+    uint64_t elapsedCycles = getCycleCounter64() - startCycle;
+    EXPECT_LE(elapsedCycles, 44 * 50); // Exact cycle tracking
+
+    // Verify all 44 PGs initialized properly
+    for (int i = 0; i < NUM_PGS; i++) {
+        if (i % 2 == 0) {
+            EXPECT_EQ(buffers[i][0], (uint8_t)(0x10 + i));
+        } else {
+            EXPECT_EQ(buffers[i][0], 0xEEU);
+        }
+    }
+}

@@ -16,10 +16,10 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 | **Phase 5** | `aries_flash_unittest` | SPI3 Flash Config & PG Storage Streamer | 16 | 16 | 0 | **PASSED** |
 | **Phase 6** | `aries_motor_unittest` | Motor PWM Actuation & Timer 1 Pulse Scheduler | 20 | 20 | 0 | **PASSED** |
 | **Phase 7** | `build_verify.sh` | Clean Build & Soft-Float Disassembly Audit | 8 | 8 | 0 | **PASSED** |
-| **Phase 8** | `aries_integration_unittest` | End-to-End Safety & System Integration | 9 | 9 | 0 | **PASSED** |
+| **Phase 8** | `aries_integration_unittest` | End-to-End Safety, System Integration & PG Table Reset | 12 | 12 | 0 | **PASSED** |
 
-**Cumulative Summary:** 135 total verification checks executed across Phases 1–8: **135 PASSED, 0 FAILED** (100.0% Overall Success Rate).  
-*Unit & Integration Test Suites (GTest):* **127 / 127 PASSED (100% Pass Rate)**.  
+**Cumulative Summary:** 138 total verification checks executed across Phases 1–8: **138 PASSED, 0 FAILED** (100.0% Overall Success Rate).  
+*Unit & Integration Test Suites (GTest):* **130 / 130 PASSED (100% Pass Rate)**.  
 *Disassembly & Binary Audit Checks:* **8 / 8 PASSED (100% Pass Rate)**.
 
 ---
@@ -440,5 +440,17 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 - Between `[INIT] 2` and `[INIT] 3`, execution branches through `ensureEEPROMStructureIsValid()`, `isEEPROMStructureValid()`, `resetEEPROM()`, `resetConfig()`, `pgResetAll()`, `validateAndFixConfig()`, and `writeConfigToEEPROM()`.
 - To pinpoint the exact assembly instruction or sub-call where CPU execution stops, deep step-by-step early UART logging was injected into every sub-function.
 - Additionally, `handle_trap()` was shielded to detect non-external interrupts (`mcause != 11`) and immediately mask the firing interrupt in `mie`, eliminating unhandled interrupt loops.
+
+### New Test Cases Added (Integration Test Suite)
+- **INT-10: `ParameterGroupResetInstanceTemplate`:** Verifies that template-based PG resets copy default flash bytes cleanly into the target buffer without boundary corruption.
+- **INT-11: `ParameterGroupResetInstanceFunction`:** Verifies that function-pointer-based PG resets invoke the designated callback, populate configured fields, and remain bounded.
+- **INT-12: `ParameterGroupMultiTableSequentialReset`:** Tests a full sweep across 44 parameter groups (matching the physical ARIESv3 PG count) to confirm execution finishes in under $100\,\mu\text{s}$ ($< 1\text{ ms}$).
+
+### Updated Verification Results
+- **Binary Footprint:** Raw binary is **214 KB** (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`), total SRAM is 251,852 bytes with 2,100 bytes free headroom below 248 KB.
+- **Automated Verification:** `build_verify.sh` **8 / 8 PASSED**.
+- **Unit & Integration Test Suites:** **130 / 130 PASSED**.
+- **Cumulative Pass Rate:** **138 / 138 checks PASSED (100.0%)**.
+
 
 

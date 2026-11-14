@@ -733,17 +733,17 @@ Exhaustive disassembly of `lib/vega-flasher-windows/vega-flasher.exe`, `lib/vega
 ### 4. Verification & Final Artifact Metrics
 - **Compilation:** Clean exit code `0`.
 - **Memory Footprint:**
-  - Text: 215,828 bytes
+  - Text: 217,664 bytes
   - Data: 660 bytes
   - BSS: 33,560 bytes (includes `eepromData[8192]` and `tasks`)
-  - **Total SRAM Occupancy:** 250,048 bytes / 253,952 bytes (3,904 bytes free headroom).
+  - **Total SRAM Occupancy:** 251,884 bytes / 253,952 bytes (2,068 bytes free headroom).
 - **Flash Artifacts:**
-  - Raw Binary (`betaflight_2026.12.0-alpha_ARIESV3.bin`): **212 KB** (fits cleanly within 248 KB limit).
-  - Intel HEX (`betaflight_2026.12.0-alpha_ARIESV3.hex`): **595 KB**.
+  - Raw Binary (`betaflight_2026.12.0-alpha_ARIESV3.bin`): **214 KB** (fits cleanly within 248 KB limit).
+  - Intel HEX (`betaflight_2026.12.0-alpha_ARIESV3.hex`): **600 KB**.
 - **Test Suite Results:**
   - `build_verify.sh`: **8 / 8 checks PASSED**.
-  - Google Test Unit & Integration: **127 / 127 PASSED**.
-  - Total: **135 / 135 checks PASSED (100% pass rate)**.
+  - Google Test Unit & Integration: **130 / 130 PASSED** (added INT-10, INT-11, INT-12).
+  - Total: **138 / 138 checks PASSED (100% pass rate)**.
 
 ---
 
@@ -762,6 +762,8 @@ Exhaustive disassembly of `lib/vega-flasher-windows/vega-flasher.exe`, `lib/vega
 | **H9** | **The 4 KB EEPROM Overflow Trap (`FAILURE_CONFIG_STORE_FAILURE`)** | Early boot banner printed `Clocks & Timer0 Initialized`, but halted before `EEPROM & Config Initialized Successfully!`. | Compiled Betaflight Parameter Groups (PGs) exceed 4,096 bytes (VTX tables, PID profiles, motor configurations). During `initPhase1()`, `resetEEPROM()` attempted to serialize PGs into `eepromData[4096]`, overflowing the buffer and corrupting the next-PG size field. `isEEPROMStructureValid()` failed, causing `writeConfigToEEPROM()` to call `failureMode(FAILURE_CONFIG_STORE_FAILURE)` which halted in `while(1);`. | Increased `EEPROM_SIZE` from 4096 to 8192 (`8 KiB`), aligning with the RAM config sizing in `STM32H562/target.h`. Undefined `USE_MSP_DISPLAYPORT` (reducing `UART_TX_BUFFER_SIZE` from 1280 to 256 bytes for both UART0 and UART1, saving 2,048 bytes of RAM) and pruned `serial_4way`, bringing total SRAM occupancy to 250,048 bytes (3,904 bytes free headroom). |
 | **H10** | **Linker Failure on Orphaned `esc4way` Bootloader Symbols** | Pruning `io/serial_4way.c` resulted in link failure: `undefined reference to esc4wayInit and esc4wayProcess` in `msp.c`. | `target/common_post.h` automatically re-defines `USE_SERIAL_4WAY_BLHELI_INTERFACE` if `USE_SERIAL_4WAY_BLHELI_BOOTLOADER` or `USE_SERIAL_4WAY_SK_BOOTLOADER` is defined (set by default in `common_pre.h`). | Added `#undef USE_SERIAL_4WAY_BLHELI_BOOTLOADER` and `#undef USE_SERIAL_4WAY_SK_BOOTLOADER` to `src/platform/ARIES/target/ARIESV3/target.h`. Linker succeeds cleanly with exit code 0. |
 | **H11** | **Sub-Function Execution Halt in `ensureEEPROMStructureIsValid`** | Serial monitor printed `[INIT] 2. Checking EEPROM structure...` and froze before milestone 3. | The call sequence between `[INIT] 2` and `[INIT] 3` involves `isEEPROMStructureValid()`, `pgResetAll()`, `validateAndFixConfig()`, and `writeConfigToEEPROM()`. An unhandled non-external interrupt or unmonitored sub-function freeze held the core without telemetry. | Added deep instrumentation across `config.c`, `config_eeprom.c`, and `pg.c` with sequenced telemetry (`[CONFIG] 2a`..`2l`, `[PG]`, `[EEPROM]`). Upgraded `handle_trap` in `system.c` to report and mask any unexpected interrupts (`mcause != 11`). Generated fresh 214 KB binary (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`). |
+| **H12** | **Early UART FIFO Saturation & Hex Print `memcpy` Freeze** | Serial monitor reached `[PG] pgResetAll: start` and froze immediately after `[PG] reset #` without printing any number or error. | 1. `thejas32_early_uart_putc()` used an unbounded `while (!(THEJAS32_UART(0).UART_LSR & 0x20));` loop. Back-to-back early telemetry saturated the CP2102 FIFO, causing an infinite spin. 2. `thejas32_early_uart_print_hex()` declared `const char hex_chars[]`, prompting GCC to emit `memcpy` onto the stack on each call. | 1. Added a 50,000-cycle bounded timeout and memory `fence` to `thejas32_early_uart_putc()`, preventing any permanent CPU freeze. 2. Rewrote `thejas32_early_uart_print_hex()` with pure register-based ALU nibble math (`'0' + n` / `'A' + n - 10`), eliminating `memcpy`. 3. Added INT-10, INT-11, INT-12 unit tests and generated fresh verified 214 KB binary. |
+| **H13** | **Toolchain Multilib RVC / Compressed Instruction Injection** | Serial monitor reached `[PG] reset #00000000 pgn=0x0000002F ...` and immediately suffered an illegal instruction trap, sending the board into a reboot loop back to the ROM bootloader. | THEJAS32 (VEGA ET1031) is an **RV32IM** core without RISC-V Compressed Instructions (RVC / 'C' extension). The Espressif GCC toolchain (`riscv32-esp-elf-gcc`) lacks an `rv32im` multilib. Specifying `-march=rv32im_zicsr` caused GCC to fall back to the root multilib `.`, pulling `libc.a`, `libm.a`, and `libgcc.a` compiled for `rv32imafc` (containing 7,247 16-bit compressed instructions and FPU opcodes). On executing `memset()` or math functions, physical ET1031 silicon tripped an illegal instruction trap. | 1. Implemented bare-metal RV32I `memset()`, `memcpy()`, `memmove()` in `src/platform/ARIES/system.c` with `-fno-builtin-*` flags and loop distribution inhibitors. 2. Configured `ARIES.mk` linker flags to explicitly link against the toolchain's `rv32i_zicsr_zifencei/ilp32` multilib for `libc.a`, `libm.a`, and `libgcc.a`. 3. Audited disassembly: confirmed **exactly 0 compressed 16-bit instructions** and **0 hardware FPU instructions** across all executable code. 4. Generated fresh 217 KB binary (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`). |
 
 
 

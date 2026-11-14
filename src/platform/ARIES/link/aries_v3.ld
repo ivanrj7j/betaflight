@@ -65,7 +65,7 @@ SECTIONS
     .stack (NOLOAD) : {
         . = ALIGN(16);
         _sstack = .;
-        . = . + 0x2000; /* 8 KB Stack matching official C-DAC link1.lds */
+        . = . + 0x1800; /* 6 KB Stack (plenty for bare-metal Betaflight < 2 KB stack watermark) */
         _estack = .;
     } > RAM
 

@@ -48,10 +48,15 @@ void pgResetInstance(const pgRegistry_t *reg, uint8_t *base)
 {
     const uint16_t regSize = pgSize(reg);
 
-    memset(base, 0, regSize);
+    for (uint16_t i = 0; i < regSize; i++) {
+        base[i] = 0;
+    }
+
     if (reg->reset.ptr >= (void*)__pg_resetdata_start && reg->reset.ptr < (void*)__pg_resetdata_end) {
-        // pointer points to resetdata section, to it is data template
-        memcpy(base, reg->reset.ptr, regSize);
+        const uint8_t *src = (const uint8_t *)reg->reset.ptr;
+        for (uint16_t i = 0; i < regSize; i++) {
+            base[i] = src[i];
+        }
     } else if (reg->reset.fn) {
         // reset function, call it
         reg->reset.fn(base);
@@ -99,8 +104,22 @@ int pgStore(const pgRegistry_t* reg, void *to, int size)
 void pgResetAll(void)
 {
     THEJAS_LOG("[PG] pgResetAll: start\r\n");
+#ifdef THEJAS32
+    int idx = 0;
+    PG_FOREACH(reg) {
+        thejas32_early_uart_puts("[PG] reset #");
+        thejas32_early_uart_print_hex((uint32_t)idx);
+        thejas32_early_uart_puts(" pgn=0x");
+        thejas32_early_uart_print_hex((uint32_t)pgN(reg));
+        thejas32_early_uart_puts(" ... ");
+        pgReset(reg);
+        thejas32_early_uart_puts("done\r\n");
+        idx++;
+    }
+#else
     PG_FOREACH(reg) {
         pgReset(reg);
     }
+#endif
     THEJAS_LOG("[PG] pgResetAll: complete\r\n");
 }

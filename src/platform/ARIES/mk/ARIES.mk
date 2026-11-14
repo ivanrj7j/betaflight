@@ -13,8 +13,13 @@ INCLUDE_DIRS := \
     $(TARGET_PLATFORM_DIR)/include
 
 ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany
-DEVICE_FLAGS = -DARIES -DTHEJAS32 -DUSE_CONFIG -Wno-type-limits -Wno-sign-compare -Wno-unused-parameter -Wno-incompatible-pointer-types -ffast-math -fno-math-errno
+DEVICE_FLAGS = -DARIES -DTHEJAS32 -DUSE_CONFIG -Wno-type-limits -Wno-sign-compare -Wno-unused-parameter -Wno-incompatible-pointer-types -ffast-math -fno-math-errno -fno-builtin-memset -fno-builtin-memcpy -fno-builtin-memmove
 LD_SCRIPT    = $(LINKER_DIR)/aries_v3.ld
+
+# Multilib path override: the toolchain lacks rv32im multilib and defaults to rv32imafc with RVC.
+# We explicitly link against the rv32i_zicsr_zifencei/ilp32 multilib to guarantee 0 compressed/FPU instructions.
+TOOLCHAIN_RV32I_LIB    := /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/riscv32-esp-elf/lib/rv32i_zicsr_zifencei/ilp32
+TOOLCHAIN_RV32I_LIBGCC := /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/lib/gcc/riscv32-esp-elf/13.2.0/rv32i_zicsr_zifencei/ilp32
 
 # Size optimization for in-SRAM execution (< 248 KB)
 OPTIMISE_DEFAULT := -Os
@@ -127,6 +132,8 @@ TARGET_MAP   = $(OBJECT_DIR)/$(FORKNAME)_$(TARGET).map
 LIBS         = -lm -lc -lgcc
 
 LD_FLAGS    := \
+    -L$(TOOLCHAIN_RV32I_LIB) \
+    -L$(TOOLCHAIN_RV32I_LIBGCC) \
     $(LIBS) -nostartfiles \
     $(ARCH_FLAGS) \
     $(LTO_FLAGS) \

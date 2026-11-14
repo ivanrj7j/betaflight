@@ -214,7 +214,8 @@ void thejas32_early_uart_init(void)
 
 void thejas32_early_uart_putc(char c)
 {
-    while (!(THEJAS32_UART(0).UART_LSR & 0x20));
+    uint32_t timeout = 50000;
+    while (!(THEJAS32_UART(0).UART_LSR & 0x20) && --timeout);
     THEJAS32_UART(0).UART_DR = (uint8_t)c;
 }
 
@@ -230,9 +231,9 @@ void thejas32_early_uart_puts(const char *s)
 
 void thejas32_early_uart_print_hex(uint32_t val)
 {
-    const char hex_chars[] = "0123456789ABCDEF";
     for (int i = 7; i >= 0; i--) {
-        thejas32_early_uart_putc(hex_chars[(val >> (i * 4)) & 0xF]);
+        uint8_t n = (val >> (i * 4)) & 0xF;
+        thejas32_early_uart_putc(n < 10 ? ('0' + n) : ('A' + n - 10));
     }
 }
 
@@ -350,5 +351,56 @@ void failureMode(failureMode_e mode)
     thejas32_early_uart_puts("\r\n");
     while (1);
 }
+
+/*
+ * Bare-metal memory routines for C-DAC THEJAS32 (VEGA ET1031 RV32IM core).
+ * Overrides toolchain newlib routines to guarantee zero 16-bit RVC (compressed)
+ * instructions are executed on non-RVC ET1031 silicon.
+ */
+__attribute__((used, optimize("no-tree-loop-distribute-patterns")))
+void *memset(void *dest, int c, size_t n)
+{
+    uint8_t *p = (uint8_t *)dest;
+    uint8_t val = (uint8_t)c;
+    while (n--) {
+        *p++ = val;
+        __asm__ volatile ("" : "+r"(p) : : "memory");
+    }
+    return dest;
+}
+
+__attribute__((used, optimize("no-tree-loop-distribute-patterns")))
+void *memcpy(void *dest, const void *src, size_t n)
+{
+    uint8_t *d = (uint8_t *)dest;
+    const uint8_t *s = (const uint8_t *)src;
+    while (n--) {
+        *d++ = *s++;
+        __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");
+    }
+    return dest;
+}
+
+__attribute__((used, optimize("no-tree-loop-distribute-patterns")))
+void *memmove(void *dest, const void *src, size_t n)
+{
+    uint8_t *d = (uint8_t *)dest;
+    const uint8_t *s = (const uint8_t *)src;
+    if (d < s) {
+        while (n--) {
+            *d++ = *s++;
+            __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");
+        }
+    } else if (d > s) {
+        d += n;
+        s += n;
+        while (n--) {
+            *--d = *--s;
+            __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");
+        }
+    }
+    return dest;
+}
+
 
 

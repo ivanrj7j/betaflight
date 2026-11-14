@@ -153,6 +153,10 @@ trap_entry:
     /* handle_trap returns new/resumed mepc in a0 */
     csrw mepc, a0
 
+    /* Remain in M-mode after mret (MSTATUS_MPP = 3 << 11 = 0x1800) */
+    li t0, 0x1800
+    csrs mstatus, t0
+
     /* Restore context */
     LREG x1,  1*REGBYTES(sp)
     LREG x3,  3*REGBYTES(sp)
