@@ -197,11 +197,54 @@ bool isMPUSoftReset(void)
     return false;
 }
 
+// -----------------------------------------------------------------------------
+// Early Direct Hardware UART0 Diagnostics (Polled, Zero-Interrupt)
+// Base: 0x10000100 (CP2102N USB Bridge)
+// -----------------------------------------------------------------------------
+void thejas32_early_uart_init(void)
+{
+    // Divisor = 100MHz / (16 * 115200) = 54 (0x36)
+    THEJAS32_UART(0).UART_LCR = 0x83; // DLAB = 1
+    THEJAS32_UART(0).UART_DR  = 54;   // Divisor LSB
+    THEJAS32_UART(0).UART_IE  = 0;    // Divisor MSB
+    THEJAS32_UART(0).UART_LCR = 0x03; // 8-N-1, DLAB = 0
+    THEJAS32_UART(0).UART_IIR_FCR = 0x07; // FIFO enable & reset
+    __asm__ volatile ("fence" ::: "memory");
+}
+
+void thejas32_early_uart_putc(char c)
+{
+    while (!(THEJAS32_UART(0).UART_LSR & 0x20));
+    THEJAS32_UART(0).UART_DR = (uint8_t)c;
+}
+
+void thejas32_early_uart_puts(const char *s)
+{
+    while (*s) {
+        if (*s == '\n') {
+            thejas32_early_uart_putc('\r');
+        }
+        thejas32_early_uart_putc(*s++);
+    }
+}
+
+static void thejas32_early_uart_print_hex(uint32_t val)
+{
+    const char hex_chars[] = "0123456789ABCDEF";
+    for (int i = 7; i >= 0; i--) {
+        thejas32_early_uart_putc(hex_chars[(val >> (i * 4)) & 0xF]);
+    }
+}
+
 void handle_trap_panic(uint32_t mcause, uint32_t mepc, uint32_t *sp)
 {
-    (void)mcause;
-    (void)mepc;
-    (void)sp;
+    thejas32_early_uart_puts("\r\n[TRAP PANIC] mcause=0x");
+    thejas32_early_uart_print_hex(mcause);
+    thejas32_early_uart_puts(" mepc=0x");
+    thejas32_early_uart_print_hex(mepc);
+    thejas32_early_uart_puts(" sp=0x");
+    thejas32_early_uart_print_hex((uint32_t)sp);
+    thejas32_early_uart_puts("\r\n");
     while (1);
 }
 
@@ -261,10 +304,20 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
     }
 }
 
+void targetPreInit(void)
+{
+    thejas32_early_uart_puts("[ARIES v3] EEPROM & Config Initialized Successfully!\r\n");
+}
+
 void systemInit(void)
 {
+    thejas32_early_uart_init();
+    thejas32_early_uart_puts("\r\n\r\n========================================\r\n");
+    thejas32_early_uart_puts("[ARIES v3] Betaflight 2026.12 Booting...\r\n");
     cycleCounterInit();
     thejas32_timer_init();
+    thejas32_early_uart_puts("[ARIES v3] Clocks & Timer0 Initialized\r\n");
+    thejas32_early_uart_puts("========================================\r\n\r\n");
 }
 
 void systemReset(void)

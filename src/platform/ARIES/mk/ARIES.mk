@@ -53,6 +53,9 @@ MCU_EXCLUDES = \
     io/asyncfatfs/asyncfatfs.c \
     io/asyncfatfs/fat_standard.c \
     google/olc/olc.c \
+    io/rcdevice.c \
+    io/rcdevice_cam.c \
+    drivers/serial_escserial.c \
     cms/cms_menu_main.c \
     cms/cms_menu_misc.c \
     cms/cms_menu_osd.c \

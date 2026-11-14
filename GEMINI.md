@@ -90,6 +90,8 @@ This project directly addresses **Mission 3 (VEGAPilot Track)** of the **NIDAR (
 > 2. Total internal SRAM is 256 KB (`0x00200000`–`0x00240000`). The first 8 KB is reserved by the bootloader; the remaining 248 KB (`0x00202000`–`0x0023FFFF`) holds the entire application image (`.text`, `.rodata`, `.data`, `.bss`, and downward-growing `.stack`).
 > 3. The `0x10000000` memory range is peripheral memory-mapped IO (UART0 is at `0x10000100`), not SRAM.
 > 4. All code and runtime memory must be linked to `0x00202000` with a combined footprint `< 240 KB` (see [`HAL_PROGRESS.md`](HAL_PROGRESS.md) and [`TEST_LOGS.md`](TEST_LOGS.md) for full details).
+> 5. **Flashing File Format Requirement:** The official flashing script `flasher.bat` (`vega-flasher.exe` / `xmodemflasher`) uses raw 128-byte XMODEM packet streaming and strictly expects a raw binary file (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`). Passing a `.hex` file flashes ASCII text into memory, causing immediate CPU fault on boot.
+> 6. **Config Storage (`CONFIG_IN_RAM`):** Because external SPI flash is not memory-mapped, config parameters must be kept in RAM via `#define CONFIG_IN_RAM` (`EEPROM_SIZE 4096`). Any direct memory dereference to `0x201F8000` (`CONFIG_IN_FLASH`) results in an immediate synchronous Load Access Fault (`mcause = 5`).
 
 
 ---

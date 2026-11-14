@@ -129,17 +129,23 @@ flowchart TD
 - Ensure all 135 existing unit/integration test assertions in `TEST_LOGS.md` remain 100% green.
 
 ### Step 6: Physical Flashing & Bench Verification
-- Generate fresh `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` and `.bin`.
+- **IMPORTANT:** Use the raw binary file `betaflight_2026.12.0-alpha_ARIESV3.bin` (**216 KB**). `flasher.bat` uses XMODEM stream transfer and expects raw binary data; passing a `.hex` file writes ASCII text into flash, preventing code execution.
 - User flashes board using `flasher.bat`:
   ```cmd
-  flasher.bat COM<X> "betaflight_2026.12.0-alpha_ARIESV3.hex"
+  flasher.bat COM<X> "path\to\betaflight_2026.12.0-alpha_ARIESV3.bin"
   ```
-- **Expected Console Output on UART0:**
+- **Expected Console Output on UART0 (115200 baud):**
   ```text
   Copying from FLASH to IRAM
   [INFO] Flash ID: ... Flash initialized
-  [INFO] Copying <240KB from address: 0x000000.
+  [INFO] Copying 216KB from address: 0x000000.
   Starting program ...
+
+  ========================================
+  [ARIES v3] Betaflight 2026.12 Booting...
+  [ARIES v3] Clocks & Timer0 Initialized
+  ========================================
+  [ARIES v3] EEPROM & Config Initialized Successfully!
   ```
 - **CLI Activation:** Open serial monitor at 115200 baud, send `#` or `Enter`, verify `# ` prompt and `status` command.
 

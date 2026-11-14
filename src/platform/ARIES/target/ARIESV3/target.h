@@ -144,9 +144,14 @@
 #undef USE_DASHBOARD
 #undef USE_RC_STATS
 #undef USE_PERSISTENT_STATS
+#undef USE_RCDEVICE
+#undef USE_ESCSERIAL
+#undef USE_ESCSERIAL_SIMONK
 
 // Enable core flight features
+#define TARGET_PREINIT
 #define USE_SPI
+#define TARGET_PREINIT
 #define USE_SPI_DEVICE_1
 #define SPI1_SCK_PIN            PA5
 #define SPI1_SDI_PIN            PA6
@@ -176,14 +181,11 @@
 // aligning with TASK_GYROPID_DESIRED_PERIOD (1000 µs) and preventing CPU task overruns.
 #define DEFAULT_PID_PROCESS_DENOM 8
 
-// Flash Config & EEPROM Emulation (32 KB reserved sector 0x201F8000 - 0x201FFFFF)
-#define CONFIG_IN_FLASH
-#define FLASH_SECTOR_SIZE               4096
-#define FLASH_PAGE_SIZE                 4096
-#define FLASH_CONFIG_STREAMER_BUFFER_SIZE 32
-#define FLASH_CONFIG_BUFFER_TYPE        uint32_t
-#define EEPROM_SIZE                     8192
-#define ENABLE_CONFIG_FLASH_INIT
+// Parameter Group / Configuration persistence in RAM for in-SRAM execution
+#define CONFIG_IN_RAM
+#define EEPROM_SIZE                     4096
+#undef CONFIG_IN_FLASH
+#undef ENABLE_CONFIG_FLASH_INIT
 
 // Stubs for pin assignments
 // Status LED LD4 on GPIO 22 (Header pin Bank 1 pin 6)

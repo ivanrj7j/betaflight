@@ -48,6 +48,9 @@ stm32.mak
 
 # artefacts for CLion
 /cmake-build-debug/
+
+# local VEGA tools
+/lib/vega-*
 /CMakeLists.txt
 
 .vagrant

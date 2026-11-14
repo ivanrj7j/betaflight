@@ -391,6 +391,33 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
   - Raw binary image shrunk to **220 KB** (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`), well within the bootloader's 250 KB limit.
   - Disassembly audit confirmed: zero double-precision soft-float, zero `__udivdi3`, `_start` @ `0x00202000`, `trap_entry` @ `0x002020f0`.
   - Test suites: **135 / 135 total tests PASSED (100.0% Success Rate)**.
-- **Ready for Step 6 (Hardware Bench Flashing):** Transfer fresh `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` to Windows machine and flash via `flasher.bat`.
+- **Ready for Step 6 (Hardware Bench Flashing):** Transfer fresh `obj/betaflight_2026.12.0-alpha_ARIESV3.bin` (**216 KB**) to Windows machine and flash via `flasher.bat`.
+
+---
+
+## [2026-11-14] - In-SRAM Execution Bring-up & Diagnostic Hardening
+
+### Failure Diagnosis on Physical Board
+1. **Flashing Tool Format Mismatch:**
+   - Analysis of `lib/vega-flasher-windows/vega-flasher.exe` and `lib/vega-flasher/xmodemflasher` confirmed that `flasher.bat` uses XMODEM packets (128 bytes) to write the raw bytes of the input file directly to flash.
+   - Supplying an Intel HEX file (`.hex`) wrote ASCII text `:1000...` to the SPI flash, which the bootloader copied into SRAM and attempted to execute as instructions.
+   - **Resolution:** `flasher.bat` requires the raw binary file `betaflight_2026.12.0-alpha_ARIESV3.bin`.
+2. **Unmapped Flash Address Trap:**
+   - `CONFIG_IN_FLASH` had defined `__config_start = 0x201F8000`.
+   - In `initPhase1()`, `readEEPROM()` -> `isEEPROMStructureValid()` executed a load instruction from `0x201F8000`.
+   - Because THEJAS32 lacks hardware XIP memory-mapping for the SPI3 controller, dereferencing `0x201F8000` caused an immediate synchronous exception (`mcause = 5`), trapping into `handle_trap_panic()` which was a silent `while(1);` loop before `initPhase2()` could open UART0.
+   - **Resolution:** Switched to `CONFIG_IN_RAM` (`EEPROM_SIZE 4096`), placing `eepromData` in `.bss` at `0x0023B640`. No access to `0x201F8000` occurs.
+
+### Fixes & Diagnostic Additions
+- **Early Hardware UART0 Driver:** Implemented polled `thejas32_early_uart_puts()` and `thejas32_early_uart_print_hex()` in `system.c`.
+- **Boot Telemetry:** Configured UART0 at 115200 baud immediately in `systemInit()`, printing boot banner and milestones on board reset.
+- **Panic Reporting:** `handle_trap_panic()` now outputs `[TRAP PANIC] mcause=0x... mepc=0x... sp=0x...` over UART0 on any exception.
+- **Footprint Pruning:** Undefined `USE_RCDEVICE` and `USE_ESCSERIAL` to save 4.5 KB.
+
+### Verification Results
+- **Binary Footprint:** Raw binary is **216 KB** (fits in 248 KB SRAM limit with 1,684 bytes headroom).
+- **Automated Verification:** `build_verify.sh` **8 / 8 PASSED**.
+- **Unit & Integration Test Suites:** **127 / 127 PASSED**.
+- **Cumulative Pass Rate:** **135 / 135 checks PASSED (100.0%)**.
 
 

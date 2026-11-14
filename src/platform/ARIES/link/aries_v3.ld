@@ -8,10 +8,6 @@ MEMORY
 
 _Min_Stack_Size = 0x1000;
 
-/* Base address where configuration shadow is mapped for parameter groups */
-__config_start = 0x201F8000;
-__config_end   = 0x20200000;
-
 SECTIONS
 {
     .init : {

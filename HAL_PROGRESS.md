@@ -685,6 +685,82 @@ To achieve clean native execution on physical ARIES v3 hardware:
   - Google Test Unit & Integration: **127 / 127 PASSED**.
   - Total: **135 / 135 checks PASSED (100% pass rate)**.
 
+---
+
+## 🛠️ In-SRAM Execution Bring-up & Diagnostics Remediation
+
+### 1. Hardware Bench Observations
+During live bench testing of the initial in-SRAM build on the physical ARIES v3 board:
+1. The ROM bootloader displayed `Copying from FLASH to IRAM`, copied the image, printed the VEGA text banner, and then halted.
+2. The serial console produced no prompt and remained completely unresponsive when sending `#`.
+
+### 2. Deep Root-Cause Analysis
+Exhaustive disassembly of `lib/vega-flasher-windows/vega-flasher.exe`, `lib/vega-flasher/xmodemflasher`, and official BSP files revealed two compounding hardware-level issues:
+
+1. **Flashing Tool File Format Mismatch (`.bin` vs `.hex`):**
+   - `vega-flasher.exe` and `xmodemflasher` are raw stream senders using XMODEM packets (128 bytes each).
+   - In the official Arduino BSP (`lib/vega-bsp/platform.txt` line 119):
+     `tools.vegaflasher.upload.pattern.windows=cmd /c call "{runtime.tools.vegaflasher.path}/flasher.bat" "{serial.port}" "{build.path}/{build.project_name}.bin"`
+   - If an Intel HEX file (`.hex`) is supplied to `flasher.bat`, the tool writes raw ASCII characters (`:1000...`) directly into the SPI Flash. When the bootloader copies this into SRAM and executes `jalr 0x00202000`, the core immediately faults on illegal instructions.
+   - **Requirement:** `flasher.bat` must strictly be passed the raw binary file `betaflight_2026.12.0-alpha_ARIESV3.bin`.
+
+2. **Unmapped Flash Address Trap (`CONFIG_IN_FLASH`):**
+   - In `target.h`, `CONFIG_IN_FLASH` configured `__config_start = 0x201F8000`.
+   - In `initPhase1()`, `readEEPROM()` -> `isEEPROMStructureValid()` executed a load instruction from `0x201F8000`.
+   - Because THEJAS32 ET1031 has no hardware XIP memory mapper to the SPI3 flash, dereferencing `0x201F8000` immediately triggered a synchronous load access fault (`mcause = 5`).
+   - `handle_trap()` dispatched to `handle_trap_panic()` which was a silent `while(1);` loop, permanently hanging the processor before `initPhase2()` could initialize UART0.
+
+### 3. Engineering Fixes Implemented
+1. **Migrated Config Storage to `CONFIG_IN_RAM`:**
+   - Defined `CONFIG_IN_RAM` and `EEPROM_SIZE 4096` in `target.h`.
+   - Undefined `CONFIG_IN_FLASH` and removed `__config_start = 0x201F8000` from `aries_v3.ld`.
+   - `eepromData` (4096 bytes) is now allocated in `.bss` in SRAM at `0x0023B640`. No access to `0x201F8000` occurs.
+2. **Pruned Non-Flight Modules to Maintain < 248 KB Budget:**
+   - Undefined `USE_RCDEVICE`, `USE_ESCSERIAL`, and `USE_ESCSERIAL_SIMONK` in `target.h` and excluded in `ARIES.mk`, saving 4.5 KB.
+3. **Early Direct Hardware UART0 Diagnostics:**
+   - Implemented `thejas32_early_uart_init()`, `thejas32_early_uart_putc()`, `thejas32_early_uart_puts()`, and `thejas32_early_uart_print_hex()` in `system.c`.
+   - Initialized UART0 (115200 baud, 8-N-1, divisor 54) at the very start of `systemInit()`.
+   - Output immediate startup banners:
+     ```text
+     ========================================
+     [ARIES v3] Betaflight 2026.12 Booting...
+     [ARIES v3] Clocks & Timer0 Initialized
+     ========================================
+     [ARIES v3] EEPROM & Config Initialized Successfully!
+     ```
+   - Upgraded `handle_trap_panic()` to report `[TRAP PANIC] mcause=0x... mepc=0x... sp=0x...` over UART0 on any fault.
+
+### 4. Verification & Final Artifact Metrics
+- **Compilation:** Clean exit code `0`.
+- **Memory Footprint:**
+  - Text: 219,996 bytes
+  - Data: 664 bytes
+  - BSS: 31,608 bytes (includes `eepromData[4096]` and `tasks`)
+  - **Total SRAM Occupancy:** 252,268 bytes / 253,952 bytes (1,684 bytes free headroom).
+- **Flash Artifacts:**
+  - Raw Binary (`betaflight_2026.12.0-alpha_ARIESV3.bin`): **216 KB** (fits cleanly within 248 KB limit).
+  - Intel HEX (`betaflight_2026.12.0-alpha_ARIESV3.hex`): **607 KB**.
+- **Test Suite Results:**
+  - `build_verify.sh`: **8 / 8 checks PASSED**.
+  - Google Test Unit & Integration: **127 / 127 PASSED**.
+  - Total: **135 / 135 checks PASSED (100% pass rate)**.
+
+---
+
+## 🧗 Comprehensive Log of Roadblocks, Hurdles & Technical Resolutions
+
+| # | Hurdle / Roadblock Encountered | Observable Symptom | Root Cause Discovered | Engineering Fix / Resolution |
+| :-: | :--- | :--- | :--- | :--- |
+| **H1** | **No Flash Execute-In-Place (XIP)** | Bootloader prints VEGA banner, then core halts; no CLI response. | THEJAS32 lacks hardware XIP engine for SPI flash; ROM bootloader copies ≤ 248 KB into SRAM at `0x00202000` and executes `jalr 0x00202000`. Linking to `0x20000000` with stack at `0x1000FEF0` placed code/stack in peripheral MMIO space. | Retargeted `aries_v3.ld` to unified `ORIGIN = 0x00202000, LENGTH = 248K`. Realigned `startup.S` with `_estack = 0x0023FC50`, `trap_entry = 0x002020F0`, and bypassed flash `.data` copy loop when LMA == VMA. |
+| **H2** | **Firmware Footprint Bloat vs. 248 KB SRAM Limit** | Linker error: `region 'RAM' overflowed by 151952 bytes`. | Default Betaflight configuration enabled optional subsystems (OSD fonts, Blackbox filesystem, GPS rescue, 15+ serial RX drivers, baro/mag). | Added `-DUSE_CONFIG` with `config.h`, enabled `-Os` size optimization in `ARIES.mk`, and pruned non-flight modules via `MCU_EXCLUDES` and `#undef` in `target.h`. Preserved 100% of PID loop, soft-float math, ICM42688P/BMI270, 4-motor PWM, and CRSF/ELRS. |
+| **H3** | **Linker Overflow from Over-Allocated Stack** | Linker error: `region 'RAM' overflowed by 3824 bytes`. | Initial in-SRAM linker script reserved a 12 KB stack (`0x3000`), exceeding the available 248 KB window. | Evaluated official C-DAC `link1.lds` which specifies an 8 KB stack (`__stack_size = 8K`). Reduced stack to 8 KB (`0x2000`), reclaiming 4,096 bytes and bringing total occupancy to 253,004 bytes. |
+| **H4** | **Legacy Flash Addresses in Verification Suite** | Script `build_verify.sh` failed check T8-04: `_start entry point at 0x20000000 -> Address is 0x00202000`. | Hardcoded legacy flash XIP address `0x20000000` in bash regex checks. | Updated test script assertions to validate physical hardware in-SRAM addresses `0x00202000` and `0x002020f0` and enforce the 248 KB boundary. |
+| **H5** | **Flashing Utility File Format Mismatch (`.hex` vs `.bin`)** | Flashing `.hex` with `flasher.bat` succeeded, but board remained dead on boot; sending `#` returned nothing. | `vega-flasher.exe` / `xmodemflasher` stream raw bytes over XMODEM in 128-byte packets without parsing Intel HEX format. Passing `.hex` wrote raw ASCII text (`:1000...`) into flash, which the bootloader executed as invalid instructions. | Enforced and documented that `flasher.bat` must strictly be passed the raw binary file `betaflight_2026.12.0-alpha_ARIESV3.bin` (matching Arduino `platform.txt` line 119). |
+| **H6** | **Synchronous Load Fault on Unmapped Config Address** | Code loaded into SRAM halted before UART0 opened; terminal remained dead. | `CONFIG_IN_FLASH` pointed `__config_start` to `0x201F8000`. In `initPhase1()`, `readEEPROM()` executed `lb a0, 0(0x201F8000)`. Without XIP hardware, dereferencing `0x201F8000` triggered an immediate Load Access Fault (`mcause = 5`). | Migrated config storage to `CONFIG_IN_RAM` (`EEPROM_SIZE 4096`). Placed `eepromData` in `.bss` at `0x0023B640`. Removed `0x201F8000` from `aries_v3.ld`. Zero bus faults occur. |
+| **H7** | **Silent Trap Panics (Zero Telemetry)** | Any CPU exception resulted in an uncommunicative freeze; no error message was displayed. | `handle_trap_panic()` in `system.c` was an empty `while (1);` loop. | Implemented a polled, zero-interrupt early UART0 driver in `system.c` running at 115200 baud immediately in `systemInit()`. Configured `handle_trap_panic()` to report `[TRAP PANIC] mcause=0x... mepc=0x... sp=0x...` over UART0 on any fault. |
+| **H8** | **SRAM Headroom Pressure with `eepromData[4096]`** | Adding 4 KB `eepromData` buffer to `.bss` threatened to breach the 248 KB ceiling. | Total SRAM capacity is strictly 248 KB (253,952 bytes). | Pruned unused non-flight peripheral drivers: `USE_RCDEVICE` (RunCam protocol - 2.3 KB) and `USE_ESCSERIAL` (BLHeli pass-through - 2.1 KB). Reduced raw binary to **216 KB**, leaving 1,684 bytes of free SRAM headroom. |
+
+
 
 
 
