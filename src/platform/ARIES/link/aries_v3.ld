@@ -3,18 +3,22 @@ ENTRY(_start)
 
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x20000000, LENGTH = 2048K
-    RAM   (rwx) : ORIGIN = 0x10000000, LENGTH = 256K
+    RAM (wxa!ri) : ORIGIN = 0x00202000, LENGTH = 248K
 }
 
-_Min_Stack_Size = 0x800;
+_Min_Stack_Size = 0x1000;
 
-/* Base address where configuration is stored in Flash (last 32KB of 2MB flash) */
-__config_start = 0x20000000 + 2048K - 32K;
-__config_end   = 0x20000000 + 2048K;
+/* Base address where configuration shadow is mapped for parameter groups */
+__config_start = 0x201F8000;
+__config_end   = 0x20200000;
 
 SECTIONS
 {
+    .init : {
+        . = ALIGN(4);
+        KEEP (*(SORT_NONE(.init)))
+    } > RAM
+
     .text : {
         . = ALIGN(4);
         *(.text.startup*)
@@ -23,7 +27,7 @@ SECTIONS
         *(.srodata*)
         . = ALIGN(4);
         _etext = .;
-    } > FLASH
+    } > RAM
 
     .pg_registry : {
         . = ALIGN(4);
@@ -31,7 +35,7 @@ SECTIONS
         KEEP (*(.pg_registry))
         KEEP (*(SORT(.pg_registry.*)))
         PROVIDE_HIDDEN (__pg_registry_end = .);
-    } > FLASH
+    } > RAM
 
     .pg_resetdata : {
         . = ALIGN(4);
@@ -39,7 +43,7 @@ SECTIONS
         KEEP (*(.pg_resetdata))
         KEEP (*(SORT(.pg_resetdata.*)))
         PROVIDE_HIDDEN (__pg_resetdata_end = .);
-    } > FLASH
+    } > RAM
 
     .data : {
         . = ALIGN(4);
@@ -48,7 +52,7 @@ SECTIONS
         *(.sdata*)
         . = ALIGN(4);
         _edata = .;
-    } > RAM AT > FLASH
+    } > RAM
 
     _sidata = LOADADDR(.data);
 
@@ -65,7 +69,7 @@ SECTIONS
     .stack (NOLOAD) : {
         . = ALIGN(16);
         _sstack = .;
-        . = . + 0x4000;
+        . = . + 0x2000; /* 8 KB Stack matching official C-DAC link1.lds */
         _estack = .;
     } > RAM
 
@@ -73,5 +77,7 @@ SECTIONS
     PROVIDE(__global_pointer$ = _sdata + 0x800);
     PROVIDE(__bss_start = _sbss);
     PROVIDE(__bss_end = _ebss);
+
+    ASSERT(_end <= (ORIGIN(RAM) + LENGTH(RAM)), "Error: Firmware image exceeds internal SRAM capacity (248 KB)!")
 }
 

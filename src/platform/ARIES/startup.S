@@ -71,6 +71,7 @@ _start:
     la t0, _sidata          /* source address in flash */
     la t1, _sdata           /* destination address in RAM */
     la t2, _edata           /* end address of .data in RAM */
+    beq t0, t1, copy_done   /* if LMA == VMA (in-RAM execution), bypass copy */
 copy_data_loop:
     beq t1, t2, copy_done
     lw t3, 0(t0)

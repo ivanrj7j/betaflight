@@ -384,5 +384,13 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 
 ### Status & Next Steps
 - Documented in `HAL_PROGRESS.md` and `TEST_LOGS.md`.
-- Next step: Retarget `aries_v3.ld` to `ORIGIN = 0x00202000, LENGTH = 248K`, update `startup.S` stack pointer to `0x0023FE00`, and configure build flags to prune optional modules to fit the complete flight controller stack within < 240 KB.
+- **Steps 1–5 Executed & Verified:**
+  - Linker script [`aries_v3.ld`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld) retargeted to `ORIGIN = 0x00202000, LENGTH = 248K`.
+  - Startup [`startup.S`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S) realigned with `_estack = 0x0023FC50` and `_start = 0x00202000`.
+  - Binary pruned via `config.h`, `target.h`, and `ARIES.mk` with `-Os` optimization.
+  - Raw binary image shrunk to **220 KB** (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`), well within the bootloader's 250 KB limit.
+  - Disassembly audit confirmed: zero double-precision soft-float, zero `__udivdi3`, `_start` @ `0x00202000`, `trap_entry` @ `0x002020f0`.
+  - Test suites: **135 / 135 total tests PASSED (100.0% Success Rate)**.
+- **Ready for Step 6 (Hardware Bench Flashing):** Transfer fresh `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` to Windows machine and flash via `flasher.bat`.
+
 

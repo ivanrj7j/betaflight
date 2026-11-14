@@ -652,15 +652,39 @@ To achieve clean native execution on physical ARIES v3 hardware:
    ```ld
    MEMORY
    {
-       ram (wxa!ri) : ORIGIN = 0x00202000, LENGTH = 248K
+       RAM (wxa!ri) : ORIGIN = 0x00202000, LENGTH = 248K
    }
    ```
 2. **Startup Sequence (`startup.S`):**
-   - Align stack pointer `_estack` to the top of internal SRAM (e.g., `0x0023FE00`).
-   - Align trap vector `trap_entry` within valid SRAM space.
+   - Align stack pointer `_estack` to the top of internal SRAM (e.g., `0x0023FC50`).
+   - Align trap vector `trap_entry` within valid SRAM space (`0x002020F0`).
+   - Added LMA vs VMA identity check in `.data` load loop (`beq t0, t1, copy_done`).
 3. **Footprint Clamping (< 240 KB Combined Budget):**
-   - Prune non-flight-critical bloat (disable full OSD graphical engine, Blackbox flashfs, GPS rescue, unused serial RX drivers).
-   - Retain core flight capabilities: PID controller (1 kHz), RV32IM soft-float filter pipeline, ICM42688P/BMI270 gyro drivers, 4-motor PWM scheduler, CRSF/ELRS receiver on UART1, parameter group persistence, and CP2102N USB-UART CLI/MSP.
+   - Added `src/platform/ARIES/target/ARIESV3/config.h` and `-DUSE_CONFIG` to prevent kitchen-sink driver inclusion.
+   - Set `MCU_FLASH_SIZE := 256`, `-Os` size optimization, and pruned non-flight bloat (OSD, Blackbox, GPS, unused serial RX).
+   - Preserved 100% of flight control: PID loop, RV32IM soft-float filter pipeline, ICM42688P/BMI270, 4-motor PWM scheduler, CRSF/ELRS receiver, and CP2102N USB-UART CLI/MSP.
+
+### 4. Verification & Binary Metrics (Steps 1–5 Completed)
+- **Compilation:** Clean exit code `0`.
+- **In-RAM Sections Breakdown (`riscv32-esp-elf-size -A`):**
+  - `.text`: 222,808 bytes (`0x00202000` entry point)
+  - `.pg_registry` & `.pg_resetdata`: 1,584 bytes
+  - `.data`: 708 bytes
+  - `.bss`: 19,704 bytes
+  - `.stack`: 8,200 bytes (8 KB stack matching official C-DAC BSP)
+  - **Total SRAM Occupancy:** 253,004 bytes / 253,952 bytes (99.6% of 248 KB SRAM budget).
+- **Physical Flash Image Size:**
+  - Raw Binary (`betaflight_2026.12.0-alpha_ARIESV3.bin`): **220 KB** (copies 100% within the bootloader's 250 KB limit).
+  - Intel HEX (`betaflight_2026.12.0-alpha_ARIESV3.hex`): **619 KB** (shrunk from 2.1 MB).
+- **Entry Points & Symbols:**
+  - `_start` confirmed at `0x00202000` (matches bootloader `jalr 0x202000`).
+  - `trap_entry` confirmed at `0x002020f0` (valid SRAM trap vector).
+  - `_estack` confirmed at `0x0023fc50` (top of internal SRAM).
+- **Automated Regression Suite:** 
+  - `build_verify.sh`: **8 / 8 checks PASSED**.
+  - Google Test Unit & Integration: **127 / 127 PASSED**.
+  - Total: **135 / 135 checks PASSED (100% pass rate)**.
+
 
 
 

@@ -59,36 +59,36 @@ else
     RAM_SIZE=9999999
 fi
 
-# T8-02: Flash footprint <= 800 KB (819,200 bytes)
-FLASH_MAX=819200
+# T8-02: Flash/Image footprint <= 248 KB (253,952 bytes)
+FLASH_MAX=253952
 if [ $FLASH_SIZE -le $FLASH_MAX ]; then
-    report_pass "T8-02" "Flash footprint <= 800 KB ($FLASH_SIZE bytes / 800 KB)"
+    report_pass "T8-02" "Binary footprint <= 248 KB ($FLASH_SIZE bytes / 248 KB)"
 else
-    report_fail "T8-02" "Flash footprint <= 800 KB" "$FLASH_SIZE exceeds limit $FLASH_MAX"
+    report_fail "T8-02" "Binary footprint <= 248 KB" "$FLASH_SIZE exceeds limit $FLASH_MAX"
 fi
 
-# T8-03: RAM footprint <= 80 KB (81,920 bytes)
-RAM_MAX=81920
+# T8-03: RAM runtime footprint <= 40 KB (40,960 bytes)
+RAM_MAX=40960
 if [ $RAM_SIZE -le $RAM_MAX ]; then
-    report_pass "T8-03" "RAM footprint <= 80 KB ($RAM_SIZE bytes / 80 KB)"
+    report_pass "T8-03" "RAM runtime footprint <= 40 KB ($RAM_SIZE bytes / 40 KB)"
 else
-    report_fail "T8-03" "RAM footprint <= 80 KB" "$RAM_SIZE exceeds limit $RAM_MAX"
+    report_fail "T8-03" "RAM runtime footprint <= 40 KB" "$RAM_SIZE exceeds limit $RAM_MAX"
 fi
 
-# T8-04: _start symbol at 0x20000000
+# T8-04: _start symbol at 0x00202000 (Physical in-SRAM execution entry)
 START_ADDR=$("$NM" "$ELF" 2>/dev/null | grep -w "_start" | awk '{print $1}')
-if [ "$START_ADDR" == "20000000" ]; then
-    report_pass "T8-04" "_start entry point at 0x20000000"
+if [ "$START_ADDR" == "00202000" ] || [ "$START_ADDR" == "202000" ]; then
+    report_pass "T8-04" "_start entry point at 0x00202000 (in-SRAM)"
 else
-    report_fail "T8-04" "_start entry point at 0x20000000" "Address is 0x$START_ADDR"
+    report_fail "T8-04" "_start entry point at 0x00202000" "Address is 0x$START_ADDR"
 fi
 
-# T8-05: trap_entry symbol at 0x200000f0
+# T8-05: trap_entry symbol at 0x002020f0
 TRAP_ADDR=$("$NM" "$ELF" 2>/dev/null | grep -w "trap_entry" | awk '{print $1}')
-if [ "$TRAP_ADDR" == "200000f0" ]; then
-    report_pass "T8-05" "trap_entry vector at 0x200000f0"
+if [ "$TRAP_ADDR" == "002020f0" ] || [ "$TRAP_ADDR" == "2020f0" ]; then
+    report_pass "T8-05" "trap_entry vector at 0x002020f0 (in-SRAM)"
 else
-    report_fail "T8-05" "trap_entry vector at 0x200000f0" "Address is 0x$TRAP_ADDR"
+    report_fail "T8-05" "trap_entry vector at 0x002020f0" "Address is 0x$TRAP_ADDR"
 fi
 
 # T8-06: Zero __adddf3/__muldf3/__divdf3 calls in PID loop functions
