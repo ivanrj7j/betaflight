@@ -633,7 +633,7 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
                 if (c == serialConfig()->reboot_character) {
                     mspPort->pendingRequest = MSP_PENDING_BOOTLOADER_ROM;
 #ifdef USE_CLI
-                } else if (c == '#') {
+                } else if (c == '#' || c == '\r') {
                     mspPort->pendingRequest = MSP_PENDING_CLI;
                 } else if (c == 0x2) {
                     mspPort->portState = PORT_CLI_CMD;

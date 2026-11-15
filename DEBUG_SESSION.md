@@ -409,3 +409,49 @@ Detailed root-cause analysis identified two compounding issues:
 - **Disassembly Audit (`build_verify.sh`):** **10 / 10 checks PASSED**.
 - **Unit Test Suites (GoogleTest):** **161 / 161 tests PASSED (100% pass rate)**.
 
+---
+
+## ⚡ 16550 THRE Interrupt Elimination & Synchronous Drain (H22)
+
+### 1. Root Cause Analysis: Why Serial Output Stalled and `#` Appeared Dead
+When the user reported:
+> `Ok now its not not even showing any outpout in the serial output, and # is also not working`
+
+Analysis revealed two compounding root causes in commit `6d41db30f`:
+1. **16550 THRE Interrupt Storm & Race with ISR:**
+   - In `uartEnableTxInterrupt()`, setting `THEJAS32_UART(ch).UART_IE |= 0x02` enabled the 16550 Transmitter Holding Register Empty (THRE) interrupt.
+   - Because the hardware FIFO was empty at that instant, IRQ 0 fired immediately, triggering `thejas32_uart0_isr()` -> `uartIrqHandler()`.
+   - `uartIrqHandler()` read `UART_IIR_FCR`, which acknowledged and cleared the THRE interrupt in hardware according to 16550 specifications.
+   - Concurrently, both the ISR and `uartEnableTxInterrupt()` were competing to drain `uartPort->port.txBufferTail` without synchronization.
+   - Because `timeout = 50000` expired while waiting for `LSR & 0x20` during multi-byte transfers, `uartEnableTxInterrupt()` bailed out with `break`, leaving unwritten bytes in `txBuffer` and leaving `UART_IE |= 0x02` enabled!
+   - This caused an interrupt storm on IRQ 0, starving the scheduler and freezing subsequent serial output.
+   - Official C-DAC VEGA BSP (`lib/vega-bsp/cores/arduino/HardwareSerial.cpp`, line 121) explicitly disables TX interrupts (`enableInterrupt(0, 1)`) because THEJAS32 DW_apb_uart 16550 IP has known THRE edge clearing quirks.
+2. **Getter Contamination in `serial_uart.c`:**
+   - `uartTotalTxBytesFree()` and `isUartTransmitBufferEmpty()` contained `#ifdef THEJAS32` blocks that invoked `uartIrqHandler()`, causing `IIR` reads and buffer mutations inside `const` query functions.
+3. **CLI Invocation Trigger:**
+   - Terminal users naturally hit `Enter` (`\r`) as well as `#` to wake up an interactive session. `mspSerialProcess()` only listened for `#`.
+
+### 2. Implemented Remediation:
+1. **Permanent TX Interrupt Disablement (`serial_uart_aries.c`):**
+   - Removed `UART_IE |= 0x02` from `uartEnableTxInterrupt()`.
+   - `UART_IE` is strictly set to `0x01` (RX interrupt only) or `0x00`, matching C-DAC's BSP.
+   - `uartEnableTxInterrupt()` synchronously drains the software TX ring buffer into `THEJAS32_UART(ch).UART_DR` with a bounded per-byte timeout, unconditionally advancing `txBufferTail` just like `thejas32_early_uart_putc()`.
+   - `uartIrqHandler()` is converted to a pure RX interrupt handler; it never mutates `txBuffer` or touches TX registers.
+2. **Cleaned Serial Driver Core (`serial_uart.c`):**
+   - Removed `uartIrqHandler()` invocations from `uartTotalTxBytesFree()` and `isUartTransmitBufferEmpty()`.
+3. **Dual Interactive Trigger (`msp_serial.c`):**
+   - Enabled immediate CLI transition for both `#` and `\r` (Enter key) without line-silence delay.
+
+### 3. Verification Metrics:
+- **Build Status:** Clean compilation (Exit Code 0).
+- **Text / Code Size:** 209,472 bytes.
+- **Data Size:** 568 bytes.
+- **BSS Size:** 32,152 bytes.
+- **Total SRAM Occupancy:** 242,192 bytes ($\le 253,952$ bytes limit).
+- **Free SRAM Headroom:** **11,760 bytes / 11.48 KB** (with full 8 KB stack).
+- **Raw Binary Image:** `obj/betaflight_2026.12.0-alpha_ARIESV3.bin` (**210,040 bytes / 205.12 KB**, **43.9 KB margin** below 250 KB ceiling).
+- **Intel HEX Artifact:** `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` (**590,872 bytes**).
+- **Disassembly Audit (`build_verify.sh`):** **10 / 10 checks PASSED**.
+- **Unit Test Suites (GoogleTest):** **161 / 161 tests PASSED (100% pass rate)**.
+
+

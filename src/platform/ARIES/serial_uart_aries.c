@@ -149,11 +149,11 @@ void uartReconfigure(uartPort_t *uartPort)
     }
     THEJAS32_UART(ch).UART_LCR = lcr;
 
-    // Enable RX interrupt (bit 0 of UART_IE) if in RX mode
+    // Enable RX interrupt only (bit 0 of UART_IE) if in RX mode; ensure TX interrupt (bit 1) is disabled
     if (uartPort->port.mode & MODE_RX) {
-        THEJAS32_UART(ch).UART_IE |= 0x01;
+        THEJAS32_UART(ch).UART_IE = 0x01;
     } else {
-        THEJAS32_UART(ch).UART_IE &= ~0x01;
+        THEJAS32_UART(ch).UART_IE = 0x00;
     }
 
     __asm__ __volatile__ ("fence");
@@ -170,26 +170,14 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
 
     uint8_t ch = uartGetIndex(uartPort->USARTx);
 
-    // If there is data waiting to be sent, enable THRE interrupt and drain software buffer into hardware holding register
-    if (uartPort->port.txBufferTail != uartPort->port.txBufferHead) {
-        THEJAS32_UART(ch).UART_IE |= 0x02;
+    // TX interrupts are disabled on THEJAS32 (matching official C-DAC VEGA BSP) to prevent THRE races.
+    // Drain software TX ring buffer directly into hardware UART holding register.
+    while (uartPort->port.txBufferTail != uartPort->port.txBufferHead) {
+        uint32_t timeout = 50000;
+        while (!(THEJAS32_UART(ch).UART_LSR & 0x20) && --timeout);
+        THEJAS32_UART(ch).UART_DR = uartPort->port.txBuffer[uartPort->port.txBufferTail];
+        uartPort->port.txBufferTail = (uartPort->port.txBufferTail + 1) % uartPort->port.txBufferSize;
         __asm__ __volatile__ ("fence");
-
-        while (uartPort->port.txBufferTail != uartPort->port.txBufferHead) {
-            uint32_t timeout = 50000;
-            while (!(THEJAS32_UART(ch).UART_LSR & 0x20) && --timeout);
-            if (!timeout) {
-                break;
-            }
-            uint8_t byte = uartPort->port.txBuffer[uartPort->port.txBufferTail];
-            THEJAS32_UART(ch).UART_DR = byte;
-            uartPort->port.txBufferTail = (uartPort->port.txBufferTail + 1) % uartPort->port.txBufferSize;
-            __asm__ __volatile__ ("fence");
-        }
-
-        if (uartPort->port.txBufferTail == uartPort->port.txBufferHead) {
-            THEJAS32_UART(ch).UART_IE &= ~0x02;
-        }
     }
 }
 
@@ -201,7 +189,7 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
 
     uint8_t ch = uartGetIndex(s->USARTx);
 
-    // 16550 Interrupt Identification: reading IIR acknowledges THRE and interrupt status
+    // 16550 Interrupt Identification: reading IIR acknowledges interrupt status
     volatile uint32_t iir = THEJAS32_UART(ch).UART_IIR_FCR;
     (void)iir;
 
@@ -218,21 +206,6 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
             s->port.rxBufferHead = (s->port.rxBufferHead + 1) % s->port.rxBufferSize;
         }
         lsr = THEJAS32_UART(ch).UART_LSR;
-    }
-
-    // 2. Check if transmitter holding register is empty (LSR Bit 5: THRE)
-    if (s->port.txBuffer && s->port.txBufferSize > 0) {
-        while ((lsr & 0x20) && (s->port.txBufferTail != s->port.txBufferHead)) {
-            uint8_t txChar = s->port.txBuffer[s->port.txBufferTail];
-            THEJAS32_UART(ch).UART_DR = txChar;
-            s->port.txBufferTail = (s->port.txBufferTail + 1) % s->port.txBufferSize;
-            lsr = THEJAS32_UART(ch).UART_LSR;
-        }
-
-        if (s->port.txBufferTail == s->port.txBufferHead) {
-            // No more data to transmit: disable TX interrupt
-            THEJAS32_UART(ch).UART_IE &= ~0x02;
-        }
     }
     __asm__ __volatile__ ("fence");
 }
@@ -289,9 +262,19 @@ uartPort_t *serialUART(uartDevice_t *uartdev, uint32_t baudRate, portMode_e mode
 
     s->port.vTable = uartVTable;
 
-    // If RX mode requested, enable RX interrupt
+    // Ensure pin bindings so uartCanWrite always returns true
+    if (!uartdev->tx.pin && hardware->txPins[0].pin) {
+        uartdev->tx.pin = hardware->txPins[0].pin;
+    }
+    if (!uartdev->rx.pin && hardware->rxPins[0].pin) {
+        uartdev->rx.pin = hardware->rxPins[0].pin;
+    }
+
+    // Enable RX interrupt only (bit 0 of UART_IE); bit 1 (TX) stays 0
     if (mode & MODE_RX) {
-        THEJAS32_UART(ch).UART_IE |= 0x01;
+        THEJAS32_UART(ch).UART_IE = 0x01;
+    } else {
+        THEJAS32_UART(ch).UART_IE = 0x00;
     }
 
     return s;
