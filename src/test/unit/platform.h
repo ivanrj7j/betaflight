@@ -118,6 +118,10 @@ typedef struct
 
 #define MCU_TYPE_NAME "UNIT_TEST"
 
+#ifndef THEJAS_LOG
+#define THEJAS_LOG(s) ((void)0)
+#endif
+
 #include "target.h"
 
 #include "target/common_defaults_post.h"

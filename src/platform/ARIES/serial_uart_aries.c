@@ -102,7 +102,7 @@ void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
 // -----------------------------------------------------------------------------
 // Baud Rate & Line Control Configuration
 // -----------------------------------------------------------------------------
-static void thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate)
+static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, bool resetFifo)
 {
     if (baudRate == 0) {
         baudRate = 115200;
@@ -123,16 +123,21 @@ static void thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate)
     // Clear DLAB: 8 data bits, 1 stop bit, no parity (0x03)
     THEJAS32_UART(ch).UART_LCR = 0x03;
 
-    // Reset and enable FIFOs
-    THEJAS32_UART(ch).UART_IIR_FCR = 0x07; // Enable FIFO, reset RX & TX FIFOs
+    // FIFO configuration: 0x07 on cold reset, 0x01 on reconfiguration
+    THEJAS32_UART(ch).UART_IIR_FCR = resetFifo ? 0x07 : 0x01;
     __asm__ __volatile__ ("fence");
+}
+
+static inline void thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate)
+{
+    thejas32_uart_set_baudrate_ex(ch, baudRate, true);
 }
 
 void uartReconfigure(uartPort_t *uartPort)
 {
     uint8_t ch = uartGetIndex(uartPort->USARTx);
 
-    thejas32_uart_set_baudrate(ch, uartPort->port.baudRate);
+    thejas32_uart_set_baudrate_ex(ch, uartPort->port.baudRate, false);
 
     // Stop bits & parity
     uint8_t lcr = 0x03; // Default: 8 bits, 1 stop bit, no parity
@@ -186,6 +191,10 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
     }
 
     uint8_t ch = uartGetIndex(s->USARTx);
+
+    // 16550 Interrupt Identification: reading IIR acknowledges THRE and interrupt status
+    volatile uint32_t iir = THEJAS32_UART(ch).UART_IIR_FCR;
+    (void)iir;
 
     // Read Line Status Register
     uint32_t lsr = THEJAS32_UART(ch).UART_LSR;

@@ -121,6 +121,7 @@ void thejas32_early_uart_init(void);
 void thejas32_early_uart_putc(char c);
 void thejas32_early_uart_puts(const char *s);
 void thejas32_early_uart_print_hex(uint32_t val);
+#undef THEJAS_LOG
 #define THEJAS_LOG(s) thejas32_early_uart_puts(s)
 
 

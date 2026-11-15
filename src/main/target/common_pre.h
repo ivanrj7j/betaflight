@@ -20,6 +20,12 @@
 
 #pragma once
 
+#ifndef THEJAS32
+#ifndef THEJAS_LOG
+#define THEJAS_LOG(s) ((void)0)
+#endif
+#endif
+
 /*
 
     The purpose of this file is to enable the firmware "gates" for features and drivers

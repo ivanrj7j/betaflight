@@ -31,7 +31,20 @@ uint8_t test_uartGetIndex(uint32_t reg_addr)
     return 0;
 }
 
-void test_thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate)
+static uint32_t iir_read_counts[2] = {0, 0};
+
+uint32_t test_uart_get_iir_read_count(uint8_t ch)
+{
+    return (ch < 2) ? iir_read_counts[ch] : 0;
+}
+
+void test_uart_reset_iir_read_count(void)
+{
+    iir_read_counts[0] = 0;
+    iir_read_counts[1] = 0;
+}
+
+void test_thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, bool resetFifo)
 {
     if (baudRate == 0) {
         baudRate = 115200;
@@ -50,15 +63,20 @@ void test_thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate)
     // Clear DLAB: 8 data bits, 1 stop bit, no parity (0x03)
     MOCK_UART(ch).UART_LCR = 0x03;
 
-    // Reset and enable FIFOs
-    MOCK_UART(ch).UART_IIR_FCR = 0x07;
+    // FIFO configuration: 0x07 on cold reset, 0x01 on reconfiguration
+    MOCK_UART(ch).UART_IIR_FCR = resetFifo ? 0x07 : 0x01;
+}
+
+void test_thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate)
+{
+    test_thejas32_uart_set_baudrate_ex(ch, baudRate, true);
 }
 
 void test_uartReconfigure(test_uart_port_t *uartPort)
 {
     uint8_t ch = test_uartGetIndex(uartPort->reg_base);
 
-    test_thejas32_uart_set_baudrate(ch, uartPort->port.baudRate);
+    test_thejas32_uart_set_baudrate_ex(ch, uartPort->port.baudRate, false);
 
     uint8_t lcr = 0x03; // Default 8N1
     if (uartPort->port.options & TEST_SERIAL_STOPBITS_2) {
@@ -102,6 +120,14 @@ void test_uartIrqHandler(test_uart_port_t *s)
     }
 
     uint8_t ch = test_uartGetIndex(s->reg_base);
+
+    // 16550 Interrupt Identification: reading IIR acknowledges THRE and interrupt status
+    volatile uint32_t iir = MOCK_UART(ch).UART_IIR_FCR;
+    (void)iir;
+    if (ch < 2) {
+        iir_read_counts[ch]++;
+    }
+
     uint32_t lsr = MOCK_UART(ch).UART_LSR;
 
     // 1. Process RX
@@ -128,6 +154,24 @@ void test_uartIrqHandler(test_uart_port_t *s)
             MOCK_UART(ch).UART_IE &= ~UART_IE_THRE;
         }
     }
+}
+
+uint8_t test_uartRead(test_uart_port_t *instance)
+{
+    if (!instance || !instance->port.rxBuffer || instance->port.rxBufferSize == 0) {
+        return 0;
+    }
+    // Draining fallback: if software buffer is empty, drain hardware FIFO first
+    if (instance->port.rxBufferHead == instance->port.rxBufferTail) {
+        test_uartIrqHandler(instance);
+    }
+    uint8_t ch = instance->port.rxBuffer[instance->port.rxBufferTail];
+    if (instance->port.rxBufferTail + 1 >= instance->port.rxBufferSize) {
+        instance->port.rxBufferTail = 0;
+    } else {
+        instance->port.rxBufferTail++;
+    }
+    return ch;
 }
 
 uint32_t test_uartTotalTxBytesFree(test_uart_port_t *uartPort)

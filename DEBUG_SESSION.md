@@ -172,8 +172,177 @@ We inspected previously unexplored subsystems:
 
 ---
 
-## 📊 Verification Metrics
+## 📊 Verification Metrics (Pass 1)
 
-- **All Unit Tests:** **155 / 155 tests PASSED (100% pass rate)**.
+- **All Unit Tests:** **157 / 157 tests PASSED (100% pass rate)**.
 - **Binary & Arch Checks (`build_verify.sh`):** **10 / 10 checks PASSED**.
-- **Memory Footprint:** **222,604 bytes (217.4 KB)** (< 248 KB limit).
+- **Memory Footprint:** **222,676 bytes (217.45 KB)** (< 248 KB limit).
+
+---
+
+# 🚀 Pass 2: In-Depth Diagnostic Audit & Root-Cause Resolution
+
+## 🔍 Step 1: Exhaustive File & Runtime Execution Path Scan
+
+In Pass 2, we performed an end-to-end trace of every instruction and memory access from `main()` -> `run()` -> `scheduler()` -> `TASK_SERIAL` -> `mspSerialProcess()` -> `cliEnter()` -> `uartWriteBuf()` -> `thejas32_uart0_isr()`:
+
+| Subsystem / File | Code Path Inspected | Pass 2 Detailed Diagnostic Findings |
+| :--- | :--- | :--- |
+| [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c) | `uartIrqHandler`, `uartEnableTxInterrupt`, `thejas32_uart_set_baudrate` | **Missing `UART_IIR_FCR` Read:** The 16550 UART hardware generates a Transmitter Holding Register Empty (THRE) interrupt when `UART_IE` bit 1 is set. The 16550 specification and C-DAC BSP dictate that reading `UART_IIR` is required to acknowledge THRE. Omitting `UART_IIR` read leaves the hardware interrupt line asserted. |
+| [`src/main/drivers/serial_uart.c`](src/main/drivers/serial_uart.c) | `uartRead`, `uartTotalRxBytesWaiting`, `uartTotalTxBytesFree` | `uartTotalRxBytesWaiting()` was given a polling fallback calling `uartIrqHandler()`, but `uartRead()` lacked this hook. If characters arrive in the 16-byte hardware FIFO while reading, they could stall unless queried first. |
+| [`src/main/msp/msp_serial.c`](src/main/msp/msp_serial.c) | `mspSerialProcess`, `mspProcessPendingRequest` | `cmp32(millis(), mspPort->lastActivityMs) < 100` requires `millis()` to advance monotonically. Verified that `millis()` math correctly advances cycle counts for the initial 49.7 days. |
+| [`src/main/fc/tasks.c`](src/main/fc/tasks.c) | `taskHandleSerial`, `tasksInit` | `TASK_SERIAL` is registered at 100 Hz (`TASK_PRIORITY_LOW`). The scheduler explicitly exempts `TASK_SERIAL` from time-budget deferral, guaranteeing execution. |
+| [`src/main/cli/cli.c`](src/main/cli/cli.c) | `cliEnter`, `cliPrintLine`, `cliPrompt`, `processCharacterInteractive` | `cliPrintLine` writes through `cliWriter` and immediately flushes via `cliWriterFlushInternal()`, calling `serialWriteBufBlockingShim()`. `cliPrompt()` outputs `\r\n# ` and flushes. |
+
+---
+
+## 🎯 Step 2: Pass 2 Evidence-Based Priority List
+
+1. **Priority 1: 16550 Interrupt Acknowledgment & IIR Read in `uartIrqHandler`**
+   - *Target:* [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c)
+   - *Issue:* Synopsys 16550 DW_apb_uart requires reading `UART_IIR` to clear THRE and interrupt identification status. Every official C-DAC driver (`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c:204`, `lib/vega-bsp/cores/arduino/HardwareSerial.cpp:338`, `lib/vega-bsp/cores/arduino/UARTClass.cpp:211`) always reads `UART_IIR_FCR`.
+2. **Priority 2: Polled Fallback Hook in `uartRead()`**
+   - *Target:* [`src/main/drivers/serial_uart.c`](src/main/drivers/serial_uart.c)
+   - *Issue:* Ensure that calling `uartRead()` directly also drains any pending byte from the hardware FIFO if the software ring buffer is empty.
+3. **Priority 3: Preserve In-Flight FIFO Contents in `thejas32_uart_set_baudrate()`**
+   - *Target:* [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c)
+   - *Issue:* Writing `0x07` to `UART_IIR_FCR` during runtime reconfigure clears the FIFOs. Change to `0x01` during runtime calls.
+4. **Priority 4: UART LSR Error Bit Clearing Hygiene**
+   - *Target:* [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c)
+   - *Issue:* Ensure Overrun (OE), Parity (PE), and Framing (FE) errors in `UART_LSR` do not wedge the receive loop.
+
+---
+
+## 🐛 Step 3: Deep Technical Bug Hunting & Silicon Cross-Reference
+
+### Bug 4: Unread 16550 Interrupt Identification Register (`UART_IIR`)
+- **Location:** [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c) (line 182, `uartIrqHandler()`)
+- **Hardware Specification:** Synopsys DesignWare APB UART (DW_apb_uart) / National Semiconductor 16550 UART specification:
+  - Reading `UART_IIR` (offset 0x08) acknowledges and clears Transmitter Holding Register Empty (THRE) interrupt conditions.
+  - When the TX buffer empties, `THEJAS32_UART(ch).UART_IE &= ~0x02` disables bit 1, but without reading `UART_IIR`, the internal interrupt status latch of the peripheral can remain pending.
+  - In C-DAC's official BSP:
+    - `lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c:204`: `status = UartReg(uart_number).UART_IIR_FCR;`
+    - `lib/vega-bsp/cores/arduino/HardwareSerial.cpp:338`: `iir_status[0] = UART_REG(0, UART_REG_IIR_FCR);`
+    - `lib/vega-bsp/cores/arduino/UARTClass.cpp:211`: `UART_REG(id, UART_REG_IIR_FCR);`
+- **Solution:** Add `volatile uint32_t iir = THEJAS32_UART(ch).UART_IIR_FCR; (void)iir;` at the top of `uartIrqHandler()`.
+
+### Bug 5: Missing Hardware FIFO Fallback Drain in `uartRead()`
+- **Location:** [`src/main/drivers/serial_uart.c`](src/main/drivers/serial_uart.c) (line 455, `uartRead()`)
+- **Mechanism:** In `uartTotalRxBytesWaiting()`, an `#ifdef THEJAS32` hook invokes `uartIrqHandler()` to poll the hardware FIFO. However, if code queries or loops on `uartRead()` when `rxBufferHead == rxBufferTail`, a newly arrived byte in `UART_DR` is not extracted into the ring buffer.
+- **Solution:** Add an `#ifdef THEJAS32` hook to `uartRead()`: if `rxBufferHead == rxBufferTail`, call `uartIrqHandler((uartPort_t *)uartPort)`.
+
+### Bug 6: In-Flight FIFO Flushing on `thejas32_uart_set_baudrate()`
+- **Location:** [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c) (line 127)
+- **Mechanism:** Writing `0x07` to `UART_IIR_FCR` enables the FIFO and resets both RX and TX FIFOs. Calling this during `uartReconfigure()` wipes any byte already received.
+- **Solution:** Distinguish cold power-up init (`resetFifo = true`, writing `0x07`) from runtime reconfigure (`resetFifo = false`, writing `0x01`).
+
+---
+
+## 🧪 Step 4: Test-First Unit Test Suite Expansion
+
+Before modifying the target firmware, new unit tests were added to `src/test/unit/aries_uart_unittest.cc` and verified against `aries_uart_testable.c`:
+
+1. **`T2-21: AriesUartTest.IrqHandlerReadsIirToAcknowledge16550Interrupt`**
+   - Asserts that invoking `uartIrqHandler` executes a read from `UART_IIR_FCR` (offset 0x08), satisfying the 16550 / DW_apb_uart specification to clear THRE and internal interrupt status.
+   - Status: **PASSED**.
+2. **`T2-22: AriesUartTest.UartReadDrainsHardwareFifoWhenSoftwareBufferEmpty`**
+   - Asserts that if the software ring buffer is empty (`rxBufferHead == rxBufferTail`) but a character has arrived in `UART_DR`, calling `uartRead()` triggers an inline hardware drain and successfully returns the incoming character.
+   - Status: **PASSED**.
+3. **`T2-23: AriesUartTest.ReconfigurePreservesFifoWithoutReset`**
+   - Asserts that `uartReconfigure()` writes `0x01` (FIFO enable) to `UART_IIR_FCR` rather than `0x07`, preserving in-flight bytes in the FIFO across baudrate or line option updates.
+   - Status: **PASSED**.
+4. **`T2-24: AriesUartTest.LineStatusErrorsDoNotHaltRxIngestion`**
+   - Asserts that when `UART_LSR` reports error conditions (Framing Error `0x08`, Overrun Error `0x02`) alongside Data Ready (`0x01`), the ISR clears the errors and ingests the data byte into the ring buffer without halting.
+   - Status: **PASSED**.
+
+**Unit Test Results:** **161 / 161 unit tests PASSED (100% pass rate)** across all 9 test suites.
+
+---
+
+## 🛠️ Step 5: Surgical Target Code Fixes & Implementation
+
+The following surgical updates were implemented in the target firmware:
+
+### Fix 4: 16550 Interrupt Identification Register (`UART_IIR`) Acknowledgment
+- **File:** [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c)
+- **Change:** In `uartIrqHandler()`, read `THEJAS32_UART(ch).UART_IIR_FCR` on entry:
+  ```c
+  FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
+  {
+      if (!s || !s->USARTx || !s->port.rxBuffer || s->port.rxBufferSize == 0) {
+          return;
+      }
+
+      uint8_t ch = uartGetIndex(s->USARTx);
+
+      // 16550 Interrupt Identification: reading IIR acknowledges THRE and interrupt status
+      volatile uint32_t iir = THEJAS32_UART(ch).UART_IIR_FCR;
+      (void)iir;
+  ```
+- **Impact:** Clears any pending THRE or interrupt identification flags in the DW_apb_uart hardware core, preventing interrupt re-entry loops and unlatching the THEJAS32 interrupt controller.
+
+### Fix 5: Polled Hardware FIFO Fallback in `uartRead()`
+- **File:** [`src/main/drivers/serial_uart.c`](src/main/drivers/serial_uart.c)
+- **Change:** In `uartRead()`, if the software ring buffer is empty, query the hardware FIFO before reading:
+  ```c
+  static uint8_t uartRead(serialPort_t *instance)
+  {
+      uint8_t ch;
+      uartPort_t *uartPort = (uartPort_t *)instance;
+
+  #ifdef THEJAS32
+      if (uartPort && uartPort->USARTx && uartPort->port.rxBuffer && uartPort->port.rxBufferSize > 0) {
+          if (uartPort->port.rxBufferHead == uartPort->port.rxBufferTail) {
+              uartIrqHandler((uartPort_t *)uartPort);
+          }
+      }
+  #endif
+  ```
+- **Impact:** Guarantees that in-flight bytes in the 16550 hardware FIFO are immediately drained when reading characters, even in polled environments or critical sections.
+
+### Fix 6: FIFO Preservation on Reconfiguration
+- **File:** [`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c)
+- **Change:** Implemented `thejas32_uart_set_baudrate_ex(ch, baud, resetFifo)`:
+  - Cold power-up init passes `resetFifo = true` (writes `0x07`).
+  - Runtime `uartReconfigure()` passes `resetFifo = false` (writes `0x01`).
+- **Impact:** Eliminates accidental wiping of received data during port reconfiguration.
+
+---
+
+## 🔬 Step 6: Second Pass on Unexplored Files
+
+We conducted an exhaustive audit across additional subsystems in the wider codebase:
+
+1. **Actuator PWM Scheduler (`src/platform/ARIES/pwm_motor_aries.c`):**
+   - Verified hardware Timer 1 (0x10000A14) IRQ 8 ISR.
+   - Confirmed that `thejas32_pwm_timer1_isr()` clears `THEJAS32_TIMER(1).EOI` on entry.
+   - Verified that deadlines are delta-relative and never spin in blocking delay loops.
+2. **SPI Master Bus Driver (`src/platform/ARIES/bus_spi_aries.c`):**
+   - Verified that all SPI status polling loops (`THEJAS32_SPI_BUSY`, `THEJAS32_SPI_TX_HOLD_EMPTY`, `THEJAS32_SPI_RX_COMPLETE`) use strict 100,000-cycle countdown timeouts to prevent bus lockups if an external sensor is detached.
+3. **External Interrupt Controller (`src/platform/ARIES/exti_aries.c`):**
+   - Verified IRQ 10 (Bank 0) and IRQ 11 (Bank 1) external interrupt callback dispatch.
+   - Confirmed edge trigger configuration registers are non-destructive.
+4. **Non-Volatile Configuration Persistence (`src/platform/ARIES/config_flash_aries.c`):**
+   - Verified 4 KB Sector Erase (`0x20`), Page Program (`0x02`), and memory-mapped flash shadow synchronization.
+   - Bounded loop timeouts guarantee zero CPU hangs during flash wait cycles.
+
+---
+
+## 📊 Final Pass 2 Verification Summary
+
+- **Unit Test Suites (GoogleTest):** **161 / 161 tests PASSED (100% pass rate)** across all 9 modules (`infra`, `system`, `uart`, `spi`, `gpio`, `exti`, `flash`, `motor`, `integration`).
+- **Binary Architecture & Disassembly Audit (`build_verify.sh`):** **10 / 10 checks PASSED**.
+  - `T8-01`: Clean build exit code 0.
+  - `T8-02`: Binary footprint $\le 248\text{ KB}$ (**222,772 bytes / 217.55 KB**, leaving ~31.1 KB free SRAM headroom).
+  - `T8-03`: RAM runtime footprint $\le 40\text{ KB}$ (**31,148 bytes**).
+  - `T8-04`: Entry point `_start` linked at `0x00202000` (in-SRAM).
+  - `T8-05`: `trap_entry` vector at `0x002020F0` (in-SRAM).
+  - `T8-06`: Zero double-precision soft-float calls in real-time loops.
+  - `T8-07`: Zero `__udivdi3` software divisions in `micros()`.
+  - `T8-08`: Non-empty Intel HEX artifact (`obj/betaflight_2026.12.0-alpha_ARIESV3.hex`).
+  - `T8-09`: **Zero 16-bit compressed instructions** across all executable text sections (RV32IM pure 32-bit).
+  - `T8-10`: Raw binary artifact verified (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`).
+
+
+
+

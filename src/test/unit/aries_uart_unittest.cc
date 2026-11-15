@@ -313,3 +313,62 @@ TEST_F(AriesUartTest, TxBytesFreeDrainsPendingBytes)
     EXPECT_EQ(uart0.port.txBufferTail, 1U);
     EXPECT_EQ(freeSpace, 255U);
 }
+
+// T2-21: IrqHandler reads IIR register on entry to acknowledge 16550 interrupt status
+TEST_F(AriesUartTest, IrqHandlerReadsIirToAcknowledge16550Interrupt)
+{
+    test_uart_reset_iir_read_count();
+    EXPECT_EQ(test_uart_get_iir_read_count(0), 0U);
+
+    // Call ISR handler
+    test_uartIrqHandler(&uart0);
+
+    // Verified: IIR (offset 0x08) was read to clear THRE and 16550 interrupt status
+    EXPECT_EQ(test_uart_get_iir_read_count(0), 1U);
+}
+
+// T2-22: UartRead drains hardware FIFO into software buffer when empty
+TEST_F(AriesUartTest, UartReadDrainsHardwareFifoWhenSoftwareBufferEmpty)
+{
+    // Both pointers at 0 (software buffer empty)
+    uart0.port.rxBufferHead = 0;
+    uart0.port.rxBufferTail = 0;
+
+    // Simulate in-flight byte in hardware FIFO: 'X' with DR set
+    test_uart_write_reg(0, 0x00, 'X');
+    test_uart_write_reg(0, 0x14, UART_LSR_DR);
+
+    // Calling test_uartRead drains hardware FIFO and returns 'X'
+    uint8_t ch = test_uartRead(&uart0);
+
+    EXPECT_EQ(ch, 'X');
+    EXPECT_EQ(uart0.port.rxBufferHead, 1U);
+    EXPECT_EQ(uart0.port.rxBufferTail, 1U);
+}
+
+// T2-23: Runtime reconfigure preserves FIFO contents without resetting queues
+TEST_F(AriesUartTest, ReconfigurePreservesFifoWithoutReset)
+{
+    // Reconfigure baudrate
+    uart0.port.baudRate = 57600;
+    test_uartReconfigure(&uart0);
+
+    // Verified: FCR was written with 0x01 (FIFO enable) instead of 0x07 (FIFO reset)
+    EXPECT_EQ(test_uart_read_reg(0, 0x08) & 0xFF, 0x01U);
+}
+
+// T2-24: Line Status errors do not halt character ingestion
+TEST_F(AriesUartTest, LineStatusErrorsDoNotHaltRxIngestion)
+{
+    uart0.port.rxBufferHead = 0;
+    uart0.port.rxBufferTail = 0;
+
+    // Simulate framing error (0x08) and overrun error (0x02) together with Data Ready (0x01)
+    test_uart_write_reg(0, 0x00, '#');
+    test_uart_write_reg(0, 0x14, UART_LSR_DR | 0x08 | 0x02);
+
+    test_uartIrqHandler(&uart0);
+
+    EXPECT_EQ(uart0.port.rxBufferHead, 1U);
+    EXPECT_EQ(uart0.port.rxBuffer[0], '#');
+}

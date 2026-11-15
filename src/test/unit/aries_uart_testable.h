@@ -53,9 +53,11 @@ typedef struct {
 // Driver functions under test
 uint8_t test_uartGetIndex(uint32_t reg_addr);
 void test_thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate);
+void test_thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, bool resetFifo);
 void test_uartReconfigure(test_uart_port_t *uartPort);
 void test_uartEnableTxInterrupt(test_uart_port_t *uartPort);
 void test_uartIrqHandler(test_uart_port_t *s);
+uint8_t test_uartRead(test_uart_port_t *instance);
 uint32_t test_uartTotalTxBytesFree(test_uart_port_t *uartPort);
 bool test_uartCanWrite(const test_uart_port_t *uartPort, uint16_t txPin);
 uint8_t test_uartSanitizeMode(uint16_t rxPin, uint16_t txPin, uint8_t mode);
@@ -64,6 +66,8 @@ void test_uartPinConfigure(test_uart_port_t *uartPort, uint16_t *rxPin, uint16_t
 // MMIO register accessor helpers for test assertions
 uint32_t test_uart_read_reg(uint8_t ch, uint32_t offset);
 void test_uart_write_reg(uint8_t ch, uint32_t offset, uint32_t val);
+uint32_t test_uart_get_iir_read_count(uint8_t ch);
+void test_uart_reset_iir_read_count(void);
 
 #ifdef __cplusplus
 }
