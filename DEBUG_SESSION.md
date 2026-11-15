@@ -368,12 +368,44 @@ Following physical hardware confirmation that `[SERIAL ALIVE]` and `[MSP RX]` ar
 - **Flash/Text Section:** Shrunk from **222,404 bytes down to 209,940 bytes** (**12,464 bytes / ~12.2 KB code reclaimed!**).
 - **Raw Binary Image:** Shrunk from **223,064 bytes down to 210,508 bytes** (**43.4 KB free margin** below the bootloader's 250 KB limit).
 - **RAM Footprint:** Even with the stack expanded by +3 KB to a full 8 KB, total RAM occupancy is **242,668 bytes** (leaving **11,284 bytes / 11.0 KB of free SRAM headroom**).
-- **Automated Verification:**
-  - `build_verify.sh`: **10 / 10 checks PASSED**.
-  - GoogleTest Unit Suites: **161 / 161 tests PASSED (100% pass rate)**.
+---
 
+## 🔌 Betaflight Configurator Handshake & Interactive CLI Remediation
 
+### 1. Root Cause Analysis: Why Configurator Timed Out (10s Failure)
+When the user attempted to connect Betaflight Configurator, Configurator opened `/dev/ttyUSB0` at 115200 baud, sent `MSP_API_VERSION` (`$M<\x00\x01\x01`), and timed out with:
+> `no configuration received in 10 seconds, communication failed`
 
+Detailed root-cause analysis identified two compounding issues:
+1. **Serial Stream Pollution from Debug ASCII Strings:**
+   - The diagnostic probe in `tasks.c` printed `[SERIAL ALIVE] #... ms=...` every second directly onto UART0 TX.
+   - The diagnostic probe in `msp_serial.c` printed `[MSP RX] c=0x...` for every single byte received from Configurator.
+   - Configurator's MSP parser strictly expects binary frames starting with `$M>...`. When receiving ASCII text (`[` `M` `S` `P` ` ` `R` `X` `]`), Configurator flags framing/CRC errors and discards all incoming data until the 10-second timeout expires.
+2. **16550 THRE Interrupt Lockup on Software Buffer Drain:**
+   - Analysis of official C-DAC VEGA BSP (`lib/vega-bsp/cores/arduino/UARTClass.cpp` & `HardwareSerial.cpp`) revealed that C-DAC disabled TX interrupts entirely (`UART_IE = 0x00`) because Synopsys DW_apb_uart 16550 IP has edge-triggered THRE interrupt behavior that is cleared whenever the Interrupt Identification Register (`IIR`) is read.
+   - In our driver, `uartEnableTxInterrupt()` transmitted only 1 byte because `LSR & 0x20` went low after the first write.
+   - `taskHandleSerial()` calling `uartRxBytesWaiting()` read `IIR` on every 10 ms tick, which cleared the hardware THRE interrupt before the interrupt handler could drain subsequent bytes.
+   - As a consequence, multi-byte MSP responses and CLI prompt banners stalled after the first character.
+3. **100 ms Guard Delay on CLI Transition:**
+   - `mspProcessPendingRequest()` enforced a 100 ms silence delay on receiving `#`. Bypassing this delay for CLI mode transitions immediately into `PORT_CLI_ACTIVE`.
 
+### 2. Implemented Fixes:
+1. **Removed All Serial Debug Pollution:**
+   - Cleared `[SERIAL ALIVE]` heartbeat in [`src/main/fc/tasks.c`](src/main/fc/tasks.c).
+   - Cleared `[MSP OPEN]`, `[MSP RX]`, and `[MSP PENDING]` logging in [`src/main/msp/msp_serial.c`](src/main/msp/msp_serial.c).
+2. **Robust Bounded Buffer Drain in `uartEnableTxInterrupt` ([`src/platform/ARIES/serial_uart_aries.c`](src/platform/ARIES/serial_uart_aries.c)):**
+   - Transmits all queued bytes in `txBuffer` to `UART_DR` with a bounded per-byte timeout (`timeout = 50000`, ~2.5 ms vs 87 µs byte duration).
+   - Disables TX interrupt once `txBufferTail == txBufferHead`.
+   - Guarantees immediate transmission of complete MSP frames (e.g. 9 bytes in ~780 µs) and CLI output without relying on flaky edge-triggered THRE interrupts.
+3. **Instant Interactive CLI Activation ([`src/main/msp/msp_serial.c`](src/main/msp/msp_serial.c)):**
+   - Allowed immediate `cliEnter()` upon receiving `#` without waiting for 100 ms of line silence.
 
+### 3. Verification Metrics:
+- **Build Status:** Clean compilation (Exit Code 0).
+- **Binary Footprint:** 209,712 text, 568 data, 32,152 bss (Total: 242,432 bytes $\le 253,952$ bytes limit).
+- **Free SRAM Headroom:** **11,520 bytes / 11.25 KB** (with 8 KB stack).
+- **Raw Binary:** `obj/betaflight_2026.12.0-alpha_ARIESV3.bin` (**210,280 bytes / 205.35 KB**, **43.7 KB margin** below 250 KB ceiling).
+- **Intel HEX Artifact:** `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` (**591,547 bytes**).
+- **Disassembly Audit (`build_verify.sh`):** **10 / 10 checks PASSED**.
+- **Unit Test Suites (GoogleTest):** **161 / 161 tests PASSED (100% pass rate)**.
 

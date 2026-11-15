@@ -170,16 +170,25 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
 
     uint8_t ch = uartGetIndex(uartPort->USARTx);
 
-    // If there is data waiting to be sent, enable THRE interrupt and stream directly while holding reg is empty
+    // If there is data waiting to be sent, enable THRE interrupt and drain software buffer into hardware holding register
     if (uartPort->port.txBufferTail != uartPort->port.txBufferHead) {
         THEJAS32_UART(ch).UART_IE |= 0x02;
         __asm__ __volatile__ ("fence");
 
-        while ((THEJAS32_UART(ch).UART_LSR & 0x20) && (uartPort->port.txBufferTail != uartPort->port.txBufferHead)) {
+        while (uartPort->port.txBufferTail != uartPort->port.txBufferHead) {
+            uint32_t timeout = 50000;
+            while (!(THEJAS32_UART(ch).UART_LSR & 0x20) && --timeout);
+            if (!timeout) {
+                break;
+            }
             uint8_t byte = uartPort->port.txBuffer[uartPort->port.txBufferTail];
             THEJAS32_UART(ch).UART_DR = byte;
             uartPort->port.txBufferTail = (uartPort->port.txBufferTail + 1) % uartPort->port.txBufferSize;
             __asm__ __volatile__ ("fence");
+        }
+
+        if (uartPort->port.txBufferTail == uartPort->port.txBufferHead) {
+            THEJAS32_UART(ch).UART_IE &= ~0x02;
         }
     }
 }

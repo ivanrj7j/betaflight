@@ -156,17 +156,6 @@ static void taskHandleSerial(timeUs_t currentTimeUs)
     DEBUG_SET(DEBUG_USB, 1, usbVcpIsConnected());   //!< USB VCP Connected
 #endif
 
-#ifdef THEJAS32
-    static uint32_t serialHeartbeatCount = 0;
-    serialHeartbeatCount++;
-    if (serialHeartbeatCount % 100 == 0) {
-        thejas32_early_uart_puts("[SERIAL ALIVE] #");
-        thejas32_early_uart_print_hex(serialHeartbeatCount / 100);
-        thejas32_early_uart_puts(" ms=");
-        thejas32_early_uart_print_hex(millis());
-        thejas32_early_uart_puts("\r\n");
-    }
-#endif
 
     bool evaluateMspData = ARMING_FLAG(ARMED) ? MSP_SKIP_NON_MSP_DATA : MSP_EVALUATE_NON_MSP_DATA;
     mspSerialProcess(evaluateMspData, mspFcProcessCommand, mspFcProcessReply);
