@@ -218,6 +218,17 @@ void thejas32_interrupt_disable(uint8_t irq_number)
     }
 }
 
+void test_enable_irq(void)
+{
+    mock_mie |= 0x800;
+    mock_mstatus |= 8;
+}
+
+void test_disable_irq(void)
+{
+    mock_mstatus &= ~8;
+}
+
 uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
 {
     if (mcause & 0x80000000UL) {

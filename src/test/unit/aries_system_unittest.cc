@@ -391,3 +391,19 @@ TEST_F(AriesSystemTest, EarlyUartPrintHexPureAlu)
     test_early_uart_print_hex(0xFFFFFFFF, hex);
     EXPECT_STREQ(hex, "FFFFFFFF");
 }
+
+// T1-29: enable_irq sets MSTATUS_MIE and MIE_MEIE
+TEST_F(AriesSystemTest, EnableIrqSetsMstatusMIEAndMieMEIE)
+{
+    mock_mstatus = 0;
+    mock_mie = 0;
+
+    test_enable_irq();
+
+    EXPECT_EQ(mock_mstatus & 0x08, 0x08U);
+    EXPECT_EQ(mock_mie & 0x800, 0x800U);
+
+    test_disable_irq();
+    EXPECT_EQ(mock_mstatus & 0x08, 0U);
+    EXPECT_EQ(mock_mie & 0x800, 0x800U); // mie remains configured
+}

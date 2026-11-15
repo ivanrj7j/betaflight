@@ -196,12 +196,15 @@
 #define BEEPER_PIN              NONE
 
 #define USE_UART0
-#define UART0_RX_PIN            NONE
-#define UART0_TX_PIN            NONE
+#define UART0_RX_PIN            PA30
+#define UART0_TX_PIN            PA31
+
+#define MSP_UART                SERIAL_PORT_UART0
 
 #define USE_UART1
 #define UART1_RX_PIN            PA17 // Header J2_15 (Serial RX)
 #define UART1_TX_PIN            PA16 // Header J2_13 (Telemetry TX)
+#define SERIALRX_UART           SERIAL_PORT_USART1
 
 // Actuator Outputs (Motor 1..4 on Header J2 & J1)
 #define USE_PWM_OUTPUT

@@ -56,6 +56,10 @@ void test_thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate);
 void test_uartReconfigure(test_uart_port_t *uartPort);
 void test_uartEnableTxInterrupt(test_uart_port_t *uartPort);
 void test_uartIrqHandler(test_uart_port_t *s);
+uint32_t test_uartTotalTxBytesFree(test_uart_port_t *uartPort);
+bool test_uartCanWrite(const test_uart_port_t *uartPort, uint16_t txPin);
+uint8_t test_uartSanitizeMode(uint16_t rxPin, uint16_t txPin, uint8_t mode);
+void test_uartPinConfigure(test_uart_port_t *uartPort, uint16_t *rxPin, uint16_t *txPin, uint16_t defaultRx, uint16_t defaultTx);
 
 // MMIO register accessor helpers for test assertions
 uint32_t test_uart_read_reg(uint8_t ch, uint32_t offset);

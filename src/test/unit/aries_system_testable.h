@@ -39,6 +39,8 @@ extern thejas32_irq_handler_t interrupt_table[32];
 void thejas32_interrupt_register(uint8_t irq_number, thejas32_irq_handler_t handler);
 void thejas32_interrupt_enable(uint8_t irq_number);
 void thejas32_interrupt_disable(uint8_t irq_number);
+void test_enable_irq(void);
+void test_disable_irq(void);
 uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp);
 
 // Bare-metal memory routines for C-DAC THEJAS32 (VEGA ET1031)

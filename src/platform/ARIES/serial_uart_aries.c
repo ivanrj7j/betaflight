@@ -31,8 +31,8 @@ const uartHardware_t uartHardware[UARTDEV_COUNT] = {
     {
         .identifier = SERIAL_PORT_UART0,
         .reg = (usartResource_t *)THEJAS32_UART_BASE, // 0x10000100
-        .rxPins = { { .pin = DEFIO_TAG__NONE }, },
-        .txPins = { { .pin = DEFIO_TAG__NONE }, },
+        .rxPins = { { .pin = DEFIO_TAG_E(PA30) }, },
+        .txPins = { { .pin = DEFIO_TAG_E(PA31) }, },
         .af = 0,
         .irqn = THEJAS32_IRQ_UART0,
         .txPriority = 0,
@@ -47,8 +47,8 @@ const uartHardware_t uartHardware[UARTDEV_COUNT] = {
     {
         .identifier = SERIAL_PORT_USART1,
         .reg = (usartResource_t *)(THEJAS32_UART_BASE + 0x100), // 0x10000200
-        .rxPins = { { .pin = DEFIO_TAG__NONE }, },
-        .txPins = { { .pin = DEFIO_TAG__NONE }, },
+        .rxPins = { { .pin = DEFIO_TAG_E(PA17) }, },
+        .txPins = { { .pin = DEFIO_TAG_E(PA16) }, },
         .af = 0,
         .irqn = THEJAS32_IRQ_UART1,
         .txPriority = 0,
@@ -90,6 +90,12 @@ void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
         uartdev->hardware = hardware;
         uartdev->rx.pin = pSerialPinConfig->ioTagRx[resourceIndex];
         uartdev->tx.pin = pSerialPinConfig->ioTagTx[resourceIndex];
+        if (!uartdev->rx.pin && hardware->rxPins[0].pin) {
+            uartdev->rx.pin = hardware->rxPins[0].pin;
+        }
+        if (!uartdev->tx.pin && hardware->txPins[0].pin) {
+            uartdev->tx.pin = hardware->txPins[0].pin;
+        }
     }
 }
 

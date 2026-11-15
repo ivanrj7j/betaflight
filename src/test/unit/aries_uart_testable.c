@@ -78,6 +78,10 @@ void test_uartReconfigure(test_uart_port_t *uartPort)
 
 void test_uartEnableTxInterrupt(test_uart_port_t *uartPort)
 {
+    if (!uartPort || !uartPort->port.txBuffer || uartPort->port.txBufferSize == 0) {
+        return;
+    }
+
     uint8_t ch = test_uartGetIndex(uartPort->reg_base);
 
     if (uartPort->port.txBufferTail != uartPort->port.txBufferHead) {
@@ -93,6 +97,10 @@ void test_uartEnableTxInterrupt(test_uart_port_t *uartPort)
 
 void test_uartIrqHandler(test_uart_port_t *s)
 {
+    if (!s || !s->port.rxBuffer || s->port.rxBufferSize == 0) {
+        return;
+    }
+
     uint8_t ch = test_uartGetIndex(s->reg_base);
     uint32_t lsr = MOCK_UART(ch).UART_LSR;
 
@@ -112,13 +120,63 @@ void test_uartIrqHandler(test_uart_port_t *s)
 
     // 2. Process TX
     if (lsr & UART_LSR_THRE) {
-        if (s->port.txBufferTail != s->port.txBufferHead) {
+        if (s->port.txBuffer && s->port.txBufferSize > 0 && s->port.txBufferTail != s->port.txBufferHead) {
             uint8_t txChar = s->port.txBuffer[s->port.txBufferTail];
             MOCK_UART(ch).UART_DR = txChar;
             s->port.txBufferTail = (s->port.txBufferTail + 1) % s->port.txBufferSize;
         } else {
             MOCK_UART(ch).UART_IE &= ~UART_IE_THRE;
         }
+    }
+}
+
+uint32_t test_uartTotalTxBytesFree(test_uart_port_t *uartPort)
+{
+    if (!uartPort) {
+        return 0;
+    }
+    // Draining hook: ensures pending TX bytes are pumped when space is queried
+    if (uartPort->port.txBuffer && uartPort->port.txBufferSize > 0) {
+        test_uartIrqHandler(uartPort);
+    }
+    uint32_t bytesUsed;
+    if (uartPort->port.txBufferHead >= uartPort->port.txBufferTail) {
+        bytesUsed = uartPort->port.txBufferHead - uartPort->port.txBufferTail;
+    } else {
+        bytesUsed = uartPort->port.txBufferSize + uartPort->port.txBufferHead - uartPort->port.txBufferTail;
+    }
+    return (uartPort->port.txBufferSize - 1) - bytesUsed;
+}
+
+bool test_uartCanWrite(const test_uart_port_t *uartPort, uint16_t txPin)
+{
+    if (!uartPort) {
+        return false;
+    }
+    return (uartPort->port.mode & TEST_MODE_TX) && (txPin != 0);
+}
+
+uint8_t test_uartSanitizeMode(uint16_t rxPin, uint16_t txPin, uint8_t mode)
+{
+    if (!txPin) {
+        mode &= ~TEST_MODE_TX;
+    }
+    if (!rxPin) {
+        mode &= ~TEST_MODE_RX;
+    }
+    return mode;
+}
+
+void test_uartPinConfigure(test_uart_port_t *uartPort, uint16_t *rxPin, uint16_t *txPin, uint16_t defaultRx, uint16_t defaultTx)
+{
+    if (!uartPort) {
+        return;
+    }
+    if (*rxPin == 0) {
+        *rxPin = defaultRx;
+    }
+    if (*txPin == 0) {
+        *txPin = defaultTx;
     }
 }
 

@@ -395,6 +395,12 @@ static uint32_t uartTotalTxBytesFree(const serialPort_t *instance)
 {
     const uartPort_t *uartPort = (const uartPort_t*)instance;
 
+#ifdef THEJAS32
+    if (uartPort && uartPort->USARTx && uartPort->port.txBuffer && uartPort->port.txBufferSize > 0) {
+        uartIrqHandler((uartPort_t *)uartPort);
+    }
+#endif
+
     uint32_t bytesUsed;
 
     if (uartPort->port.txBufferHead >= uartPort->port.txBufferTail) {

@@ -149,6 +149,9 @@ int main(int argc, char * argv[])
 
 void FAST_CODE run(void)
 {
+#ifdef THEJAS32
+    __enable_irq();
+#endif
     while (true) {
         scheduler();
 

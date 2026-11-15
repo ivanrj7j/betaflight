@@ -5,6 +5,8 @@
 #include "mock_csr.h"
 
 uint64_t mock_mcycle64 = 0;
+uint32_t mock_mstatus = 0;
+uint32_t mock_mie = 0;
 
 void mock_csr_advance(uint64_t delta)
 {
@@ -19,6 +21,8 @@ void mock_csr_set(uint64_t value)
 void mock_csr_reset(void)
 {
     mock_mcycle64 = 0;
+    mock_mstatus = 0;
+    mock_mie = 0;
 }
 
 uint64_t getCycleCounter64(void)

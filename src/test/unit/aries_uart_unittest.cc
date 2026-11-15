@@ -232,3 +232,84 @@ TEST_F(AriesUartTest, ParityAndStopBitsConfiguration)
     // 0x03 (8 bits) | 0x04 (2 stop bits) | 0x18 (even parity) = 0x1F
     EXPECT_EQ(test_uart_read_reg(0, 0x0C), 0x1FU);
 }
+
+// T2-15: NULL pointer safety guards against crashes
+TEST_F(AriesUartTest, NullPointerSafetyGuards)
+{
+    // Calling ISR or TX routines with nullptr must return safely without segfault
+    test_uartIrqHandler(nullptr);
+    test_uartEnableTxInterrupt(nullptr);
+    EXPECT_FALSE(test_uartCanWrite(nullptr, 31));
+}
+
+// T2-16: Zero buffer size and null buffer guards (preventing % 0 SIGFPE)
+TEST_F(AriesUartTest, ZeroBufferSizeSafetyGuards)
+{
+    test_uart_port_t dummyPort;
+    memset(&dummyPort, 0, sizeof(dummyPort));
+    dummyPort.reg_base = 0x10000100;
+    dummyPort.port.rxBuffer = nullptr;
+    dummyPort.port.rxBufferSize = 0;
+    dummyPort.port.txBuffer = nullptr;
+    dummyPort.port.txBufferSize = 0;
+
+    // Both functions must gracefully bail out without divide-by-zero
+    test_uartIrqHandler(&dummyPort);
+    test_uartEnableTxInterrupt(&dummyPort);
+}
+
+// T2-17: uartSanitizeMode strips RX and TX modes when pins are 0 (NONE)
+TEST_F(AriesUartTest, UartSanitizeModeStripsModesWhenPinsZero)
+{
+    uint8_t mode = TEST_MODE_RX | TEST_MODE_TX;
+
+    // When both pins are 0 (NONE), mode is completely stripped
+    uint8_t sanitized = test_uartSanitizeMode(0, 0, mode);
+    EXPECT_EQ(sanitized, 0U);
+
+    // With txPin == 0, canWrite returns false, preventing byte transmission
+    EXPECT_FALSE(test_uartCanWrite(&uart0, 0));
+}
+
+// T2-18: uartSanitizeMode preserves RX and TX modes when pins are valid
+TEST_F(AriesUartTest, UartSanitizeModePreservesModesWhenPinsValid)
+{
+    uint8_t mode = TEST_MODE_RX | TEST_MODE_TX;
+
+    // When both pins are assigned (PA30 / PA31), modes are fully preserved
+    uint8_t sanitized = test_uartSanitizeMode(30, 31, mode);
+    EXPECT_EQ(sanitized, (TEST_MODE_RX | TEST_MODE_TX));
+
+    // With txPin != 0 and TX mode, canWrite returns true for CLI & MSP streaming
+    EXPECT_TRUE(test_uartCanWrite(&uart0, 31));
+}
+
+// T2-19: PinConfigure fallback binds default hardware pins if unconfigured
+TEST_F(AriesUartTest, PinConfigureFallbackBindsDefaultHardwarePins)
+{
+    uint16_t cfgRx = 0; // NONE
+    uint16_t cfgTx = 0; // NONE
+
+    test_uartPinConfigure(&uart0, &cfgRx, &cfgTx, 30, 31);
+
+    EXPECT_EQ(cfgRx, 30U);
+    EXPECT_EQ(cfgTx, 31U);
+}
+
+// T2-20: TotalTxBytesFree drains pending bytes to DR when space is checked
+TEST_F(AriesUartTest, TxBytesFreeDrainsPendingBytes)
+{
+    uart0.port.txBuffer[0] = 'K';
+    uart0.port.txBufferHead = 1;
+    uart0.port.txBufferTail = 0;
+
+    // Set LSR THRE (transmitter ready)
+    test_uart_write_reg(0, 0x14, UART_LSR_THRE);
+
+    // Calling test_uartTotalTxBytesFree triggers hardware drain and advances tail
+    uint32_t freeSpace = test_uartTotalTxBytesFree(&uart0);
+
+    EXPECT_EQ(test_uart_read_reg(0, 0x00) & 0xFF, (uint32_t)'K');
+    EXPECT_EQ(uart0.port.txBufferTail, 1U);
+    EXPECT_EQ(freeSpace, 255U);
+}
