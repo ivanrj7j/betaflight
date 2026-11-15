@@ -152,6 +152,18 @@
 #undef USE_SERIAL_4WAY_BLHELI_BOOTLOADER
 #undef USE_SERIAL_4WAY_SK_BOOTLOADER
 
+// Prune telemetry, serial passthrough, beeper, and ADC to reclaim RAM & execution headroom
+#undef USE_TELEMETRY
+#undef USE_TELEMETRY_CRSF
+#undef USE_TELEMETRY_FRSKY_HUB
+#undef USE_TELEMETRY_SMARTPORT
+#undef USE_TELEMETRY_GHST
+#undef USE_TELEMETRY_SRXL
+#undef USE_SERIAL_PASSTHROUGH
+#undef USE_BEEPER
+#undef USE_ADC
+#undef USE_ADC_INTERNAL
+
 // Enable core flight features
 #define TARGET_PREINIT
 #define USE_SPI

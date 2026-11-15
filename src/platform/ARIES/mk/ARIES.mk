@@ -125,7 +125,42 @@ MCU_EXCLUDES = \
     drivers/compass/compass_mmc560x.c \
     drivers/compass/compass_mpu925x_ak8963.c \
     drivers/compass/compass_qmc5883.c \
-    drivers/compass/compass_virtual.c
+    drivers/compass/compass_virtual.c \
+    drivers/accgyro/accgyro_mpu6050.c \
+    drivers/accgyro/accgyro_spi_bmi160.c \
+    drivers/accgyro/accgyro_spi_bmi423.c \
+    drivers/accgyro/accgyro_spi_icm20649.c \
+    drivers/accgyro/accgyro_spi_icm20689.c \
+    drivers/accgyro/accgyro_spi_icm40609.c \
+    drivers/accgyro/accgyro_spi_icm456xx.c \
+    drivers/accgyro/accgyro_spi_icm56686.c \
+    drivers/accgyro/accgyro_spi_l3gd20.c \
+    drivers/accgyro/accgyro_spi_lsm6dso.c \
+    drivers/accgyro/accgyro_spi_lsm6dso_init.c \
+    drivers/accgyro/accgyro_spi_lsm6dsv16x.c \
+    drivers/accgyro/accgyro_spi_mpu6000.c \
+    drivers/accgyro/accgyro_spi_mpu9250.c \
+    drivers/accgyro/accgyro_virtual.c \
+    drivers/max7456.c \
+    drivers/vtx_rtc6705.c \
+    drivers/vtx_rtc6705_soft_spi.c \
+    drivers/transponder_ir_arcitimer.c \
+    drivers/transponder_ir_ilap.c \
+    drivers/transponder_ir_erlt.c \
+    drivers/lcd_console.c \
+    drivers/lcd_panel/lcd_panel_font_5x7.c \
+    drivers/lcd_panel/lcd_panel_stub.c \
+    drivers/lcd_panel/ssd1306_i2c.c \
+    drivers/display_canvas.c \
+    drivers/display.c \
+    drivers/buttons.c \
+    drivers/camera_control.c \
+    drivers/pitot/pitot_ms4525.c \
+    drivers/rangefinder/rangefinder_hcsr04.c \
+    drivers/rangefinder/rangefinder_lidarmt.c \
+    drivers/rangefinder/rangefinder_lidartf.c \
+    drivers/rangefinder/rangefinder_nooploop.c \
+    drivers/rangefinder/rangefinder_upt1.c
 
 TARGET_MAP   = $(OBJECT_DIR)/$(FORKNAME)_$(TARGET).map
 

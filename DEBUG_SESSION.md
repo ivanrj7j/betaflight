@@ -349,6 +349,30 @@ To empirically verify whether `scheduler()` and `taskHandleSerial()` are running
 - **Unit Tests:** 161 / 161 PASSED.
 - **`build_verify.sh`:** 10 / 10 PASSED.
 
+---
+
+## ✂️ Subsystem Bloat Pruning & 8 KB Stack Expansion
+
+Following physical hardware confirmation that `[SERIAL ALIVE]` and `[MSP RX]` are functioning, non-flight bloat was pruned from compilation to relieve RAM exhaustion and restore an 8 KB stack:
+
+### 1. Modules Pruned:
+- **Telemetry Subsystem:** `#undef USE_TELEMETRY`, `USE_TELEMETRY_CRSF`, `USE_TELEMETRY_FRSKY_HUB`, `USE_TELEMETRY_SMARTPORT`, `USE_TELEMETRY_GHST`, `USE_TELEMETRY_SRXL`.
+- **Unused Gyro Drivers Excluded in `ARIES.mk`:** `accgyro_mpu6050`, `accgyro_spi_bmi160`, `accgyro_spi_bmi423`, `accgyro_spi_icm20649`, `accgyro_spi_icm20689`, `accgyro_spi_icm40609`, `accgyro_spi_icm456xx`, `accgyro_spi_icm56686`, `accgyro_spi_l3gd20`, `accgyro_spi_lsm6dso`, `accgyro_spi_lsm6dso_init`, `accgyro_spi_lsm6dsv16x`, `accgyro_spi_mpu6000`, `accgyro_spi_mpu9250`, `accgyro_virtual`. *(Retained ICM42688P and BMI270 on Header J1).*
+- **Peripherals & Non-Flight Drivers Excluded in `ARIES.mk`:** `max7456`, `vtx_rtc6705`, `transponder_ir_*`, `lcd_console`, `lcd_panel_*`, `display_canvas`, `display`, `buttons`, `camera_control`, `pitot_*`, `rangefinder_*`.
+- **Ancillary Features:** `#undef USE_SERIAL_PASSTHROUGH`, `#undef USE_BEEPER`, `#undef USE_ADC`, `#undef USE_ADC_INTERNAL`.
+
+### 2. Stack Sizing Restored to 8 KB:
+- In `src/platform/ARIES/link/aries_v3.ld`: Increased `.stack` from `0x1400` (5 KB) to `0x2000` (**8 KB**), matching the official C-DAC BSP `link1.lds`.
+
+### 3. Sizing & Memory Impact:
+- **Flash/Text Section:** Shrunk from **222,404 bytes down to 209,940 bytes** (**12,464 bytes / ~12.2 KB code reclaimed!**).
+- **Raw Binary Image:** Shrunk from **223,064 bytes down to 210,508 bytes** (**43.4 KB free margin** below the bootloader's 250 KB limit).
+- **RAM Footprint:** Even with the stack expanded by +3 KB to a full 8 KB, total RAM occupancy is **242,668 bytes** (leaving **11,284 bytes / 11.0 KB of free SRAM headroom**).
+- **Automated Verification:**
+  - `build_verify.sh`: **10 / 10 checks PASSED**.
+  - GoogleTest Unit Suites: **161 / 161 tests PASSED (100% pass rate)**.
+
+
 
 
 
