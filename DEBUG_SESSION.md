@@ -328,20 +328,27 @@ We conducted an exhaustive audit across additional subsystems in the wider codeb
 
 ---
 
-## 📊 Final Pass 2 Verification Summary
+## 💓 Live Scheduler & Serial Diagnostic Probe (Pre-Bloat Prune Stage)
 
-- **Unit Test Suites (GoogleTest):** **161 / 161 tests PASSED (100% pass rate)** across all 9 modules (`infra`, `system`, `uart`, `spi`, `gpio`, `exti`, `flash`, `motor`, `integration`).
-- **Binary Architecture & Disassembly Audit (`build_verify.sh`):** **10 / 10 checks PASSED**.
-  - `T8-01`: Clean build exit code 0.
-  - `T8-02`: Binary footprint $\le 248\text{ KB}$ (**222,772 bytes / 217.55 KB**, leaving ~31.1 KB free SRAM headroom).
-  - `T8-03`: RAM runtime footprint $\le 40\text{ KB}$ (**31,148 bytes**).
-  - `T8-04`: Entry point `_start` linked at `0x00202000` (in-SRAM).
-  - `T8-05`: `trap_entry` vector at `0x002020F0` (in-SRAM).
-  - `T8-06`: Zero double-precision soft-float calls in real-time loops.
-  - `T8-07`: Zero `__udivdi3` software divisions in `micros()`.
-  - `T8-08`: Non-empty Intel HEX artifact (`obj/betaflight_2026.12.0-alpha_ARIESV3.hex`).
-  - `T8-09`: **Zero 16-bit compressed instructions** across all executable text sections (RV32IM pure 32-bit).
-  - `T8-10`: Raw binary artifact verified (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`).
+To empirically verify whether `scheduler()` and `taskHandleSerial()` are running on physical hardware, diagnostic probes were instrumented:
+
+1. **`taskHandleSerial()` Execution Heartbeat ([`src/main/fc/tasks.c`](src/main/fc/tasks.c)):**
+   - At 100 Hz task execution rate, every 100th iteration (~1 second), prints:
+     `[SERIAL ALIVE] #<count> ms=<millis>\r\n`
+   - Validates that the Betaflight scheduler is actively cycling and servicing `TASK_PRIORITY_LOW` tasks without being starved by gyro/PID loops.
+2. **`mspSerialOpenPort()` Port State ([`src/main/msp/msp_serial.c`](src/main/msp/msp_serial.c)):**
+   - Logs `[MSP OPEN] id=<identifier> port=<serialPort_ptr>\r\n` during initialization to confirm MSP successfully claimed `UART0`.
+3. **`mspSerialProcess()` Ingestion Probe ([`src/main/msp/msp_serial.c`](src/main/msp/msp_serial.c)):**
+   - Logs `[MSP RX] c=0x<hex>\r\n` whenever `serialRead()` pulls a byte from `mspPort->port`.
+   - Logs `[MSP PENDING] Triggering cliEnter!\r\n` when entering CLI mode upon receiving `#`.
+
+### Verification Metrics:
+- **Build Status:** Clean compilation (Exit Code 0).
+- **ELF Footprint:** 222,404 text, 660 data, 30,488 bss (Total: 253,552 bytes $\le 253,952$ bytes).
+- **Artifacts:** `obj/betaflight_2026.12.0-alpha_ARIESV3.bin` (223,064 bytes) and `.hex`.
+- **Unit Tests:** 161 / 161 PASSED.
+- **`build_verify.sh`:** 10 / 10 PASSED.
+
 
 
 

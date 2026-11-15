@@ -95,6 +95,13 @@ static void mspSerialOpenPort(unsigned *portIndex, serialPortIdentifier_e identi
 
     serialPort_t *serialPort = openSerialPort(identifier, FUNCTION_MSP, NULL, NULL,
                                               mspSerialBaudRate(baud), MODE_RXTX, mspSerialPortOptions(identifier));
+#ifdef THEJAS32
+    thejas32_early_uart_puts("[MSP OPEN] id=");
+    thejas32_early_uart_print_hex((uint32_t)identifier);
+    thejas32_early_uart_puts(" port=");
+    thejas32_early_uart_print_hex((uint32_t)serialPort);
+    thejas32_early_uart_puts("\r\n");
+#endif
     if (!serialPort) {
         return;
     }
@@ -521,6 +528,9 @@ static void mspProcessPendingRequest(mspPort_t * mspPort)
 
 #ifdef USE_CLI
     case MSP_PENDING_CLI:
+#ifdef THEJAS32
+        thejas32_early_uart_puts("[MSP PENDING] Triggering cliEnter!\r\n");
+#endif
         mspPort->pendingRequest = MSP_PENDING_NONE;
         mspPort->portState = PORT_CLI_ACTIVE;
 
@@ -610,6 +620,11 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
         while (mspPort->portState == PORT_IDLE && serialRxBytesWaiting(mspPort->port)) {
             mspPort->lastActivityMs = millis();
             const uint8_t c = serialRead(mspPort->port);
+#ifdef THEJAS32
+            thejas32_early_uart_puts("[MSP RX] c=0x");
+            thejas32_early_uart_print_hex((uint32_t)c);
+            thejas32_early_uart_puts("\r\n");
+#endif
             if (c == '$') {
                 // MSP frame incoming — cancel any pending non-MSP request.
                 // Resetting only on '$' (not every byte) allows '#\r' sequences to set
