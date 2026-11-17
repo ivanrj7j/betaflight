@@ -193,3 +193,15 @@ Detailed architectural critiques, scoring (0–10), and line-by-line analyses of
 * [betaflight.com/docs/development/MSP-Protocol-Reference-Dev.md](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/MSP-Protocol-Reference-Dev.md): Comprehensive reference of all MSP v1 & v2 commands, offsets, and field structures.
 * [betaflight.com/docs/development/Defines.md](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/Defines.md): Complete index of all `USE_` and `ENABLE_` feature flags used in Betaflight builds.
 * [betaflight.com/docs/development/API/BusDrivers.md](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/API/BusDrivers.md): Specifications for bus-agnostic device access (`busReadRegister`, `busWriteRegister`, DMA segments).
+
+---
+
+## 7. Exhaustive Micro-Planning Document Suite (`PLAN/`)
+The implementation micro-plans cover every single hardware and software microcomponent required for physical bringup:
+1. **[00_MASTER_PLAN_OVERVIEW.md](file:///home/ivan/Desktop/betaflight/PLAN/00_MASTER_PLAN_OVERVIEW.md)**: Master architecture index, 8 inviolable ground truths mapping, verification checklists.
+2. **[01_BOOT_LINKER_AND_CORE_PRIMITIVES.md](file:///home/ivan/Desktop/betaflight/PLAN/01_BOOT_LINKER_AND_CORE_PRIMITIVES.md)**: Machine startup (`startup.S`), 248 KB SRAM linker script (`aries_v3.ld`), CSR `mstatus.MIE` atomics (`platform.h`), Timer 0 timebase (`system.c`).
+3. **[02_BUILD_SYSTEM_AND_MEMORY_OPTIMIZATION.md](file:///home/ivan/Desktop/betaflight/PLAN/02_BUILD_SYSTEM_AND_MEMORY_OPTIMIZATION.md)**: Dynamic toolchain path discovery, multilib RVC isolation (`rv32i_zicsr_zifencei`), `MCU_EXCLUDES` pruning, compile-time `EEPROM_SIZE 8192` guard.
+4. **[03_SERIAL_COMMUNICATION_MSP_AND_CLI.md](file:///home/ivan/Desktop/betaflight/PLAN/03_SERIAL_COMMUNICATION_MSP_AND_CLI.md)**: 16550 UART0/1 driver, 16-byte hardware FIFO activation, bounded TX burst draining, zero-allocation MSP state machine, instant Enter/`#` CLI activation.
+5. **[04_GPIO_EXTI_AND_HARDWARE_TIMERS.md](file:///home/ivan/Desktop/betaflight/PLAN/04_GPIO_EXTI_AND_HARDWARE_TIMERS.md)**: Flat 32-bit address-decoded atomic GPIO (`io_aries.c`), open-drain emulation, $O(1)$ EXTI `__builtin_ctz` fast-path (`exti_aries.c`), Timer 1 ascending deadline soft-PWM (`pwm_motor_aries.c`).
+6. **[05_SPI_BUS_IMU_AND_FLASH_PERSISTENCE.md](file:///home/ivan/Desktop/betaflight/PLAN/05_SPI_BUS_IMU_AND_FLASH_PERSISTENCE.md)**: Polled SPI0 master clamped to 12.5 MHz (`bus_spi_aries.c`), ICM-42688P 1.0 kHz synchronization, `CONFIG_IN_RAM` (8 KB), command-based `MDP_SPI_3` cold-reboot persistence.
+7. **[06_SENSORS_RC_TELEMETRY_AND_SCHEDULER.md](file:///home/ivan/Desktop/betaflight/PLAN/06_SENSORS_RC_TELEMETRY_AND_SCHEDULER.md)**: Non-inverted CRSF/ExpressLRS on `UART1` (420,000 baud), battery ADC nominal safe fallback, 1.0 kHz cooperative scheduler, state-preserving software atomics (`stub_drivers.c`).
