@@ -1,9 +1,9 @@
 # Knowledge Graph: Retrospective Analysis of Historical Porting Implementation
 
 > **Document ID:** `RETRO-GRAPH-01`  
-> **Parent Documents:** [`PORTING_KNOWLEDGE_GRAPH.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md), [`INDEX.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md)  
-> **Analyzed Log Sources:** [`oldfiles/logs/`](file:///home/ivan/Desktop/betaflight/oldfiles/logs) (14 Files Audited)  
-> **Dedicated Retrospective Logs:** [`knowledgebase/retrospective_logs/01..14`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs)  
+> **Parent Documents:** [`PORTING_KNOWLEDGE_GRAPH.md`](PORTING_KNOWLEDGE_GRAPH.md), [`INDEX.md`](INDEX.md)  
+> **Analyzed Log Sources:** [`oldfiles/logs/`](../oldfiles/logs) (14 Files Audited)  
+> **Dedicated Retrospective Logs:** [`knowledgebase/retrospective_logs/01..14`](retrospective_logs)  
 > **Date:** 2026-11-17  
 > **Status:** Completed & Backed by Direct References
 
@@ -64,7 +64,7 @@ graph TD
 ## 2. The Five Great Failure Cascades of the Previous Attempt
 
 ### Cascade 1: The Memory Map & Bootloader DMA Truncation Cascade
-* **Sources:** [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`03_RETROSPECTIVE_GEMINI.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/03_RETROSPECTIVE_GEMINI.md), [`08_RETROSPECTIVE_PORT_GUIDE.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/08_RETROSPECTIVE_PORT_GUIDE.md)
+* **Sources:** [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`03_RETROSPECTIVE_GEMINI.md`](retrospective_logs/03_RETROSPECTIVE_GEMINI.md), [`08_RETROSPECTIVE_PORT_GUIDE.md`](retrospective_logs/08_RETROSPECTIVE_PORT_GUIDE.md)
 
 ```mermaid
 graph TD
@@ -94,7 +94,7 @@ graph TD
 ---
 
 ### Cascade 2: The Toolchain Multilib & Simulation Masking Cascade
-* **Sources:** [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`10_RETROSPECTIVE_RENODE_CHANGES.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)
+* **Sources:** [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`10_RETROSPECTIVE_RENODE_CHANGES.md`](retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)
 
 ```mermaid
 graph TD
@@ -123,7 +123,7 @@ graph TD
 ---
 
 ### Cascade 3: The 16550 UART THRE Interrupt Storm & ASCII Pollution Cascade
-* **Sources:** [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
+* **Sources:** [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
 
 ```mermaid
 graph TD
@@ -151,7 +151,7 @@ graph TD
 ---
 
 ### Cascade 4: The Unarmed Global Interrupts & Pin Tag Disabler Cascade
-* **Sources:** [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
+* **Sources:** [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
 
 ```mermaid
 graph TD
@@ -177,7 +177,7 @@ graph TD
 ---
 
 ### Cascade 5: The Simulation Fallback Falsification & False Green Paradox
-* **Sources:** [`04_RETROSPECTIVE_TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md), [`05_RETROSPECTIVE_TEST_PLAN_PHASES.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/05_RETROSPECTIVE_TEST_PLAN_PHASES.md), [`12_RETROSPECTIVE_RUN_SIMULATION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/12_RETROSPECTIVE_RUN_SIMULATION.md)
+* **Sources:** [`04_RETROSPECTIVE_TEST_LOGS.md`](retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md), [`05_RETROSPECTIVE_TEST_PLAN_PHASES.md`](retrospective_logs/05_RETROSPECTIVE_TEST_PLAN_PHASES.md), [`12_RETROSPECTIVE_RUN_SIMULATION.md`](retrospective_logs/12_RETROSPECTIVE_RUN_SIMULATION.md)
 
 ```mermaid
 graph TD
@@ -206,42 +206,42 @@ The table below maps every critical hurdle and flawed decision discovered across
 
 | Historical Hurdle | Past Flawed Decision | Silicon Reality Discovered | 128 KB Rebuild Architecture | Verification Gate |
 | :--- | :--- | :--- | :--- | :--- |
-| **No Flash XIP** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Linked `.text` to `0x20000000` & stack to `0x1000FEF0` | THEJAS32 has no XIP; bootloader copies 248 KB to SRAM `0x00202000` | Unified Linker Script: `RAM : ORIGIN = 0x00202000, LENGTH = 128K`. Stack top at `0x0023FFFF`. | Entry point asserted at `0x00202000` via `nm`. |
-| **Toolchain Multilib RVC** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`Log 10`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)) | Enabled `rv32im_zicsr_c` in Renode to silence opcode `0x433d` | ET1031 is pure RV32IM (no 'C'). GCC linked compressed `libc.a` | Explicitly link `rv32i_zicsr_zifencei/ilp32` multilib; custom bare-metal `memset`/`memcpy` | Automated objdump audit: `grep -E '\b(c\.[a-z]+)' == 0`. |
-| **16550 THRE Storm** ([`Log 01`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Enabled TX interrupts (`UART_IE |= 0x02`), causing race with `IIR` read | DW_apb_uart 16550 THRE is unreliable; official C-DAC BSP disables TX interrupts | Permanently set `UART_IE = 0x01` (RX only). Synchronous bounded FIFO draining in `uartEnableTxInterrupt()` | Continuous transmission without IRQ 0 assert. |
-| **Telemetry Pollution** ([`Log 01`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)) | Printed `[SERIAL ALIVE]` & `[MSP RX]` ASCII on UART0 | Corrupted binary MSP frame framing and CRC, timing out Configurator | **Zero ASCII debug prints on UART0 wire.** Clean binary MSP frames only | 10,000 MSP packets over CP2102N with 0% CRC errors (`SW-UART-05`). |
-| **Unarmed Global IRQs** ([`Log 01`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)) | Betaflight never called `__enable_irq()`, assuming ARM default | RISC-V resets with `mstatus.MIE = 0` and `mie.MEIE = 0` | Explicitly invoke `__enable_irq()` right before scheduler loop in `run()` | Verified `mstatus` bit 3 and `mie` bit 11 set in GDB. |
-| **UART0 Pin Tag Trap** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Set `UART0_RX_PIN = NONE` (0) because pins are fixed on-chip | Betaflight core stripped `MODE_RX`/`MODE_TX` and dropped writes | Dedicated pin tags `PA30` and `PA31` assigned to UART0 in `target.h` | `serialPortUsageList` allocates port; CLI responds. |
-| **Unmapped Config Fault** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Defined `CONFIG_IN_FLASH` at `0x201F8000` | Dereferencing unmapped flash caused Load Access Fault (`mcause = 5`) | Define `CONFIG_IN_RAM` with `EEPROM_SIZE 8192` in `.bss` at `0x0023B640` | Clean boot without exception trap; `save` persists in RAM. |
-| **4 KB EEPROM Overflow** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Sized `EEPROM_SIZE` at 4096 bytes | Parameter Groups exceed 4 KB, corrupting buffer and halting in `failureMode()` | Sized `EEPROM_SIZE` to 8192 bytes; pruned unused PGs (OSD, GPS, VTX) | `isEEPROMStructureValid()` returns true on first boot. |
-| **42.95s Rollover Bug** ([`Log 04`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md), [`Log 07`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md)) | Read naive 32-bit `mcycle` CSR directly | Rolls over every 42.95s at 100 MHz, causing scheduler delta panic | Atomic double-read loop (`mcycle`/`mcycleh`) with fast reciprocal division (`100ULL`) | 5-Minute Uptime Soak Test advances past 300s cleanly. |
-| **Timer 0 Infinite ISR** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`Log 07`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md)) | Exited Timer 0 ISR without clearing hardware latch | Synopsys DW_apb_timers latch re-asserts interrupt immediately on `mret` | Evaluate `THEJAS32_TIMER(0).EOI` at beginning of `thejas32_timer0_isr` | CPU resumes main scheduler after interrupt servicing. |
-| **SPI CS Glitch (CSAAT)** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`Log 07`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md)) | Standard polled transfer dropped CS between bytes | Reset IMU auto-increment address counter, returning `0x00`/`0xFF` | Explicitly assert `Bits.CSAAT = 1` during intermediate burst bytes | 14-byte IMU burst read returns coherent gyro/accel traces. |
-| **Flashing File Format** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`Log 09`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/09_RETROSPECTIVE_COMPILATION_GUIDE.md)) | Fed `.hex` to `flasher.bat` | XMODEM flasher flashed raw ASCII text into memory | Build pipeline outputs and flashes strictly raw binary `.bin` | Board boots immediately after XMODEM transfer completes. |
-| **Early UART FIFO Freeze** ([`Log 02`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Unbounded `while (!(UART_LSR & 0x20));` with stack `memcpy` hex print | CP2102 FIFO saturation locked CPU; hex print caused stack overflow | 50,000-cycle bounded timeout; pure register ALU bit-shift hex formatting | Boot banner displays milestones `[INIT] 1..7` without freeze. |
+| **No Flash XIP** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Linked `.text` to `0x20000000` & stack to `0x1000FEF0` | THEJAS32 has no XIP; bootloader copies 248 KB to SRAM `0x00202000` | Unified Linker Script: `RAM : ORIGIN = 0x00202000, LENGTH = 128K`. Stack top at `0x0023FFFF`. | Entry point asserted at `0x00202000` via `nm`. |
+| **Toolchain Multilib RVC** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`Log 10`](retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)) | Enabled `rv32im_zicsr_c` in Renode to silence opcode `0x433d` | ET1031 is pure RV32IM (no 'C'). GCC linked compressed `libc.a` | Explicitly link `rv32i_zicsr_zifencei/ilp32` multilib; custom bare-metal `memset`/`memcpy` | Automated objdump audit: `grep -E '\b(c\.[a-z]+)' == 0`. |
+| **16550 THRE Storm** ([`Log 01`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Enabled TX interrupts (`UART_IE |= 0x02`), causing race with `IIR` read | DW_apb_uart 16550 THRE is unreliable; official C-DAC BSP disables TX interrupts | Permanently set `UART_IE = 0x01` (RX only). Synchronous bounded FIFO draining in `uartEnableTxInterrupt()` | Continuous transmission without IRQ 0 assert. |
+| **Telemetry Pollution** ([`Log 01`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)) | Printed `[SERIAL ALIVE]` & `[MSP RX]` ASCII on UART0 | Corrupted binary MSP frame framing and CRC, timing out Configurator | **Zero ASCII debug prints on UART0 wire.** Clean binary MSP frames only | 10,000 MSP packets over CP2102N with 0% CRC errors (`SW-UART-05`). |
+| **Unarmed Global IRQs** ([`Log 01`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)) | Betaflight never called `__enable_irq()`, assuming ARM default | RISC-V resets with `mstatus.MIE = 0` and `mie.MEIE = 0` | Explicitly invoke `__enable_irq()` right before scheduler loop in `run()` | Verified `mstatus` bit 3 and `mie` bit 11 set in GDB. |
+| **UART0 Pin Tag Trap** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Set `UART0_RX_PIN = NONE` (0) because pins are fixed on-chip | Betaflight core stripped `MODE_RX`/`MODE_TX` and dropped writes | Dedicated pin tags `PA30` and `PA31` assigned to UART0 in `target.h` | `serialPortUsageList` allocates port; CLI responds. |
+| **Unmapped Config Fault** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Defined `CONFIG_IN_FLASH` at `0x201F8000` | Dereferencing unmapped flash caused Load Access Fault (`mcause = 5`) | Define `CONFIG_IN_RAM` with `EEPROM_SIZE 8192` in `.bss` at `0x0023B640` | Clean boot without exception trap; `save` persists in RAM. |
+| **4 KB EEPROM Overflow** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Sized `EEPROM_SIZE` at 4096 bytes | Parameter Groups exceed 4 KB, corrupting buffer and halting in `failureMode()` | Sized `EEPROM_SIZE` to 8192 bytes; pruned unused PGs (OSD, GPS, VTX) | `isEEPROMStructureValid()` returns true on first boot. |
+| **42.95s Rollover Bug** ([`Log 04`](retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md), [`Log 07`](retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md)) | Read naive 32-bit `mcycle` CSR directly | Rolls over every 42.95s at 100 MHz, causing scheduler delta panic | Atomic double-read loop (`mcycle`/`mcycleh`) with fast reciprocal division (`100ULL`) | 5-Minute Uptime Soak Test advances past 300s cleanly. |
+| **Timer 0 Infinite ISR** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`Log 07`](retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md)) | Exited Timer 0 ISR without clearing hardware latch | Synopsys DW_apb_timers latch re-asserts interrupt immediately on `mret` | Evaluate `THEJAS32_TIMER(0).EOI` at beginning of `thejas32_timer0_isr` | CPU resumes main scheduler after interrupt servicing. |
+| **SPI CS Glitch (CSAAT)** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`Log 07`](retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md)) | Standard polled transfer dropped CS between bytes | Reset IMU auto-increment address counter, returning `0x00`/`0xFF` | Explicitly assert `Bits.CSAAT = 1` during intermediate burst bytes | 14-byte IMU burst read returns coherent gyro/accel traces. |
+| **Flashing File Format** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`Log 09`](retrospective_logs/09_RETROSPECTIVE_COMPILATION_GUIDE.md)) | Fed `.hex` to `flasher.bat` | XMODEM flasher flashed raw ASCII text into memory | Build pipeline outputs and flashes strictly raw binary `.bin` | Board boots immediately after XMODEM transfer completes. |
+| **Early UART FIFO Freeze** ([`Log 02`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)) | Unbounded `while (!(UART_LSR & 0x20));` with stack `memcpy` hex print | CP2102 FIFO saturation locked CPU; hex print caused stack overflow | 50,000-cycle bounded timeout; pure register ALU bit-shift hex formatting | Boot banner displays milestones `[INIT] 1..7` without freeze. |
 
 ---
 
 ## 4. Retrospective Logs Catalog & Cross-Reference Matrix
 
-The 14 dedicated retrospective logs in [`knowledgebase/retrospective_logs/`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs) provide the factual baseline for every decision scored:
+The 14 dedicated retrospective logs in [`knowledgebase/retrospective_logs/`](retrospective_logs) provide the factual baseline for every decision scored:
 
 | Log ID | Retrospective File | Source Document | Key Discoveries & Direct References |
 | :---: | :--- | :--- | :--- |
-| **`RETRO-01`** | **[`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)** | `DEBUG_SESSION.md` | RISC-V interrupt unmasking (`mie.MEIE`), 16550 THRE interrupt storm, ASCII telemetry pollution on wire |
-| **`RETRO-02`** | **[`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)** | `HAL_PROGRESS.md` | Phases 1–8 HAL, Hardware Hurdles H1–H22, No-XIP in-SRAM boot protocol discovery (`0x00202000`, 248 KB limit) |
-| **`RETRO-03`** | **[`03_RETROSPECTIVE_GEMINI.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/03_RETROSPECTIVE_GEMINI.md)** | `GEMINI.md` | Agent handoff notes, NIDAR mission context, document split personality (obsolete 770 KB / `0x1000FEF0`) |
-| **`RETRO-04`** | **[`04_RETROSPECTIVE_TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md)** | `TEST_LOGS.md` | The "100% Passing Tests on Non-Working Silicon" paradox, `micros()` reciprocal optimization, RVC opcode audit |
-| **`RETRO-05`** | **[`05_RETROSPECTIVE_TEST_PLAN_PHASES.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/05_RETROSPECTIVE_TEST_PLAN_PHASES.md)** | `SOFTWARE_TEST_PLAN_PHASES.md` | Modular M0–M3 mocks, test shims, hardcoded `_start == 0x20000000` assertion fallacy in `build_verify.sh` |
-| **`RETRO-06`** | **[`06_RETROSPECTIVE_SOFTWARE_TEST_PLAN.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/06_RETROSPECTIVE_SOFTWARE_TEST_PLAN.md)** | `SOFTWARE_TEST_PLAN.md` | 10,000 MSP packet test, arming lockouts, failsafe timings, internal contradiction between Module 1 and script |
-| **`RETRO-07`** | **[`07_RETROSPECTIVE_TEST_PLAN.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md)** | `TEST_PLAN.md` | Propellers Off rule, 5V BEC and TVS/low-ESR capacitor rules, 3.3V ceiling, soft-float feature restrictions |
-| **`RETRO-08`** | **[`08_RETROSPECTIVE_PORT_GUIDE.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/08_RETROSPECTIVE_PORT_GUIDE.md)** | `PORT_GUIDE.md` | Day-1 feasibility, CP2102N USB-to-UART bridge advantage, origin of the `0x20000000`/`0x10000000` fallacy |
-| **`RETRO-09`** | **[`09_RETROSPECTIVE_COMPILATION_GUIDE.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/09_RETROSPECTIVE_COMPILATION_GUIDE.md)** | `COMPILATION_GUIDE.md` | GCC 12/13 `-march=rv32im_zicsr` flag necessity, atomic stub emulation, flashing command pitfalls |
-| **`RETRO-10`** | **[`10_RETROSPECTIVE_RENODE_CHANGES.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)** | `RENODE_CHANGES.md` | **The Simulation Trap:** Modifying Renode CPU to `rv32im_zicsr_c` to silence opcode `0x433d` instead of fixing multilib |
-| **`RETRO-11`** | **[`11_RETROSPECTIVE_BUILD_AND_BENCHMARK.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/11_RETROSPECTIVE_BUILD_AND_BENCHMARK.md)** | `buildAndBenchmark.sh` | Symbol-range objdump disassembly audit for soft-float, calculating Flash % against fictional 2 MB |
-| **`RETRO-12`** | **[`12_RETROSPECTIVE_RUN_SIMULATION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/12_RETROSPECTIVE_RUN_SIMULATION.md)** | `runSimulation.sh` | **The Fallback Falsification:** Script hardcoding fake `PC=0x200000b0` / `SP=0x10010b30` if grep returns empty |
-| **`RETRO-13`** | **[`13_RETROSPECTIVE_STARTUP_AGENT_SPEC.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/13_RETROSPECTIVE_STARTUP_AGENT_SPEC.md)** | `ariesv3_betaflight_startup_agent_spec.md` | A masterpiece of prompt engineering & epistemic humility (Verified vs. Inferred vs. Unverified) that was later ignored |
-| **`RETRO-14`** | **[`14_RETROSPECTIVE_PRESENTATION_PLAN.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/14_RETROSPECTIVE_PRESENTATION_PLAN.md)** | `PRESENTATION_PLAN.md` | Strategic DIR-V framing, real-time control loop microsecond budget (290 µs WCET), custom 30.5mm PCB roadmap |
+| **`RETRO-01`** | **[`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)** | `DEBUG_SESSION.md` | RISC-V interrupt unmasking (`mie.MEIE`), 16550 THRE interrupt storm, ASCII telemetry pollution on wire |
+| **`RETRO-02`** | **[`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)** | `HAL_PROGRESS.md` | Phases 1–8 HAL, Hardware Hurdles H1–H22, No-XIP in-SRAM boot protocol discovery (`0x00202000`, 248 KB limit) |
+| **`RETRO-03`** | **[`03_RETROSPECTIVE_GEMINI.md`](retrospective_logs/03_RETROSPECTIVE_GEMINI.md)** | `GEMINI.md` | Agent handoff notes, NIDAR mission context, document split personality (obsolete 770 KB / `0x1000FEF0`) |
+| **`RETRO-04`** | **[`04_RETROSPECTIVE_TEST_LOGS.md`](retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md)** | `TEST_LOGS.md` | The "100% Passing Tests on Non-Working Silicon" paradox, `micros()` reciprocal optimization, RVC opcode audit |
+| **`RETRO-05`** | **[`05_RETROSPECTIVE_TEST_PLAN_PHASES.md`](retrospective_logs/05_RETROSPECTIVE_TEST_PLAN_PHASES.md)** | `SOFTWARE_TEST_PLAN_PHASES.md` | Modular M0–M3 mocks, test shims, hardcoded `_start == 0x20000000` assertion fallacy in `build_verify.sh` |
+| **`RETRO-06`** | **[`06_RETROSPECTIVE_SOFTWARE_TEST_PLAN.md`](retrospective_logs/06_RETROSPECTIVE_SOFTWARE_TEST_PLAN.md)** | `SOFTWARE_TEST_PLAN.md` | 10,000 MSP packet test, arming lockouts, failsafe timings, internal contradiction between Module 1 and script |
+| **`RETRO-07`** | **[`07_RETROSPECTIVE_TEST_PLAN.md`](retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md)** | `TEST_PLAN.md` | Propellers Off rule, 5V BEC and TVS/low-ESR capacitor rules, 3.3V ceiling, soft-float feature restrictions |
+| **`RETRO-08`** | **[`08_RETROSPECTIVE_PORT_GUIDE.md`](retrospective_logs/08_RETROSPECTIVE_PORT_GUIDE.md)** | `PORT_GUIDE.md` | Day-1 feasibility, CP2102N USB-to-UART bridge advantage, origin of the `0x20000000`/`0x10000000` fallacy |
+| **`RETRO-09`** | **[`09_RETROSPECTIVE_COMPILATION_GUIDE.md`](retrospective_logs/09_RETROSPECTIVE_COMPILATION_GUIDE.md)** | `COMPILATION_GUIDE.md` | GCC 12/13 `-march=rv32im_zicsr` flag necessity, atomic stub emulation, flashing command pitfalls |
+| **`RETRO-10`** | **[`10_RETROSPECTIVE_RENODE_CHANGES.md`](retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)** | `RENODE_CHANGES.md` | **The Simulation Trap:** Modifying Renode CPU to `rv32im_zicsr_c` to silence opcode `0x433d` instead of fixing multilib |
+| **`RETRO-11`** | **[`11_RETROSPECTIVE_BUILD_AND_BENCHMARK.md`](retrospective_logs/11_RETROSPECTIVE_BUILD_AND_BENCHMARK.md)** | `buildAndBenchmark.sh` | Symbol-range objdump disassembly audit for soft-float, calculating Flash % against fictional 2 MB |
+| **`RETRO-12`** | **[`12_RETROSPECTIVE_RUN_SIMULATION.md`](retrospective_logs/12_RETROSPECTIVE_RUN_SIMULATION.md)** | `runSimulation.sh` | **The Fallback Falsification:** Script hardcoding fake `PC=0x200000b0` / `SP=0x10010b30` if grep returns empty |
+| **`RETRO-13`** | **[`13_RETROSPECTIVE_STARTUP_AGENT_SPEC.md`](retrospective_logs/13_RETROSPECTIVE_STARTUP_AGENT_SPEC.md)** | `ariesv3_betaflight_startup_agent_spec.md` | A masterpiece of prompt engineering & epistemic humility (Verified vs. Inferred vs. Unverified) that was later ignored |
+| **`RETRO-14`** | **[`14_RETROSPECTIVE_PRESENTATION_PLAN.md`](retrospective_logs/14_RETROSPECTIVE_PRESENTATION_PLAN.md)** | `PRESENTATION_PLAN.md` | Strategic DIR-V framing, real-time control loop microsecond budget (290 µs WCET), custom 30.5mm PCB roadmap |
 
 ---
 

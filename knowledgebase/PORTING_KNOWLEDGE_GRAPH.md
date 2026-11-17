@@ -3,13 +3,13 @@
 This document synthesizes findings across all 25 hardware inspection logs, **14 retrospective logs from the previous porting attempt**, and **15 deep codebase evaluation nodes** into a unified, component-by-component architectural blueprint for porting Betaflight to the **ARIES v3.0** board powered by the **THEJAS32 SoC (VEGA ET1031 RISC-V RV32IM)**.
 
 It directly rectifies the historical planning and practical implementation mistakes documented in:
-* [PLANNING_MISTAKES_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PLANNING_MISTAKES_ANALYSIS.md)
-* [HISTORICAL_PLANNING_MISTAKES_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/HISTORICAL_PLANNING_MISTAKES_GRAPH.md)
-* [HISTORICAL_RETROSPECTIVE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/HISTORICAL_RETROSPECTIVE_GRAPH.md)
-* [Retrospective Logs 01–14 Catalog](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs)
-* [Codebase Evaluations 01–15 Catalog](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations)
-* [Critical Knowledge Gaps & Assumptions Register](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
-* [Exhaustive Micro-Planning Document Suite (`PLAN/`)](file:///home/ivan/Desktop/betaflight/PLAN/00_MASTER_PLAN_OVERVIEW.md)
+* [PLANNING_MISTAKES_ANALYSIS.md](PLANNING_MISTAKES_ANALYSIS.md)
+* [HISTORICAL_PLANNING_MISTAKES_GRAPH.md](HISTORICAL_PLANNING_MISTAKES_GRAPH.md)
+* [HISTORICAL_RETROSPECTIVE_GRAPH.md](HISTORICAL_RETROSPECTIVE_GRAPH.md)
+* [Retrospective Logs 01–14 Catalog](retrospective_logs)
+* [Codebase Evaluations 01–15 Catalog](codebase_evaluations)
+* [Critical Knowledge Gaps & Assumptions Register](CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
+* [Exhaustive Micro-Planning Document Suite (`PLAN/`)](../PLAN/00_MASTER_PLAN_OVERVIEW.md)
 
 ---
 
@@ -91,8 +91,8 @@ graph TD
 ## 2. Component-by-Component Porting Blueprint
 
 ### Module 1: Toolchain, Target Flags & Memory Layout
-* **Dedicated Component Node**: [09_BUILD_LINKER_AND_MEMORY.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/09_BUILD_LINKER_AND_MEMORY.md)
-* **Retrospective Post-Mortem**: [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) (H1, H2, H13) & [`10_RETROSPECTIVE_RENODE_CHANGES.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)
+* **Dedicated Component Node**: [09_BUILD_LINKER_AND_MEMORY.md](components/09_BUILD_LINKER_AND_MEMORY.md)
+* **Retrospective Post-Mortem**: [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) (H1, H2, H13) & [`10_RETROSPECTIVE_RENODE_CHANGES.md`](retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)
 * **Target Architecture**: RISC-V RV32IM (Integer + Hardware Multiply & Divide, soft-float, 32 general-purpose registers `x0`–`x31`). **Strictly zero compressed ('C') instructions in silicon!**
 * **Toolchain & Multilib Directive**:
   * Toolchain: `riscv32-esp-elf-gcc` v13.2.0.
@@ -119,17 +119,17 @@ graph TD
   * External SPI Flash: Offline storage only; **NO Execute-In-Place (XIP)**.
   * Flashing Delivery: Strictly raw binary **`.bin`** (`betaflight_ARIESV3.bin`) streamed via XMODEM `flasher.bat`. (Passing `.hex` flashes ASCII text `:1000...` causing immediate crashes).
 * **Consulted Logs**:
-  * [12_STM32_LINKER_AND_SECTIONS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md)
-  * [13_STM32_BUILD_MAKEFILE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md)
-  * [25_ESP32_BUILD_AND_LINKER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md)
-  * [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
-  * [`10_RETROSPECTIVE_RENODE_CHANGES.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)
+  * [12_STM32_LINKER_AND_SECTIONS.md](../logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md)
+  * [13_STM32_BUILD_MAKEFILE.md](../logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md)
+  * [25_ESP32_BUILD_AND_LINKER.md](../logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md)
+  * [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
+  * [`10_RETROSPECTIVE_RENODE_CHANGES.md`](retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md)
 
 ---
 
 ### Module 2: System Boot, Startup Assembly & Exception Traps
-* **Dedicated Component Node**: [02_STARTUP_BOOT_AND_EXCEPTIONS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/02_STARTUP_BOOT_AND_EXCEPTIONS.md)
-* **Retrospective Post-Mortem**: [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`13_RETROSPECTIVE_STARTUP_AGENT_SPEC.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/13_RETROSPECTIVE_STARTUP_AGENT_SPEC.md)
+* **Dedicated Component Node**: [02_STARTUP_BOOT_AND_EXCEPTIONS.md](components/02_STARTUP_BOOT_AND_EXCEPTIONS.md)
+* **Retrospective Post-Mortem**: [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md), [`13_RETROSPECTIVE_STARTUP_AGENT_SPEC.md`](retrospective_logs/13_RETROSPECTIVE_STARTUP_AGENT_SPEC.md)
 * **Startup Assembly (`startup.S`)**:
   * Initializes all 31 GPRs (`x1`–`x31`) to zero to prevent uninitialized register leaks.
   * Sets stack pointer `sp` to `_estack` (within valid internal SRAM).
@@ -151,17 +151,17 @@ graph TD
   * Output sequenced boot milestones: `[INIT] 1. EEPROM... [INIT] 2. Config...`.
   * Early UART driver must use a 50,000-cycle bounded timeout and register-based ALU nibble math to prevent CPU freezes and stack `memcpy` bloat.
 * **Consulted Logs**:
-  * [02_STM32_SYSTEM_INIT.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/02_STM32_SYSTEM_INIT.md)
-  * [03_STM32_STARTUP_ASSEMBLY.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md)
-  * [04_STM32_FAULT_HANDLERS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md)
-  * [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)
-  * [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
+  * [02_STM32_SYSTEM_INIT.md](../logs/hardware_inspection/02_STM32_SYSTEM_INIT.md)
+  * [03_STM32_STARTUP_ASSEMBLY.md](../logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md)
+  * [04_STM32_FAULT_HANDLERS.md](../logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md)
+  * [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)
+  * [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
 
 ---
 
 ### Module 3: Timebase & Monotonic Clocks
-* **Dedicated Component Node**: [01_SYSTEM_AND_CLOCKS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/01_SYSTEM_AND_CLOCKS.md)
-* **Retrospective Post-Mortem**: [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) (H hurdle), [`04_RETROSPECTIVE_TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md) (BUILD-07)
+* **Dedicated Component Node**: [01_SYSTEM_AND_CLOCKS.md](components/01_SYSTEM_AND_CLOCKS.md)
+* **Retrospective Post-Mortem**: [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) (H hurdle), [`04_RETROSPECTIVE_TEST_LOGS.md`](retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md) (BUILD-07)
 * **Atomic Monotonic Timebase (Eliminating 42.95s Rollover)**:
   * At 100 MHz, the 32-bit `mcycle` CSR overflows every 42.949 seconds, inducing massive delta-time panics.
   * Solution: Atomic double-read loop combining `mcycleh` and `mcycle`:
@@ -189,15 +189,15 @@ graph TD
   * Hardware Timer 0 (`0x10000A00`) on IRQ 7 (`THEJAS32_IRQ_TIMER0`).
   * Synopsys DW_apb_timers IP requires reading the End-of-Interrupt (`EOI`) register (`0x10000A0C`) upon ISR entry: `(void)THEJAS32_TIMER(0).EOI;` to clear the latch and prevent infinite trap re-entry.
 * **Consulted Logs**:
-  * [01_STM32_COMMON_SYSTEM.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md)
-  * [17_ESP32_SYSTEM_AND_TIMER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/17_ESP32_SYSTEM_AND_TIMER.md)
-  * [`04_RETROSPECTIVE_TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md)
+  * [01_STM32_COMMON_SYSTEM.md](../logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md)
+  * [17_ESP32_SYSTEM_AND_TIMER.md](../logs/hardware_inspection/17_ESP32_SYSTEM_AND_TIMER.md)
+  * [`04_RETROSPECTIVE_TEST_LOGS.md`](retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md)
 
 ---
 
 ### Module 4: Serial Communication & MSP Handshake
-* **Dedicated Component Node**: [03_SERIAL_UART_AND_MSP.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/03_SERIAL_UART_AND_MSP.md)
-* **Retrospective Post-Mortem**: [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) (H14–H22)
+* **Dedicated Component Node**: [03_SERIAL_UART_AND_MSP.md](components/03_SERIAL_UART_AND_MSP.md)
+* **Retrospective Post-Mortem**: [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md), [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) (H14–H22)
 * **Hardware IP & Clock Divisor**:
   * Synopsys 16550 UART0 at `0x10000100`, hardwired to Silicon Labs CP2102N USB-UART bridge.
   * Divisor @ 100 MHz APB: $\text{Divisor} = \frac{100,000,000}{16 \times 115200} = 54$ (`0x36`). Line control: 8-N-1 (`0x03`).
@@ -213,16 +213,16 @@ graph TD
   * **NEVER emit unpacketized ASCII strings (`[SERIAL ALIVE]`, `[MSP RX]`) onto UART0.**
   * ASCII text corrupts binary MSP frames, causing framing/CRC errors and Configurator 10-second timeouts.
 * **Consulted Logs**:
-  * [05_STM32_SERIAL_UART_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md)
-  * [06_STM32_SERIAL_UART_DRIVER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md)
-  * [15_MSP_SERIAL_PARSER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/15_MSP_SERIAL_PARSER.md)
-  * [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)
-  * [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
+  * [05_STM32_SERIAL_UART_HW.md](../logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md)
+  * [06_STM32_SERIAL_UART_DRIVER.md](../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md)
+  * [15_MSP_SERIAL_PARSER.md](../logs/hardware_inspection/15_MSP_SERIAL_PARSER.md)
+  * [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md)
+  * [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md)
 
 ---
 
 ### Module 5: Non-Volatile Configuration Persistence (`CONFIG_IN_RAM`)
-* **Retrospective Post-Mortem**: [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) (H6, H9)
+* **Retrospective Post-Mortem**: [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) (H6, H9)
 * **The Unmapped Flash Trap**:
   * External SPI flash is connected to SPI3 (`0x10200200`) and has no memory-mapped XIP controller.
   * Accessing `0x201F8000` (`CONFIG_IN_FLASH`) executes a synchronous load fault (`mcause = 5`), permanently hanging the core in `while(1);`.
@@ -238,11 +238,11 @@ graph TD
 ---
 
 ### Module 6: Interrupts & EXTI Subsystem
-* **Dedicated Component Node**: [06_INTERRUPTS_AND_EXTI.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/06_INTERRUPTS_AND_EXTI.md)
+* **Dedicated Component Node**: [06_INTERRUPTS_AND_EXTI.md](components/06_INTERRUPTS_AND_EXTI.md)
 * **Hardware Architecture**: Platform-Level Interrupt Controller (`PLIC` at base `0x0C000000`).
 * **Pin Interrupt Routing**:
   * Pins `GPIO0`–`GPIO31` route external edge triggers to the PLIC.
-  * Dispatched via the single-ISR compiler intrinsic pattern proven in [24_ESP32_DMA_AND_EXTI.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md):
+  * Dispatched via the single-ISR compiler intrinsic pattern proven in [24_ESP32_DMA_AND_EXTI.md](../logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md):
     ```c
     void GPIO_PLIC_IRQHandler(void) {
         uint32_t status = THEJAS32_GPIO->INT_STATUS;
@@ -257,49 +257,49 @@ graph TD
     }
     ```
 * **Consulted Logs**:
-  * [03_STM32_STARTUP_ASSEMBLY.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md)
-  * [04_STM32_FAULT_HANDLERS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md)
-  * [20_ESP32_INTERRUPT_MODEL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/20_ESP32_INTERRUPT_MODEL.md)
-  * [24_ESP32_DMA_AND_EXTI.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md)
+  * [03_STM32_STARTUP_ASSEMBLY.md](../logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md)
+  * [04_STM32_FAULT_HANDLERS.md](../logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md)
+  * [20_ESP32_INTERRUPT_MODEL.md](../logs/hardware_inspection/20_ESP32_INTERRUPT_MODEL.md)
+  * [24_ESP32_DMA_AND_EXTI.md](../logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md)
 
 ---
 
 ### Module 7: Motor Output Subsystem (PWM / OneShot)
-* **Dedicated Component Node**: [05_TIMER_AND_MOTOR_PWM.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/05_TIMER_AND_MOTOR_PWM.md)
+* **Dedicated Component Node**: [05_TIMER_AND_MOTOR_PWM.md](components/05_TIMER_AND_MOTOR_PWM.md)
 * **Hardware Engine**: Dedicated 8-Channel PWM controller (`PWM[0..7]` at base `0x10000600`).
 * **Architectural Advantage Over STM32**:
-  * STM32 timers suffer from asymmetric APB1/APB2 bus multipliers and severe DMA stream collisions (analyzed in [09_STM32_TIMER_PWM_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md)).
+  * STM32 timers suffer from asymmetric APB1/APB2 bus multipliers and severe DMA stream collisions (analyzed in [09_STM32_TIMER_PWM_HW.md](../logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md)).
   * THEJAS32 runs all 8 PWM channels off the same 100 MHz clock, eliminating timer clock doublers and DMA collisions entirely.
 * **Pin Assignments on ARIES v3.0 Headers**:
   * Motors 1–3: `PWM[0..2]` on Header `J2` (Pins 86, 85, 82)
   * Motor 4 & Servo: `PWM[3..4]` on Header `J1` (Pins 81, 80)
   * Aux / Beeper: `PWM[5..7]` on Header `J3` (Pins 77, 76, 75)
 * **VTable Non-Null Safety**:
-  * Must implement `convertExternalToMotor` and `convertMotorToExternal` to prevent NULL-pointer panics when Configurator's Motor sliders are engaged ([22_ESP32_PWM_DSHOT.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/22_ESP32_PWM_DSHOT.md)).
+  * Must implement `convertExternalToMotor` and `convertMotorToExternal` to prevent NULL-pointer panics when Configurator's Motor sliders are engaged ([22_ESP32_PWM_DSHOT.md](../logs/hardware_inspection/22_ESP32_PWM_DSHOT.md)).
 * **Consulted Logs**:
-  * [09_STM32_TIMER_PWM_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md)
-  * [22_ESP32_PWM_DSHOT.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/22_ESP32_PWM_DSHOT.md)
+  * [09_STM32_TIMER_PWM_HW.md](../logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md)
+  * [22_ESP32_PWM_DSHOT.md](../logs/hardware_inspection/22_ESP32_PWM_DSHOT.md)
 
 ---
 
 ### Module 8: Bus Peripherals (SPI & I2C)
-* **Dedicated Component Node**: [07_BUS_SPI_AND_I2C.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/07_BUS_SPI_AND_I2C.md)
+* **Dedicated Component Node**: [07_BUS_SPI_AND_I2C.md](components/07_BUS_SPI_AND_I2C.md)
 * **SPI Driver**:
   * THEJAS32 provides SPI0 (onboard SPI Flash `U5`), SPI1, SPI2, SPI3 (Header `J4` for external SPI IMU).
-  * For <128KB minimal target, implement **polled SPI** (proven on ESP32 in [21_ESP32_BUS_SPI_I2C.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md)).
+  * For <128KB minimal target, implement **polled SPI** (proven on ESP32 in [21_ESP32_BUS_SPI_I2C.md](../logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md)).
   * No Cortex-M7 L1 D-Cache invalidation issues (`SCB_InvalidateDCache_by_Addr`).
   * No DMA descriptor alignment bounce buffer issues.
 * **I2C Driver**:
   * `I2C2` routes to onboard 4-channel ADC (`U9`).
   * Uses simple polled write/read buffer flow (START $\rightarrow$ ADDR $\rightarrow$ REG $\rightarrow$ RESTART $\rightarrow$ READ $\rightarrow$ STOP).
 * **Consulted Logs**:
-  * [10_STM32_BUS_SPI_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/10_STM32_BUS_SPI_HW.md)
-  * [21_ESP32_BUS_SPI_I2C.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md)
+  * [10_STM32_BUS_SPI_HW.md](../logs/hardware_inspection/10_STM32_BUS_SPI_HW.md)
+  * [21_ESP32_BUS_SPI_I2C.md](../logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md)
 
 ---
 
 ### Module 9: Sensor Sampling & ADC Subsystem
-* **Dedicated Component Node**: [08_ANALOG_ADC_SUBSYSTEM.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/08_ANALOG_ADC_SUBSYSTEM.md)
+* **Dedicated Component Node**: [08_ANALOG_ADC_SUBSYSTEM.md](components/08_ANALOG_ADC_SUBSYSTEM.md)
 * **Physical Hardware Topology**:
   * THEJAS32 SoC has **no internal SAR ADC**.
   * Analog input pins `ADC_CH0`–`ADC_CH3` on Header `J10` connect to an external 4-channel I2C ADC chip (`U9`) on `I2C2`.
@@ -309,13 +309,13 @@ graph TD
     * `TASK_BATTERY` reads cached values from `aries_adc_raw[4]`.
   * For initial MSP handshake, battery monitoring can return static nominal values (e.g. 12.6V), enabling instant Configurator telemetry without waiting for `I2C2` bus bringup.
 * **Consulted Logs**:
-  * [11_STM32_ADC_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/11_STM32_ADC_IMPL.md)
-  * [23_ESP32_ADC.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/23_ESP32_ADC.md)
+  * [11_STM32_ADC_IMPL.md](../logs/hardware_inspection/11_STM32_ADC_IMPL.md)
+  * [23_ESP32_ADC.md](../logs/hardware_inspection/23_ESP32_ADC.md)
 
 ---
 
 ### Module 10: Size Budget & Modular Stripping (<128 KB Target)
-* **Dedicated Component Nodes**: [10_SCHEDULER_AND_TASK_ARCHITECTURE.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/10_SCHEDULER_AND_TASK_ARCHITECTURE.md) & [11_TARGET_OPTIMIZATION_BUDGET.md](file:///home/ivan/Desktop/betaflight/knowledgebase/components/11_TARGET_OPTIMIZATION_BUDGET.md)
+* **Dedicated Component Nodes**: [10_SCHEDULER_AND_TASK_ARCHITECTURE.md](components/10_SCHEDULER_AND_TASK_ARCHITECTURE.md) & [11_TARGET_OPTIMIZATION_BUDGET.md](components/11_TARGET_OPTIMIZATION_BUDGET.md)
 To ensure the firmware compiles under **128 KB** and executes within the **250 KB SRAM** boundary, the following modules are excluded from the target build:
 * **Excluded**:
   1. ST Native USB Middleware (`-DUSE_VCP` omitted $\rightarrow$ saves ~30 KB). Handled by hardware CP2102N.
@@ -332,11 +332,11 @@ To ensure the firmware compiles under **128 KB** and executes within the **250 K
   5. THEJAS32 UART0, GPIO, and Timer Drivers.
 * **Estimated Binary Size**: **~68 KB to 85 KB**, easily fitting within the 128 KB limit!
 * **Consulted Logs**:
-  * [13_STM32_BUILD_MAKEFILE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md)
-  * [14_MAIN_STARTUP_FLOW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/14_MAIN_STARTUP_FLOW.md)
-  * [15_MSP_SERIAL_PARSER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/15_MSP_SERIAL_PARSER.md)
-  * [16_SCHEDULER_CORE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/16_SCHEDULER_CORE.md)
-  * [25_ESP32_BUILD_AND_LINKER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md)
+  * [13_STM32_BUILD_MAKEFILE.md](../logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md)
+  * [14_MAIN_STARTUP_FLOW.md](../logs/hardware_inspection/14_MAIN_STARTUP_FLOW.md)
+  * [15_MSP_SERIAL_PARSER.md](../logs/hardware_inspection/15_MSP_SERIAL_PARSER.md)
+  * [16_SCHEDULER_CORE.md](../logs/hardware_inspection/16_SCHEDULER_CORE.md)
+  * [25_ESP32_BUILD_AND_LINKER.md](../logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md)
 
 ---
 
@@ -439,21 +439,21 @@ The following matrix synthesizes the line-by-line technical audits conducted on 
 
 | Node ID | Target File Evaluated | Key Architectural Decisions Scored | What Went Wrong (Vulnerabilities Found) | What Could Have Been Done Better | Brilliant Engineering Insights |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| **[E01](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/01_EVAL_STARTUP_S.md)** | `startup.S` | 5 Scored | Trap frame omitted `x2` (`sp`) save; single `sp` for machine/trap handler risking stack smash. | Separate trap handler stack (`mscratch`); explicit GPR clear on reset. | Zeroed registers `x1..x31` prevent cold boot register leakage; 256-byte trap vector alignment. |
-| **[E02](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/02_EVAL_LINKER_ARIES_V3_LD.md)** | `aries_v3.ld` | 5 Scored | Unchecked stack growth colliding with `.bss` boundary; absent flash XIP section awareness. | Compile-time stack assertion: `ASSERT(_stack_size <= (ORIGIN(RAM) + LENGTH(RAM) - .), "SRAM overflow")`. | Accurately mapped SRAM execution base `0x00202000` to `0x0023FFFF` (248 KB); clean `.pg_registry` anchoring. |
-| **[E03](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/03_EVAL_BSP_THEJAS32_H.md)** | `bsp_thejas32.h` | 5 Scored | Hardcoded crystal frequency macro without dynamic PLL detection. | Guarding with `#ifndef SYSTEM_CLOCK_HZ`; documenting APB bus divisor topology. | Bit-exact memory map for 16550 UART, Synopsys APB Timers, SPI, and dual-bank GPIO controllers. |
-| **[E04](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/04_EVAL_PLATFORM_H.md)** | `platform.h` | 5 Scored | **Critical Bug:** `__get_BASEPRI()` and `__set_BASEPRI()` were empty stubs, rendering `ATOMIC_BLOCK` completely ineffective! | Map atomic sections directly to RISC-V `csrrci %0, mstatus, 8` / `csrs mstatus, 8`. | Clean mapping of ARM CMSIS intrinsics (`__REV`, `__REV16`, `__NOP`, `__WFI`) to RISC-V instructions. |
-| **[E05](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/05_EVAL_SYSTEM_C.md)** | `system.c` | 6 Scored | Soft reboot invoked an infinite loop `while(1);` rather than jumping to `_start` or issuing software reset. | Soft jump to `_start` with trap unmasking; cycle counter overflow test harness. | Pure 32-bit `memset`/`memcpy` routines prevent multilib RVC traps; high-precision 64-bit `mcycle` timebase. |
-| **[E06](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/06_EVAL_SERIAL_UART_ARIES_C.md)** | `serial_uart_aries.c` | 6 Scored | Unbounded synchronous TX polling can stall PID flight loop during large MSP configuration dumps. | Bounded cycle limit on TX busy loop with software ring buffer fallback. | RX-only interrupt handling with dedicated ring buffers; baud rate divisor calculation at 100 MHz. |
-| **[E07](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/07_EVAL_IO_ARIES_C_AND_DEF.md)** | `io_aries.c` | 5 Scored | Missing open-drain emulation bitmask in standard output write API. | Atomic bit manipulation via hardware set/clear registers; open-drain simulation for bus unsticking. | Flat 32-bit pin tag indexing (`DEFIO_TAG_MAKE`) avoids multi-bank lookup popcount tables. |
-| **[E08](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/08_EVAL_EXTI_ARIES_C.md)** | `exti_aries.c` | 5 Scored | Linear 16-pin scanning in IRQ 10/11 ISR introduces latency on high-frequency (1 kHz) Gyro DRDY interrupts. | Track active EXTI pins in a 32-bit bitmask and dispatch using `__builtin_ctz()`. | Clean segregation of Bank 0 (pins 0..15) and Bank 1 (pins 16..31) interrupt vectors. |
-| **[E09](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/09_EVAL_BUS_SPI_ARIES_C.md)** | `bus_spi_aries.c` | 6 Scored | Divisor 0 generates 25 MHz SCK, exceeding the 24.0 MHz maximum specification of the ICM-42688P IMU by 4.1%. | Clamp sensor SPI frequency to Divisor 1 (12.5 MHz), costing $< 9\,\mu\text{s}$ per gyro read. | Bit-exact shift-by-4 divisor mapping (`bBaudCFD << 4`); seamless Mode 0 and Mode 3 polarity control. |
-| **[E10](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/10_EVAL_CONFIG_FLASH_ARIES_C.md)** | `config_flash_aries.c` | 5 Scored | **Critical Bug:** Dereferencing memory-mapped SPI flash `0x20000000` triggers Store Access Fault (`mcause = 7`) on real silicon. | Adopt `#define CONFIG_IN_RAM` (`EEPROM_SIZE 8192`) in internal SRAM, completely avoiding external flash XIP. | Clean JEDEC 4 KB sector erase (`0x20`) and page program (`0x02`) command sequencing. |
-| **[E11](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/11_EVAL_PWM_MOTOR_ARIES_C.md)** | `pwm_motor_aries.c` | 5 Scored | Race condition in `pwmCompleteMotorUpdate`: Timer 1 was left active while setting motor pins HIGH. | Disable Timer 1 at entrance of motor update; group deadlines $< 100$ cycles together. | **Ascending deadline event scheduler:** Non-blocking hardware Timer 1 sequencing consumes $< 3\,\mu\text{s}$ CPU total! |
-| **[E12](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/12_EVAL_STUB_DRIVERS_C.md)** | `stub_drivers.c` | 5 Scored | ADC stub returning `0` triggers false 0.0V battery failsafe lock; atomic fallback clobbers nested interrupt state. | State-preserving `csrrci mstatus, 8` sequence; explicit `#undef USE_ADC` in `target.h`. | Implemented `__atomic_fetch_add_4` for RV32IM, resolving libatomic missing symbols on non-atomic silicon. |
-| **[E13](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md)** | `ARIES.mk` | 5 Scored | Hardcoded host toolchain path `/home/ivan/...` breaks cross-platform and CI builds. | Dynamic toolchain resolution using `which riscv32-esp-elf-gcc` and `-print-file-name=libc.a`. | **Multilib RVC override:** Forcing `rv32i_zicsr_zifencei/ilp32` prevented fatal compressed instruction traps. |
-| **[E14](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md)** | `target.h` | 5 Scored | Reducing `EEPROM_SIZE` from 8192 to 4096 triggers boot panic because Betaflight PGs exceed 4.8 KB. | Static compile-time assertion guarding `EEPROM_SIZE >= 8192`. | Locked 1.0 kHz flight loop (`DEFAULT_PID_PROCESS_DENOM 8`) leaves $> 50\%$ CPU headroom on soft-float core. |
-| **[E15](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)** | `src/main/` | 5 Scored | Injected `#ifdef THEJAS32` and `THEJAS_LOG` debug strings directly into 9 core files, violating platform isolation. | Encapsulate target diagnostics in weak platform hooks; gate logs behind `#if defined(THEJAS32_DEBUG_LOG)`. | **Instant CLI activation:** Pressing Enter (`\r`) or `#` eliminates the 100ms guard-time barrier for serial monitors. |
+| **[E01](codebase_evaluations/01_EVAL_STARTUP_S.md)** | `startup.S` | 5 Scored | Trap frame omitted `x2` (`sp`) save; single `sp` for machine/trap handler risking stack smash. | Separate trap handler stack (`mscratch`); explicit GPR clear on reset. | Zeroed registers `x1..x31` prevent cold boot register leakage; 256-byte trap vector alignment. |
+| **[E02](codebase_evaluations/02_EVAL_LINKER_ARIES_V3_LD.md)** | `aries_v3.ld` | 5 Scored | Unchecked stack growth colliding with `.bss` boundary; absent flash XIP section awareness. | Compile-time stack assertion: `ASSERT(_stack_size <= (ORIGIN(RAM) + LENGTH(RAM) - .), "SRAM overflow")`. | Accurately mapped SRAM execution base `0x00202000` to `0x0023FFFF` (248 KB); clean `.pg_registry` anchoring. |
+| **[E03](codebase_evaluations/03_EVAL_BSP_THEJAS32_H.md)** | `bsp_thejas32.h` | 5 Scored | Hardcoded crystal frequency macro without dynamic PLL detection. | Guarding with `#ifndef SYSTEM_CLOCK_HZ`; documenting APB bus divisor topology. | Bit-exact memory map for 16550 UART, Synopsys APB Timers, SPI, and dual-bank GPIO controllers. |
+| **[E04](codebase_evaluations/04_EVAL_PLATFORM_H.md)** | `platform.h` | 5 Scored | **Critical Bug:** `__get_BASEPRI()` and `__set_BASEPRI()` were empty stubs, rendering `ATOMIC_BLOCK` completely ineffective! | Map atomic sections directly to RISC-V `csrrci %0, mstatus, 8` / `csrs mstatus, 8`. | Clean mapping of ARM CMSIS intrinsics (`__REV`, `__REV16`, `__NOP`, `__WFI`) to RISC-V instructions. |
+| **[E05](codebase_evaluations/05_EVAL_SYSTEM_C.md)** | `system.c` | 6 Scored | Soft reboot invoked an infinite loop `while(1);` rather than jumping to `_start` or issuing software reset. | Soft jump to `_start` with trap unmasking; cycle counter overflow test harness. | Pure 32-bit `memset`/`memcpy` routines prevent multilib RVC traps; high-precision 64-bit `mcycle` timebase. |
+| **[E06](codebase_evaluations/06_EVAL_SERIAL_UART_ARIES_C.md)** | `serial_uart_aries.c` | 6 Scored | Unbounded synchronous TX polling can stall PID flight loop during large MSP configuration dumps. | Bounded cycle limit on TX busy loop with software ring buffer fallback. | RX-only interrupt handling with dedicated ring buffers; baud rate divisor calculation at 100 MHz. |
+| **[E07](codebase_evaluations/07_EVAL_IO_ARIES_C_AND_DEF.md)** | `io_aries.c` | 5 Scored | Missing open-drain emulation bitmask in standard output write API. | Atomic bit manipulation via hardware set/clear registers; open-drain simulation for bus unsticking. | Flat 32-bit pin tag indexing (`DEFIO_TAG_MAKE`) avoids multi-bank lookup popcount tables. |
+| **[E08](codebase_evaluations/08_EVAL_EXTI_ARIES_C.md)** | `exti_aries.c` | 5 Scored | Linear 16-pin scanning in IRQ 10/11 ISR introduces latency on high-frequency (1 kHz) Gyro DRDY interrupts. | Track active EXTI pins in a 32-bit bitmask and dispatch using `__builtin_ctz()`. | Clean segregation of Bank 0 (pins 0..15) and Bank 1 (pins 16..31) interrupt vectors. |
+| **[E09](codebase_evaluations/09_EVAL_BUS_SPI_ARIES_C.md)** | `bus_spi_aries.c` | 6 Scored | Divisor 0 generates 25 MHz SCK, exceeding the 24.0 MHz maximum specification of the ICM-42688P IMU by 4.1%. | Clamp sensor SPI frequency to Divisor 1 (12.5 MHz), costing $< 9\,\mu\text{s}$ per gyro read. | Bit-exact shift-by-4 divisor mapping (`bBaudCFD << 4`); seamless Mode 0 and Mode 3 polarity control. |
+| **[E10](codebase_evaluations/10_EVAL_CONFIG_FLASH_ARIES_C.md)** | `config_flash_aries.c` | 5 Scored | **Critical Bug:** Dereferencing memory-mapped SPI flash `0x20000000` triggers Store Access Fault (`mcause = 7`) on real silicon. | Adopt `#define CONFIG_IN_RAM` (`EEPROM_SIZE 8192`) in internal SRAM, completely avoiding external flash XIP. | Clean JEDEC 4 KB sector erase (`0x20`) and page program (`0x02`) command sequencing. |
+| **[E11](codebase_evaluations/11_EVAL_PWM_MOTOR_ARIES_C.md)** | `pwm_motor_aries.c` | 5 Scored | Race condition in `pwmCompleteMotorUpdate`: Timer 1 was left active while setting motor pins HIGH. | Disable Timer 1 at entrance of motor update; group deadlines $< 100$ cycles together. | **Ascending deadline event scheduler:** Non-blocking hardware Timer 1 sequencing consumes $< 3\,\mu\text{s}$ CPU total! |
+| **[E12](codebase_evaluations/12_EVAL_STUB_DRIVERS_C.md)** | `stub_drivers.c` | 5 Scored | ADC stub returning `0` triggers false 0.0V battery failsafe lock; atomic fallback clobbers nested interrupt state. | State-preserving `csrrci mstatus, 8` sequence; explicit `#undef USE_ADC` in `target.h`. | Implemented `__atomic_fetch_add_4` for RV32IM, resolving libatomic missing symbols on non-atomic silicon. |
+| **[E13](codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md)** | `ARIES.mk` | 5 Scored | Hardcoded host toolchain path `/home/ivan/...` breaks cross-platform and CI builds. | Dynamic toolchain resolution using `which riscv32-esp-elf-gcc` and `-print-file-name=libc.a`. | **Multilib RVC override:** Forcing `rv32i_zicsr_zifencei/ilp32` prevented fatal compressed instruction traps. |
+| **[E14](codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md)** | `target.h` | 5 Scored | Reducing `EEPROM_SIZE` from 8192 to 4096 triggers boot panic because Betaflight PGs exceed 4.8 KB. | Static compile-time assertion guarding `EEPROM_SIZE >= 8192`. | Locked 1.0 kHz flight loop (`DEFAULT_PID_PROCESS_DENOM 8`) leaves $> 50\%$ CPU headroom on soft-float core. |
+| **[E15](codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)** | `src/main/` | 5 Scored | Injected `#ifdef THEJAS32` and `THEJAS_LOG` debug strings directly into 9 core files, violating platform isolation. | Encapsulate target diagnostics in weak platform hooks; gate logs behind `#if defined(THEJAS32_DEBUG_LOG)`. | **Instant CLI activation:** Pressing Enter (`\r`) or `#` eliminates the 100ms guard-time barrier for serial monitors. |
 
 ---
 
@@ -463,15 +463,15 @@ When the minimal build is flashed into SRAM and executed:
 
 | Step | Verification Milestone | Expected Observable Result | Log Blueprint |
 | :---: | :--- | :--- | :--- |
-| **1** | Machine Reset & Stack Init | CPU enters `Reset_Handler`, clears GPRs `x1`–`x31`, initializes `sp = _estack` within `0x00202000`–`0x0023FFFF`. | [03_STM32_STARTUP_ASSEMBLY.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md) & [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) |
-| **2** | Opcode Disassembly Audit (`T8-09`) | Script greps `betaflight_ARIESV3.elf` for 16-bit compressed instructions: `c.` count strictly equals **0**. | [`04_RETROSPECTIVE_TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md) & [`10_RETROSPECTIVE_RENODE_CHANGES.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md) |
-| **3** | Binary Footprint Ceiling (`T8-10`) | Raw binary artifact size is strictly **$\le 131,072$ bytes (128 KB)**, well within the 248 KB SRAM limit. | [`04_RETROSPECTIVE_TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md) & [`TARGET_OPTIMIZATION_128KB.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md) |
-| **4** | Parameter Group Init in RAM | `initPhase1()` -> `initEEPROM()` initializes `eepromData[8192]` in `.bss` at `0x0023B640`; zero access to unmapped `0x201F8000`. | [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) |
-| **5** | Microsecond Monotonic Clock | `micros()` advances monotonically via atomic double-read of `mcycle`/`mcycleh` with reciprocal division (0 `__udivdi3` calls). | [01_STM32_COMMON_SYSTEM.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md) & [`04_RETROSPECTIVE_TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md) |
-| **6** | Global Interrupt Unmasking | `run()` explicitly executes `__enable_irq()`, setting `mstatus.MIE` (bit 3) and `mie.MEIE` (bit 11). | [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md) |
-| **7** | UART0 115,200 Baud Init | Dedicated pin tags `PA30`/`PA31` active; divisor 54 programmed; RX interrupt unmasked (`UART_IE = 0x01`); TX interrupt disabled. | [05_STM32_SERIAL_UART_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md) & [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md) |
-| **8** | MSP Serial Poll Loop | `scheduler()` calls `TASK_SERIAL` every loop without blocking; synchronous bounded drain pushes replies within $< 1\text{ ms}$. | [15_MSP_SERIAL_PARSER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/15_MSP_SERIAL_PARSER.md) & [`02_RETROSPECTIVE_HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) |
-| **9** | Protocol Wire Cleanliness | Zero ASCII diagnostic strings emitted on UART0; 10,000 MSP frames streamed with 0% CRC/framing errors. | [`01_RETROSPECTIVE_DEBUG_SESSION.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md) & [`06_RETROSPECTIVE_SOFTWARE_TEST_PLAN.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/06_RETROSPECTIVE_SOFTWARE_TEST_PLAN.md) |
-| **10** | Configurator Handshake | Betaflight Configurator connects to `/dev/ttyUSB0` at 115200 baud; sends `MSP_API_VERSION`; firmware responds `$M>3\x01\x01...`. UI indicates **"Connected"**! | [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md) |
-| **11** | 5-Minute Monotonic Soak Test | System runs in CLI/Configurator for $> 300\text{ seconds}$ crossing the 42.95s rollover without jitter, panic, or disconnects. | [`07_RETROSPECTIVE_TEST_PLAN.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md) |
+| **1** | Machine Reset & Stack Init | CPU enters `Reset_Handler`, clears GPRs `x1`–`x31`, initializes `sp = _estack` within `0x00202000`–`0x0023FFFF`. | [03_STM32_STARTUP_ASSEMBLY.md](../logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md) & [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) |
+| **2** | Opcode Disassembly Audit (`T8-09`) | Script greps `betaflight_ARIESV3.elf` for 16-bit compressed instructions: `c.` count strictly equals **0**. | [`04_RETROSPECTIVE_TEST_LOGS.md`](retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md) & [`10_RETROSPECTIVE_RENODE_CHANGES.md`](retrospective_logs/10_RETROSPECTIVE_RENODE_CHANGES.md) |
+| **3** | Binary Footprint Ceiling (`T8-10`) | Raw binary artifact size is strictly **$\le 131,072$ bytes (128 KB)**, well within the 248 KB SRAM limit. | [`04_RETROSPECTIVE_TEST_LOGS.md`](retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md) & [`TARGET_OPTIMIZATION_128KB.md`](TARGET_OPTIMIZATION_128KB.md) |
+| **4** | Parameter Group Init in RAM | `initPhase1()` -> `initEEPROM()` initializes `eepromData[8192]` in `.bss` at `0x0023B640`; zero access to unmapped `0x201F8000`. | [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) |
+| **5** | Microsecond Monotonic Clock | `micros()` advances monotonically via atomic double-read of `mcycle`/`mcycleh` with reciprocal division (0 `__udivdi3` calls). | [01_STM32_COMMON_SYSTEM.md](../logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md) & [`04_RETROSPECTIVE_TEST_LOGS.md`](retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md) |
+| **6** | Global Interrupt Unmasking | `run()` explicitly executes `__enable_irq()`, setting `mstatus.MIE` (bit 3) and `mie.MEIE` (bit 11). | [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md) |
+| **7** | UART0 115,200 Baud Init | Dedicated pin tags `PA30`/`PA31` active; divisor 54 programmed; RX interrupt unmasked (`UART_IE = 0x01`); TX interrupt disabled. | [05_STM32_SERIAL_UART_HW.md](../logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md) & [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md) |
+| **8** | MSP Serial Poll Loop | `scheduler()` calls `TASK_SERIAL` every loop without blocking; synchronous bounded drain pushes replies within $< 1\text{ ms}$. | [15_MSP_SERIAL_PARSER.md](../logs/hardware_inspection/15_MSP_SERIAL_PARSER.md) & [`02_RETROSPECTIVE_HAL_PROGRESS.md`](retrospective_logs/02_RETROSPECTIVE_HAL_PROGRESS.md) |
+| **9** | Protocol Wire Cleanliness | Zero ASCII diagnostic strings emitted on UART0; 10,000 MSP frames streamed with 0% CRC/framing errors. | [`01_RETROSPECTIVE_DEBUG_SESSION.md`](retrospective_logs/01_RETROSPECTIVE_DEBUG_SESSION.md) & [`06_RETROSPECTIVE_SOFTWARE_TEST_PLAN.md`](retrospective_logs/06_RETROSPECTIVE_SOFTWARE_TEST_PLAN.md) |
+| **10** | Configurator Handshake | Betaflight Configurator connects to `/dev/ttyUSB0` at 115200 baud; sends `MSP_API_VERSION`; firmware responds `$M>3\x01\x01...`. UI indicates **"Connected"**! | [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md) |
+| **11** | 5-Minute Monotonic Soak Test | System runs in CLI/Configurator for $> 300\text{ seconds}$ crossing the 42.95s rollover without jitter, panic, or disconnects. | [`07_RETROSPECTIVE_TEST_PLAN.md`](retrospective_logs/07_RETROSPECTIVE_TEST_PLAN.md) |
 

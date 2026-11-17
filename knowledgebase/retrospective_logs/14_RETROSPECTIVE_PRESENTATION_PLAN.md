@@ -1,6 +1,6 @@
 # Retrospective Log 14: Master Presentation Plan & Jury Review Dossier
 
-> **Source File:** [`oldfiles/logs/PRESENTATION_PLAN.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/PRESENTATION_PLAN.md)  
+> **Source File:** [`oldfiles/logs/PRESENTATION_PLAN.md`](../../oldfiles/logs/PRESENTATION_PLAN.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

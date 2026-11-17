@@ -1,8 +1,8 @@
 # Hardware Inspection Log: `src/platform/ESP32/adc_esp32.c`
-**Consulted Log**: [11_STM32_ADC_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/11_STM32_ADC_IMPL.md)
+**Consulted Log**: [11_STM32_ADC_IMPL.md](11_STM32_ADC_IMPL.md)
 
 ## 1. File Purpose & Role in Architecture
-* **File Path**: [src/platform/ESP32/adc_esp32.c](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/adc_esp32.c)
+* **File Path**: [src/platform/ESP32/adc_esp32.c](../../src/platform/ESP32/adc_esp32.c)
 * **Subsystem**: Analog-to-Digital Converter (ADC) Hardware Abstraction Layer.
 * **Key Components**:
   * `adcInit()`: Configures ADC1 resolution (12-bit) and 12 dB input attenuation (`ADC_ATTEN_DB_12`) for 0–3.3V measurement range.

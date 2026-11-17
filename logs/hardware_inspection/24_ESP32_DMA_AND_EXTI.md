@@ -1,10 +1,10 @@
 # Hardware Inspection Log: `src/platform/ESP32/dma_esp32.c` & `exti_esp32.c`
-**Consulted Logs**: [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/08_STM32_IO_IMPL.md) & [10_STM32_BUS_SPI_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/10_STM32_BUS_SPI_HW.md)
+**Consulted Logs**: [08_STM32_IO_IMPL.md](08_STM32_IO_IMPL.md) & [10_STM32_BUS_SPI_HW.md](10_STM32_BUS_SPI_HW.md)
 
 ## 1. File Purpose & Role in Architecture
 * **File Paths**:
-  * [src/platform/ESP32/dma_esp32.c](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/dma_esp32.c)
-  * [src/platform/ESP32/exti_esp32.c](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/exti_esp32.c)
+  * [src/platform/ESP32/dma_esp32.c](../../src/platform/ESP32/dma_esp32.c)
+  * [src/platform/ESP32/exti_esp32.c](../../src/platform/ESP32/exti_esp32.c)
 * **Subsystem**: General DMA Channel Allocation and External Pin Interrupt (EXTI) Dispatch Engine.
 * **Key Components**:
   * `dmaGetFreeIdentifier()` / `dmaSetHandler()`: Dynamic GDMA channel allocation and runtime CPU interrupt binding.

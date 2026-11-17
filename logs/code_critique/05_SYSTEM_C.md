@@ -1,10 +1,10 @@
 # Code Critique: `src/platform/ARIES/system.c` vs `lib/vega-sdk/vega-sdk/bsp/`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/system.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c)
+- **Source File**: [`src/platform/ARIES/system.c`](../../src/platform/ARIES/system.c)
 - **Reference Files**:
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c)
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)
 - **Component**: Clocks, cycle counters, high-resolution timebase (`micros()`, `millis()`), DW_apb_timer 0 driver, C trap dispatcher (`handle_trap`), early UART diagnostics, and non-RVC safe `memset`/`memcpy`/`memmove`.
 
 ---

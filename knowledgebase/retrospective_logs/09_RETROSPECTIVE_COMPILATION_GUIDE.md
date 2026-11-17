@@ -1,6 +1,6 @@
 # Retrospective Log 09: Compilation & Flashing Guide
 
-> **Source File:** [`oldfiles/logs/COMPILATION_GUIDE.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/COMPILATION_GUIDE.md)  
+> **Source File:** [`oldfiles/logs/COMPILATION_GUIDE.md`](../../oldfiles/logs/COMPILATION_GUIDE.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

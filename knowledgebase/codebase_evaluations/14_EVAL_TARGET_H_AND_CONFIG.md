@@ -2,12 +2,12 @@
 
 ## 1. Executive Summary & File Traceability
 - **Evaluated Files**:
-  - [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h)
-  - [`src/platform/ARIES/target/ARIESV3/config.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/config.h)
-- **Source Log**: [`logs/code_critique/14_TARGET_H_AND_CONFIG.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/14_TARGET_H_AND_CONFIG.md)
+  - [`src/platform/ARIES/target/ARIESV3/target.h`](../../src/platform/ARIES/target/ARIESV3/target.h)
+  - [`src/platform/ARIES/target/ARIESV3/config.h`](../../src/platform/ARIES/target/ARIESV3/config.h)
+- **Source Log**: [`logs/code_critique/14_TARGET_H_AND_CONFIG.md`](../../logs/code_critique/14_TARGET_H_AND_CONFIG.md)
 - **Upstream References**:
-  - [`src/main/target/common_pre.h`](file:///home/ivan/Desktop/betaflight/src/main/target/common_pre.h)
-  - [`src/main/target/common_post.h`](file:///home/ivan/Desktop/betaflight/src/main/target/common_post.h)
+  - [`src/main/target/common_pre.h`](../../src/main/target/common_pre.h)
+  - [`src/main/target/common_post.h`](../../src/main/target/common_post.h)
 - **Domain**: Board identification, hardware pin mapping, feature gatekeeper, soft-float PID loop rate clamping, memory budget controls.
 
 ---
@@ -28,7 +28,7 @@
 
 ### What Went Wrong
 1. **The 4 KB vs 8 KB EEPROM Buffer Overflow Risk**:
-   - In [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h#L20-L28), `EEPROM_SIZE` is defined as `8192`.
+   - In [`src/platform/ARIES/target/ARIESV3/target.h`](../../src/platform/ARIES/target/ARIESV3/target.h#L20-L28), `EEPROM_SIZE` is defined as `8192`.
    - Earlier development iterations experimented with `EEPROM_SIZE 4096` to save 4 KB of SRAM.
    - However, in modern Betaflight, active Parameter Groups (PIDs, gyro lowpass/notch filters, mixers, RC rates, failsafe settings) exceed 4,800 bytes.
    - When `EEPROM_SIZE` was 4096, `writeConfigToEEPROM()` threw a buffer size panic (`FAILURE_CONFIG_STORE_FAILURE`), halting execution on startup.

@@ -3,12 +3,12 @@
 This document models the complete entity-relationship knowledge graph for the **ARIES v3.0 (THEJAS32 / VEGA ET1031)** hardware platform based on the official C-DAC datasheets (`ARIESv3 0_Datasheet-4.pdf` and `ARIESv3 0_Datasheet_14-10-24.pdf`).
 
 ### Connected Knowledge Nodes
-* **Master Knowledge Index**: [INDEX.md](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md)
-* **Hardware Datasheet Specs**: [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md)
-* **Silicon & Core Manual**: [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md)
-* **Serial Protocol & Handshake**: [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md)
-* **Subsystem Architecture**: [BETAFLIGHT_ARCHITECTURE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/BETAFLIGHT_ARCHITECTURE_GRAPH.md)
-* **128KB Optimization**: [TARGET_OPTIMIZATION_128KB.md](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md)
+* **Master Knowledge Index**: [INDEX.md](INDEX.md)
+* **Hardware Datasheet Specs**: [ARIES_V3_DATASHEET_ANALYSIS.md](ARIES_V3_DATASHEET_ANALYSIS.md)
+* **Silicon & Core Manual**: [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md)
+* **Serial Protocol & Handshake**: [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md)
+* **Subsystem Architecture**: [BETAFLIGHT_ARCHITECTURE_GRAPH.md](BETAFLIGHT_ARCHITECTURE_GRAPH.md)
+* **128KB Optimization**: [TARGET_OPTIMIZATION_128KB.md](TARGET_OPTIMIZATION_128KB.md)
 
 ---
 

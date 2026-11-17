@@ -1,11 +1,11 @@
 # Porting Component Knowledge Node: GPIO & Pin IO Abstraction
 **Component ID**: `PORT-COMP-04`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/08_STM32_IO_IMPL.md) (Multi-bank GPIOA–I abstraction & popcount memory compression)
-* [19_ESP32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/19_ESP32_IO_IMPL.md) (Single flat GPIO port & $O(1)$ direct array index)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (Flat 32-bit GPIO controller at `0x10000000`)
-* [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md) (Physical pinout: `GPIO0`–`GPIO31`)
+* [08_STM32_IO_IMPL.md](../../logs/hardware_inspection/08_STM32_IO_IMPL.md) (Multi-bank GPIOA–I abstraction & popcount memory compression)
+* [19_ESP32_IO_IMPL.md](../../logs/hardware_inspection/19_ESP32_IO_IMPL.md) (Single flat GPIO port & $O(1)$ direct array index)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (Flat 32-bit GPIO controller at `0x10000000`)
+* [ARIES_V3_DATASHEET_ANALYSIS.md](../ARIES_V3_DATASHEET_ANALYSIS.md) (Physical pinout: `GPIO0`–`GPIO31`)
 
 ---
 
@@ -49,7 +49,7 @@ graph TD
 
 ## 2. Hardware Comparison: STM32 vs. ESP32 vs. THEJAS32
 
-Backed directly by [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/08_STM32_IO_IMPL.md) and [19_ESP32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/19_ESP32_IO_IMPL.md):
+Backed directly by [08_STM32_IO_IMPL.md](../../logs/hardware_inspection/08_STM32_IO_IMPL.md) and [19_ESP32_IO_IMPL.md](../../logs/hardware_inspection/19_ESP32_IO_IMPL.md):
 
 | Feature | STM32 (`08_STM32_IO_IMPL.md`) | ESP32 (`19_ESP32_IO_IMPL.md`) | THEJAS32 / ARIES v3.0 |
 | :--- | :--- | :--- | :--- |
@@ -64,7 +64,7 @@ Backed directly by [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/lo
 
 ### Failure Mode 1: Memory Bloat from Multi-Port Tables (STM32)
 * **The Bug**: An naive pin descriptor array across 9 STM32 ports $\times 16$ pins would require $144 \times 8 = 1{,}152$ bytes of RAM, even though a 48-pin chip physically exposes fewer than 36 pins.
-* **Overcome By**: From [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/08_STM32_IO_IMPL.md), STM32 generated sparse compile-time bitmasks and used `popcount` to compress indices:
+* **Overcome By**: From [08_STM32_IO_IMPL.md](../../logs/hardware_inspection/08_STM32_IO_IMPL.md), STM32 generated sparse compile-time bitmasks and used `popcount` to compress indices:
   ```c
   int offset = popcount(((1 << pinIdx) - 1) & ioDefUsedMask[portIdx]) + ioDefUsedOffset[portIdx];
   return ioRecs + offset;
@@ -73,7 +73,7 @@ Backed directly by [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/lo
 
 ### Failure Mode 2: Multi-Letter Pin Tag Confusion
 * **The Bug**: Betaflight configuration strings (`ioTag_t`) in STM32 use packed port+pin bitfields (e.g. `DEFIO_TAG_E(PA10)`). Drivers porting from STM32 often crash when assuming `portIdx` is non-zero.
-* **ARIES v3.0 Resolution**: Adopt the clean ESP32 pin tagging pattern ([19_ESP32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/19_ESP32_IO_IMPL.md)):
+* **ARIES v3.0 Resolution**: Adopt the clean ESP32 pin tagging pattern ([19_ESP32_IO_IMPL.md](../../logs/hardware_inspection/19_ESP32_IO_IMPL.md)):
   ```c
   // Direct 1-based pin tagging: Tag 1 = GPIO0, Tag 32 = GPIO31
   #define DEFIO_TAG_MAKE(pin) ((ioTag_t)((pin) + 1))

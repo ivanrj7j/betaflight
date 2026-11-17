@@ -1,10 +1,10 @@
 # Code Critique: `src/platform/ARIES/exti_aries.c` vs `lib/vega-sdk/vega-sdk/bsp/`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/exti_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/exti_aries.c)
+- **Source File**: [`src/platform/ARIES/exti_aries.c`](../../src/platform/ARIES/exti_aries.c)
 - **Reference Files**:
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c)
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c)
 - **Component**: External Interrupt driver (EXTI), mapping GPIO Bank 0 (IRQ 10) and Bank 1 (IRQ 11) to Betaflight callback handlers (IMU DRDY, RX sync).
 
 ---

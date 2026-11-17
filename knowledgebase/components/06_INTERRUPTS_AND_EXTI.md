@@ -1,12 +1,12 @@
 # Porting Component Knowledge Node: Interrupt Controller & EXTI Subsystem
 **Component ID**: `PORT-COMP-06`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/08_STM32_IO_IMPL.md) (Rigid SYSCFG EXTI multiplexing constraints)
-* [16_SCHEDULER_CORE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/16_SCHEDULER_CORE.md) (Gyro EXTI data-ready synchronization with `TASK_GYROPID`)
-* [20_ESP32_INTERRUPT_MODEL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/20_ESP32_INTERRUPT_MODEL.md) (Dynamic peripheral interrupt routing table)
-* [24_ESP32_DMA_AND_EXTI.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md) (Centralized GPIO ISR dispatch using `__builtin_ctz()`)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (PLIC architecture at `0x0C000000`)
+* [08_STM32_IO_IMPL.md](../../logs/hardware_inspection/08_STM32_IO_IMPL.md) (Rigid SYSCFG EXTI multiplexing constraints)
+* [16_SCHEDULER_CORE.md](../../logs/hardware_inspection/16_SCHEDULER_CORE.md) (Gyro EXTI data-ready synchronization with `TASK_GYROPID`)
+* [20_ESP32_INTERRUPT_MODEL.md](../../logs/hardware_inspection/20_ESP32_INTERRUPT_MODEL.md) (Dynamic peripheral interrupt routing table)
+* [24_ESP32_DMA_AND_EXTI.md](../../logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md) (Centralized GPIO ISR dispatch using `__builtin_ctz()`)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (PLIC architecture at `0x0C000000`)
 
 ---
 
@@ -61,7 +61,7 @@ graph TD
 
 ## 2. Hardware Comparison: STM32 vs. ESP32 vs. THEJAS32
 
-Backed directly by [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/08_STM32_IO_IMPL.md), [20_ESP32_INTERRUPT_MODEL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/20_ESP32_INTERRUPT_MODEL.md), and [24_ESP32_DMA_AND_EXTI.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md):
+Backed directly by [08_STM32_IO_IMPL.md](../../logs/hardware_inspection/08_STM32_IO_IMPL.md), [20_ESP32_INTERRUPT_MODEL.md](../../logs/hardware_inspection/20_ESP32_INTERRUPT_MODEL.md), and [24_ESP32_DMA_AND_EXTI.md](../../logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md):
 
 | Feature | STM32 (`08_STM32_...`) | ESP32 (`20_...`, `24_...`) | THEJAS32 / ARIES v3.0 |
 | :--- | :--- | :--- | :--- |
@@ -80,7 +80,7 @@ Backed directly by [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/lo
 
 ### Failure Mode 2: Missing Back-to-Back Edges in Centralized GPIO ISR
 * **The Bug**: When routing multiple pin interrupts through a single shared interrupt line, if two pins toggle in rapid succession, a naive `if/else` ladder may service the first pin and exit, leaving the second pin's interrupt pending or dropped.
-* **Overcome By**: From [24_ESP32_DMA_AND_EXTI.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md), the driver scans the status word in a tight loop using compiler intrinsics:
+* **Overcome By**: From [24_ESP32_DMA_AND_EXTI.md](../../logs/hardware_inspection/24_ESP32_DMA_AND_EXTI.md), the driver scans the status word in a tight loop using compiler intrinsics:
   ```c
   while (status) {
       uint32_t pin = __builtin_ctz(status);
@@ -95,7 +95,7 @@ Backed directly by [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/lo
 
 ## 4. PLIC Register Architecture for THEJAS32
 
-Backed directly by [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md):
+Backed directly by [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md):
 
 * **PLIC Base Address**: `0x0C000000`
 * **Priority Registers**: `0x0C000000 + (4 * Source_ID)` (Value `1` to `7`, higher = higher priority)

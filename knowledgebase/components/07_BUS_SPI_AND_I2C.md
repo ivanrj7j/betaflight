@@ -1,11 +1,11 @@
 # Porting Component Knowledge Node: Bus Peripherals (SPI & I2C)
 **Component ID**: `PORT-COMP-07`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [10_STM32_BUS_SPI_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/10_STM32_BUS_SPI_HW.md) (Cortex-M7 L1 D-Cache invalidation & DMA2 Errata 2.1.10)
-* [21_ESP32_BUS_SPI_I2C.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md) (GDMA word alignment bounce buffers & 64-byte polled bypass)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (SPI0–SPI3 and I2C0–I2C2 controllers)
-* [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md) (SPI0 onboard flash `U5`, SPI3 on `J4`, I2C2 on `U9`)
+* [10_STM32_BUS_SPI_HW.md](../../logs/hardware_inspection/10_STM32_BUS_SPI_HW.md) (Cortex-M7 L1 D-Cache invalidation & DMA2 Errata 2.1.10)
+* [21_ESP32_BUS_SPI_I2C.md](../../logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md) (GDMA word alignment bounce buffers & 64-byte polled bypass)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (SPI0–SPI3 and I2C0–I2C2 controllers)
+* [ARIES_V3_DATASHEET_ANALYSIS.md](../ARIES_V3_DATASHEET_ANALYSIS.md) (SPI0 onboard flash `U5`, SPI3 on `J4`, I2C2 on `U9`)
 
 ---
 
@@ -48,7 +48,7 @@ graph TD
 
 ## 2. Hardware Comparison: STM32 vs. ESP32 vs. THEJAS32
 
-Backed directly by [10_STM32_BUS_SPI_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/10_STM32_BUS_SPI_HW.md) and [21_ESP32_BUS_SPI_I2C.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md):
+Backed directly by [10_STM32_BUS_SPI_HW.md](../../logs/hardware_inspection/10_STM32_BUS_SPI_HW.md) and [21_ESP32_BUS_SPI_I2C.md](../../logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md):
 
 | Feature | STM32 (`10_STM32_BUS_SPI_HW.md`) | ESP32 (`21_ESP32_BUS_SPI_I2C.md`) | THEJAS32 / ARIES v3.0 |
 | :--- | :--- | :--- | :--- |
@@ -63,7 +63,7 @@ Backed directly by [10_STM32_BUS_SPI_HW.md](file:///home/ivan/Desktop/betaflight
 
 ### Failure Mode 1: L1 Data Cache Invalidation Corruption (STM32 Cortex-M7)
 * **The Bug**: On STM32H7, when SPI DMA writes incoming gyro samples into SRAM, the CPU L1 Data Cache does not know RAM changed. If the CPU subsequently reads the buffer, it reads stale cache lines, causing severe gyro packet corruption and violent flyaways.
-* **Overcome By**: From [10_STM32_BUS_SPI_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/10_STM32_BUS_SPI_HW.md), STM32 forces cache invalidation across cache-line boundaries in `spiRxIrqHandler()`:
+* **Overcome By**: From [10_STM32_BUS_SPI_HW.md](../../logs/hardware_inspection/10_STM32_BUS_SPI_HW.md), STM32 forces cache invalidation across cache-line boundaries in `spiRxIrqHandler()`:
   ```c
   #ifdef __DCACHE_PRESENT
   SCB_InvalidateDCache_by_Addr(addr, size);
@@ -73,7 +73,7 @@ Backed directly by [10_STM32_BUS_SPI_HW.md](file:///home/ivan/Desktop/betaflight
 
 ### Failure Mode 2: I2C Slave Bus Latching (SDA Stuck Low)
 * **The Bug**: If the flight controller reboots mid-transaction while an external I2C slave (such as the `U9` ADC or a magnetometer) is holding the SDA line low during a read ACK, the hardware I2C master sees a permanently busy bus and deadlocks.
-* **Overcome By**: From [21_ESP32_BUS_SPI_I2C.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md), implemented `i2cRecover()`:
+* **Overcome By**: From [21_ESP32_BUS_SPI_I2C.md](../../logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md), implemented `i2cRecover()`:
   * Disconnects the I2C peripheral from pins.
   * Toggles SCL manually 9 times to clock out stuck slave bits.
   * Sends a software STOP condition (SCL high while SDA transitions from low to high).

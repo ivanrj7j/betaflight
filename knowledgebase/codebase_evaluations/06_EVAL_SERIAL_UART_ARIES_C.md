@@ -1,9 +1,9 @@
 # Knowledge Evaluation Node: `src/platform/ARIES/serial_uart_aries.c`
-**Evaluated Log**: [`logs/code_critique/06_SERIAL_UART_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/06_SERIAL_UART_ARIES_C.md)  
-**Target Code**: [`src/platform/ARIES/serial_uart_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c)  
+**Evaluated Log**: [`logs/code_critique/06_SERIAL_UART_ARIES_C.md`](../../logs/code_critique/06_SERIAL_UART_ARIES_C.md)  
+**Target Code**: [`src/platform/ARIES/serial_uart_aries.c`](../../src/platform/ARIES/serial_uart_aries.c)  
 **Reference Code**:
-- [`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c)
-- [`lib/vega-sdk/vega-sdk/bsp/include/uart.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/uart.h)  
+- [`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c)
+- [`lib/vega-sdk/vega-sdk/bsp/include/uart.h`](../../lib/vega-sdk/vega-sdk/bsp/include/uart.h)  
 **Component**: Hardware UART Driver, 16550 Divisor Calculations, Ring Buffer Management, Bounded Synchronous TX Draining, RX Interrupt Servicing.
 
 ---
@@ -17,11 +17,11 @@
 
 | Decision / Action Taken | Score (0-10) | Category | Technical Analysis & Rationale | References |
 | :--- | :---: | :---: | :--- | :--- |
-| **Enforcing RX-Only Interrupts (`UART_IE = 0x01`)** | **9.5 / 10** | **Brilliant** | Eliminates 16550 level-triggered THRE interrupt storms. When the TX FIFO is empty, keeping bit 1 cleared prevents continuous interrupt firing while the CPU is executing other tasks. | [`serial_uart_aries.c#L153-L157`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c#L153-L157) |
-| **Enabling 16-Byte Hardware FIFOs (`FCR = 0x07` / `0x01`)** | **9.2 / 10** | **Brilliant** | C-DAC reference `uart.c` left FIFOs disabled (`FCR = 0x00`). Enabling 16-byte hardware FIFOs prevents byte drops when high-priority tasks (e.g. gyro reading) delay the UART ISR. | [`serial_uart_aries.c#L127`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c#L127) vs [`uart.c#L104`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c#L104) |
-| **Precise Baud Rate Divisor Formula** | **9.0 / 10** | **Good** | Using `SystemCoreClock / (baudRate * 16)` yields divisor 54 for 115200 baud (+0.47% error) and divisor 15 for 420000 baud (-0.79% error), perfectly matching standard serial tolerances. | [`serial_uart_aries.c#L113-L116`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c#L113-L116) vs [`uart.c#L66`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c#L66) |
-| **Unbounded Synchronous TX Draining** | **4.0 / 10** | **Flawed** | Draining the entire software TX buffer in a synchronous `while` loop at 115200 baud ($86.8\,\mu\text{s}$/byte) causes large MSP telemetry packets to stall the CPU for $> 10\text{ ms}$, exceeding the 1.0 kHz flight loop deadline. | [`serial_uart_aries.c#L175-L181`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c#L175-L181) |
-| **Missing Ring Buffer Overflow Protection in RX ISR** | **5.0 / 10** | **Mediocre** | Advancing `s->port.rxBufferHead` without verifying that it has not caught up to `s->port.rxBufferTail` allowed high-speed RX traffic to corrupt the unread byte queue. | [`serial_uart_aries.c#L206`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c#L206) |
+| **Enforcing RX-Only Interrupts (`UART_IE = 0x01`)** | **9.5 / 10** | **Brilliant** | Eliminates 16550 level-triggered THRE interrupt storms. When the TX FIFO is empty, keeping bit 1 cleared prevents continuous interrupt firing while the CPU is executing other tasks. | [`serial_uart_aries.c#L153-L157`](../../src/platform/ARIES/serial_uart_aries.c#L153-L157) |
+| **Enabling 16-Byte Hardware FIFOs (`FCR = 0x07` / `0x01`)** | **9.2 / 10** | **Brilliant** | C-DAC reference `uart.c` left FIFOs disabled (`FCR = 0x00`). Enabling 16-byte hardware FIFOs prevents byte drops when high-priority tasks (e.g. gyro reading) delay the UART ISR. | [`serial_uart_aries.c#L127`](../../src/platform/ARIES/serial_uart_aries.c#L127) vs [`uart.c#L104`](../../lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c#L104) |
+| **Precise Baud Rate Divisor Formula** | **9.0 / 10** | **Good** | Using `SystemCoreClock / (baudRate * 16)` yields divisor 54 for 115200 baud (+0.47% error) and divisor 15 for 420000 baud (-0.79% error), perfectly matching standard serial tolerances. | [`serial_uart_aries.c#L113-L116`](../../src/platform/ARIES/serial_uart_aries.c#L113-L116) vs [`uart.c#L66`](../../lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c#L66) |
+| **Unbounded Synchronous TX Draining** | **4.0 / 10** | **Flawed** | Draining the entire software TX buffer in a synchronous `while` loop at 115200 baud ($86.8\,\mu\text{s}$/byte) causes large MSP telemetry packets to stall the CPU for $> 10\text{ ms}$, exceeding the 1.0 kHz flight loop deadline. | [`serial_uart_aries.c#L175-L181`](../../src/platform/ARIES/serial_uart_aries.c#L175-L181) |
+| **Missing Ring Buffer Overflow Protection in RX ISR** | **5.0 / 10** | **Mediocre** | Advancing `s->port.rxBufferHead` without verifying that it has not caught up to `s->port.rxBufferTail` allowed high-speed RX traffic to corrupt the unread byte queue. | [`serial_uart_aries.c#L206`](../../src/platform/ARIES/serial_uart_aries.c#L206) |
 
 ---
 

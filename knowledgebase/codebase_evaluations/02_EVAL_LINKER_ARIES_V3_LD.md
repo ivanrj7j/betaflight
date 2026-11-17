@@ -1,9 +1,9 @@
 # Knowledge Evaluation Node: `src/platform/ARIES/link/aries_v3.ld`
-**Evaluated Log**: [`logs/code_critique/02_LINKER_ARIES_V3_LD.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/02_LINKER_ARIES_V3_LD.md)  
-**Target Code**: [`src/platform/ARIES/link/aries_v3.ld`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld)  
+**Evaluated Log**: [`logs/code_critique/02_LINKER_ARIES_V3_LD.md`](../../logs/code_critique/02_LINKER_ARIES_V3_LD.md)  
+**Target Code**: [`src/platform/ARIES/link/aries_v3.ld`](../../src/platform/ARIES/link/aries_v3.ld)  
 **Reference Code**:
-- [`lib/vega-bsp/thejas32/link1.lds`](file:///home/ivan/Desktop/betaflight/lib/vega-bsp/thejas32/link1.lds) (Official C-DAC RAM Linker Script)
-- [`lib/vega-sdk/vega-sdk/bsp/common/mbl.lds`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/mbl.lds)  
+- [`lib/vega-bsp/thejas32/link1.lds`](../../lib/vega-bsp/thejas32/link1.lds) (Official C-DAC RAM Linker Script)
+- [`lib/vega-sdk/vega-sdk/bsp/common/mbl.lds`](../../lib/vega-sdk/vega-sdk/bsp/common/mbl.lds)  
 **Component**: Linker Script, Memory Mapping, Section Layout, Stack Allocation, Size Assertions.
 
 ---
@@ -17,12 +17,12 @@
 
 | Decision / Action Taken | Score (0-10) | Category | Technical Analysis & Rationale | References |
 | :--- | :---: | :---: | :--- | :--- |
-| **Enforcing 248 KB Limit (`LENGTH = 248K`) & Linker Assertion** | **9.8 / 10** | **Masterpiece** | C-DAC reference `link1.lds` set `LENGTH = 256K`, ignoring that the first 8 KB is used by the ROM bootloader. Defining `LENGTH = 248K` and adding `ASSERT(_end <= ...)` guarantees the binary cannot silently overflow physical SRAM. | [`aries_v3.ld#L6-L78`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld#L6-L78) vs [`link1.lds#L7`](file:///home/ivan/Desktop/betaflight/lib/vega-bsp/thejas32/link1.lds#L7) |
-| **Origin Placement at `0x00202000`** | **9.5 / 10** | **Brilliant** | Matches the exact bootloader jump target of the on-chip ROM, ensuring instant firmware execution without a secondary stage bootloader. | [`aries_v3.ld#L6`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld#L6) |
-| **Explicit Parameter Group Linker Sections (`.pg_registry`, `.pg_resetdata`)** | **9.0 / 10** | **Brilliant** | Preserving `__pg_registry_start/end` and `__pg_resetdata_start/end` with `KEEP()` and `SORT()` is strictly required for Betaflight's configuration system to discover settings structures. | [`aries_v3.ld#L29-L43`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld#L29-L43) |
-| **8 KB Dedicated Stack (`.stack` section)** | **8.5 / 10** | **Good** | Reserving `_sstack` to `_estack` (0x2000 bytes, 16-byte aligned) provides verified headroom for deep nested interrupts (Timer 0, Timer 1, UART RX). | [`aries_v3.ld#L66-L71`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld#L66-L71) |
-| **Placing Standalone `.init` Before `.text.startup`** | **3.0 / 10** | **Flawed** | Having `.init` defined before `.text` means if any library defines a `.init` section, it will be placed at `0x00202000` ahead of `_start` (`.text.startup`), causing the core to execute wrong code on boot. | [`aries_v3.ld#L13-L20`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld#L13-L20) |
-| **Folding `.rodata` Directly into `.text`** | **6.0 / 10** | **Mediocre** | While functional in RAM, nesting `.rodata` and `.srodata` directly inside `.text` obscures binary analysis by merging constant data into the executable code size metrics. | [`aries_v3.ld#L24-L25`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld#L24-L25) |
+| **Enforcing 248 KB Limit (`LENGTH = 248K`) & Linker Assertion** | **9.8 / 10** | **Masterpiece** | C-DAC reference `link1.lds` set `LENGTH = 256K`, ignoring that the first 8 KB is used by the ROM bootloader. Defining `LENGTH = 248K` and adding `ASSERT(_end <= ...)` guarantees the binary cannot silently overflow physical SRAM. | [`aries_v3.ld#L6-L78`](../../src/platform/ARIES/link/aries_v3.ld#L6-L78) vs [`link1.lds#L7`](../../lib/vega-bsp/thejas32/link1.lds#L7) |
+| **Origin Placement at `0x00202000`** | **9.5 / 10** | **Brilliant** | Matches the exact bootloader jump target of the on-chip ROM, ensuring instant firmware execution without a secondary stage bootloader. | [`aries_v3.ld#L6`](../../src/platform/ARIES/link/aries_v3.ld#L6) |
+| **Explicit Parameter Group Linker Sections (`.pg_registry`, `.pg_resetdata`)** | **9.0 / 10** | **Brilliant** | Preserving `__pg_registry_start/end` and `__pg_resetdata_start/end` with `KEEP()` and `SORT()` is strictly required for Betaflight's configuration system to discover settings structures. | [`aries_v3.ld#L29-L43`](../../src/platform/ARIES/link/aries_v3.ld#L29-L43) |
+| **8 KB Dedicated Stack (`.stack` section)** | **8.5 / 10** | **Good** | Reserving `_sstack` to `_estack` (0x2000 bytes, 16-byte aligned) provides verified headroom for deep nested interrupts (Timer 0, Timer 1, UART RX). | [`aries_v3.ld#L66-L71`](../../src/platform/ARIES/link/aries_v3.ld#L66-L71) |
+| **Placing Standalone `.init` Before `.text.startup`** | **3.0 / 10** | **Flawed** | Having `.init` defined before `.text` means if any library defines a `.init` section, it will be placed at `0x00202000` ahead of `_start` (`.text.startup`), causing the core to execute wrong code on boot. | [`aries_v3.ld#L13-L20`](../../src/platform/ARIES/link/aries_v3.ld#L13-L20) |
+| **Folding `.rodata` Directly into `.text`** | **6.0 / 10** | **Mediocre** | While functional in RAM, nesting `.rodata` and `.srodata` directly inside `.text` obscures binary analysis by merging constant data into the executable code size metrics. | [`aries_v3.ld#L24-L25`](../../src/platform/ARIES/link/aries_v3.ld#L24-L25) |
 
 ---
 

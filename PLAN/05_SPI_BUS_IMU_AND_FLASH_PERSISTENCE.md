@@ -1,13 +1,13 @@
 # Domain Plan 05: SPI Bus, IMU & Flash Persistence
 
 > **Component Plan ID**: `PLAN-DOM-05`  
-> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](file:///home/ivan/Desktop/betaflight/PLAN/00_MASTER_PLAN_OVERVIEW.md)  
+> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](00_MASTER_PLAN_OVERVIEW.md)  
 > **Primary Knowledge References**:
-> - [`knowledgebase/codebase_evaluations/09_EVAL_BUS_SPI_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/09_EVAL_BUS_SPI_ARIES_C.md)
-> - [`knowledgebase/codebase_evaluations/10_EVAL_CONFIG_FLASH_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/10_EVAL_CONFIG_FLASH_ARIES_C.md)
-> - [`knowledgebase/components/07_BUS_SPI_AND_I2C.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/07_BUS_SPI_AND_I2C.md)
-> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
-> - [`lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c)
+> - [`knowledgebase/codebase_evaluations/09_EVAL_BUS_SPI_ARIES_C.md`](../knowledgebase/codebase_evaluations/09_EVAL_BUS_SPI_ARIES_C.md)
+> - [`knowledgebase/codebase_evaluations/10_EVAL_CONFIG_FLASH_ARIES_C.md`](../knowledgebase/codebase_evaluations/10_EVAL_CONFIG_FLASH_ARIES_C.md)
+> - [`knowledgebase/components/07_BUS_SPI_AND_I2C.md`](../knowledgebase/components/07_BUS_SPI_AND_I2C.md)
+> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
+> - [`lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c`](../lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c)
 
 ---
 
@@ -44,7 +44,7 @@ PLAN/05_SPI_BUS_IMU_AND_FLASH_PERSISTENCE.md
 ### Microcomponent 05_A: Polled SPI0 Master Controller & Conservative 12.5 MHz Clock Engine (bus_spi_aries.c)
 
 #### 1. Why (Silicon Necessity & Architectural Traceability)
-* **The 25 MHz Overclocking Flaw**: In earlier code ([`src/platform/ARIES/bus_spi_aries.c#L74-L85`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/bus_spi_aries.c#L74-L85)), setting the SPI clock to $\ge 20\,\text{MHz}$ selected divisor 0, producing a 25.0 MHz SCK on the 100 MHz APB bus. The ICM-42688P specifies an absolute maximum clock rate of 24.0 MHz. Running at 25 MHz degrades signal integrity, inducing SPI CRC corruptions and telemetry glitches.
+* **The 25 MHz Overclocking Flaw**: In earlier code ([`src/platform/ARIES/bus_spi_aries.c#L74-L85`](../src/platform/ARIES/bus_spi_aries.c#L74-L85)), setting the SPI clock to $\ge 20\,\text{MHz}$ selected divisor 0, producing a 25.0 MHz SCK on the 100 MHz APB bus. The ICM-42688P specifies an absolute maximum clock rate of 24.0 MHz. Running at 25 MHz degrades signal integrity, inducing SPI CRC corruptions and telemetry glitches.
 * **Polled Mode Determinism**: The VEGA ET1031 has no general-purpose DMA engine connected to SPI0. Attempting to simulate DMA via interrupts increases context switching latency. Polled register access completes a 14-byte gyro burst in $8.96\,\mu\text{s}$, consuming $< 0.9\%$ of the 1.0 kHz ($1000\,\mu\text{s}$) flight cycle while avoiding complex DMA alignment bounce buffers.
 
 #### 2. How (Detailed Algorithmic & Register Execution)
@@ -195,7 +195,7 @@ PLAN/05_SPI_BUS_IMU_AND_FLASH_PERSISTENCE.md
 
 #### 2. How (Detailed Algorithmic & Memory Implementation)
 1. **Target Header Configuration**:
-   - In [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h):
+   - In [`src/platform/ARIES/target/ARIESV3/target.h`](../src/platform/ARIES/target/ARIESV3/target.h):
      ```c
      #define CONFIG_IN_RAM
      #define EEPROM_SIZE 8192
@@ -227,7 +227,7 @@ PLAN/05_SPI_BUS_IMU_AND_FLASH_PERSISTENCE.md
 
 #### 1. Why (Silicon Necessity & Architectural Traceability)
 * **Cold-Reboot Retention**: While `CONFIG_IN_RAM` persists through warm restarts, powering off the quadcopter erases SRAM. True cold-reboot persistence requires storing parameters in non-volatile SPI flash.
-* **The Proven Solution**: C-DAC's reference implementation in [`lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c) proves how physical SPI flash is accessed on ARIES v3:
+* **The Proven Solution**: C-DAC's reference implementation in [`lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c`](../lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c) proves how physical SPI flash is accessed on ARIES v3:
   - Target controller: `MDP_SPI_3` (`0x10200100`).
   - Chip Select control: `SPI_set_CSAAT_pin(MDP_SPI_3, 1)`.
   - Command byte protocol: JEDEC standard opcodes (`0x03`, `0x02`, `0x20`, `0x06`, `0x05`).

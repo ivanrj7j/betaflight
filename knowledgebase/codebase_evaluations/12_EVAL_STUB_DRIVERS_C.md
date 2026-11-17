@@ -1,12 +1,12 @@
 # Evaluation Node 12: Linker & Subsystem Stub Drivers (`stub_drivers.c`)
 
 ## 1. Executive Summary & File Traceability
-- **Evaluated File**: [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c)
-- **Source Log**: [`logs/code_critique/12_STUB_DRIVERS_C.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/12_STUB_DRIVERS_C.md)
+- **Evaluated File**: [`src/platform/ARIES/stub_drivers.c`](../../src/platform/ARIES/stub_drivers.c)
+- **Source Log**: [`logs/code_critique/12_STUB_DRIVERS_C.md`](../../logs/code_critique/12_STUB_DRIVERS_C.md)
 - **Upstream References**:
-  - [`src/main/drivers/dma.h`](file:///home/ivan/Desktop/betaflight/src/main/drivers/dma.h)
-  - [`src/main/drivers/adc.h`](file:///home/ivan/Desktop/betaflight/src/main/drivers/adc.h)
-  - [`src/main/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/main/target/ARIESV3/target.h)
+  - [`src/main/drivers/dma.h`](../../src/main/drivers/dma.h)
+  - [`src/main/drivers/adc.h`](../../src/main/drivers/adc.h)
+  - [`src/main/target/ARIESV3/target.h`](../../src/main/target/ARIESV3/target.h)
 - **Domain**: Unresolved GCC symbols, atomic built-ins on RV32IM, DMA stubs, ADC voltage fallback, soft reboot persistence.
 
 ---
@@ -27,7 +27,7 @@
 
 ### What Went Wrong
 1. **Interrupt Nesting Clobbered by Atomic Emulation**:
-   - In [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c#L35-L42):
+   - In [`src/platform/ARIES/stub_drivers.c`](../../src/platform/ARIES/stub_drivers.c#L35-L42):
      ```c
      unsigned int __atomic_fetch_add_4(volatile void *ptr, unsigned int val, int memorder) {
          __disable_irq();

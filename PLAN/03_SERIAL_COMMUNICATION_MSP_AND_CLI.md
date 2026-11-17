@@ -1,13 +1,13 @@
 # Domain Plan 03: Serial Communication, MSP & CLI
 
 > **Component Plan ID**: `PLAN-DOM-03`  
-> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](file:///home/ivan/Desktop/betaflight/PLAN/00_MASTER_PLAN_OVERVIEW.md)  
+> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](00_MASTER_PLAN_OVERVIEW.md)  
 > **Primary Knowledge References**:
-> - [`knowledgebase/codebase_evaluations/06_EVAL_SERIAL_UART_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/06_EVAL_SERIAL_UART_ARIES_C.md)
-> - [`knowledgebase/codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)
-> - [`knowledgebase/components/03_SERIAL_UART_AND_MSP.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/03_SERIAL_UART_AND_MSP.md)
-> - [`knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md)
-> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
+> - [`knowledgebase/codebase_evaluations/06_EVAL_SERIAL_UART_ARIES_C.md`](../knowledgebase/codebase_evaluations/06_EVAL_SERIAL_UART_ARIES_C.md)
+> - [`knowledgebase/codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md`](../knowledgebase/codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)
+> - [`knowledgebase/components/03_SERIAL_UART_AND_MSP.md`](../knowledgebase/components/03_SERIAL_UART_AND_MSP.md)
+> - [`knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md`](../knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md)
+> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
 
 ---
 
@@ -99,7 +99,7 @@ PLAN/03_SERIAL_COMMUNICATION_MSP_AND_CLI.md
 
 #### 1. Why (Silicon Necessity & Architectural Traceability)
 * **The 16550 THRE Storm Trap**: Standard 16550 UARTs use level-triggered Transmit Holding Register Empty (`THRE`) interrupts. When the TX buffer is empty, enabling `THRE` interrupts causes the ISR to fire continuously, consuming $100\%$ CPU time and starving flight tasks.
-* **The Blocking Drain Bug**: In [`src/platform/ARIES/serial_uart_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c#L175-L181), earlier code resolved this by disabling TX interrupts and executing a synchronous `while(tail != head)` loop that waited for `LSR_THRE`.
+* **The Blocking Drain Bug**: In [`src/platform/ARIES/serial_uart_aries.c`](../src/platform/ARIES/serial_uart_aries.c#L175-L181), earlier code resolved this by disabling TX interrupts and executing a synchronous `while(tail != head)` loop that waited for `LSR_THRE`.
 * **The Flight Loop Stall**: At 115,200 baud, each serial byte requires $86.8\,\mu\text{s}$. A typical MSP response frame (such as `MSP_BOXIDS` or `MSP_STATUS`) ranges from 100 to 200 bytes. Draining 200 bytes synchronously stalls the CPU for:
   $$200 \times 86.8\,\mu\text{s} = 17.36\text{ ms}$$
   In a 1.0 kHz flight loop ($1000\,\mu\text{s}$ period), an unbuffered 17 ms stall causes 17 dropped PID cycles, triggering failsafe and motor cutoffs.
@@ -231,11 +231,11 @@ PLAN/03_SERIAL_COMMUNICATION_MSP_AND_CLI.md
 
 #### 1. Why (Silicon Necessity & Architectural Traceability)
 * **The CLI Activation Friction**: Standard upstream Betaflight requires three consecutive `#` characters within a 100 ms time window with preceding silence to enter the CLI terminal. From manual serial terminals (e.g. `picocom`, `minicom`, `screen`), users frequently fail to trigger CLI mode.
-* **Codebase Cleanliness**: In previous iterations, upstream files ([`init.c`](file:///home/ivan/Desktop/betaflight/src/main/fc/init.c), [`config.c`](file:///home/ivan/Desktop/betaflight/src/main/config/config.c), [`msp_serial.c`](file:///home/ivan/Desktop/betaflight/src/main/msp/msp_serial.c)) were polluted with `#ifdef THEJAS32` and `THEJAS_LOG` calls, creating upstream merge conflicts and bloat.
+* **Codebase Cleanliness**: In previous iterations, upstream files ([`init.c`](../src/main/fc/init.c), [`config.c`](../src/main/config/config.c), [`msp_serial.c`](../src/main/msp/msp_serial.c)) were polluted with `#ifdef THEJAS32` and `THEJAS_LOG` calls, creating upstream merge conflicts and bloat.
 
 #### 2. How (Detailed Algorithmic & Code Architecture)
 1. **Immediate CLI Activation on Enter (`\r` / `\n`) or `#`**:
-   - In [`src/main/msp/msp_serial.c`](file:///home/ivan/Desktop/betaflight/src/main/msp/msp_serial.c):
+   - In [`src/main/msp/msp_serial.c`](../src/main/msp/msp_serial.c):
      ```c
      if (c == '#' || c == '\r' || c == '\n') {
          // Activate CLI immediately without requiring 100ms guard time

@@ -1,8 +1,8 @@
 # Code Critique: `src/platform/ARIES/serial_uart_aries.c` vs `lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/serial_uart_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/serial_uart_aries.c)
-- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c)
+- **Source File**: [`src/platform/ARIES/serial_uart_aries.c`](../../src/platform/ARIES/serial_uart_aries.c)
+- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c)
 - **Component**: 16550 UART hardware driver, baud rate generation, ring buffer integration, RX interrupt servicing, synchronous TX draining.
 
 ---

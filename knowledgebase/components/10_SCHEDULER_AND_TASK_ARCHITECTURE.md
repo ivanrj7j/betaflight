@@ -1,11 +1,11 @@
 # Porting Component Knowledge Node: Cooperative Scheduler & Task Architecture
 **Component ID**: `PORT-COMP-10`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [14_MAIN_STARTUP_FLOW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/14_MAIN_STARTUP_FLOW.md) (Phased boot sequence: `initPhase1` through `initPhase3`)
-* [15_MSP_SERIAL_PARSER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/15_MSP_SERIAL_PARSER.md) (Zero-allocation heapless MSP state machine)
-* [16_SCHEDULER_CORE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/16_SCHEDULER_CORE.md) (Cooperative multitasking & `TASK_SERIAL` non-blocking guarantee)
-* [BETAFLIGHT_ARCHITECTURE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/BETAFLIGHT_ARCHITECTURE_GRAPH.md) (Subsystems & Task loop)
+* [14_MAIN_STARTUP_FLOW.md](../../logs/hardware_inspection/14_MAIN_STARTUP_FLOW.md) (Phased boot sequence: `initPhase1` through `initPhase3`)
+* [15_MSP_SERIAL_PARSER.md](../../logs/hardware_inspection/15_MSP_SERIAL_PARSER.md) (Zero-allocation heapless MSP state machine)
+* [16_SCHEDULER_CORE.md](../../logs/hardware_inspection/16_SCHEDULER_CORE.md) (Cooperative multitasking & `TASK_SERIAL` non-blocking guarantee)
+* [BETAFLIGHT_ARCHITECTURE_GRAPH.md](../BETAFLIGHT_ARCHITECTURE_GRAPH.md) (Subsystems & Task loop)
 
 ---
 
@@ -54,7 +54,7 @@ graph TD
 
 ## 2. Hardware Comparison: RTOS vs. Betaflight Cooperative Scheduler
 
-Backed directly by [14_MAIN_STARTUP_FLOW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/14_MAIN_STARTUP_FLOW.md) and [16_SCHEDULER_CORE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/16_SCHEDULER_CORE.md):
+Backed directly by [14_MAIN_STARTUP_FLOW.md](../../logs/hardware_inspection/14_MAIN_STARTUP_FLOW.md) and [16_SCHEDULER_CORE.md](../../logs/hardware_inspection/16_SCHEDULER_CORE.md):
 
 | Feature | Standard RTOS (e.g. FreeRTOS on ESP32) | Betaflight Cooperative Scheduler | ARIES v3.0 Advantages |
 | :--- | :--- | :--- | :--- |
@@ -69,7 +69,7 @@ Backed directly by [14_MAIN_STARTUP_FLOW.md](file:///home/ivan/Desktop/betafligh
 
 ### Failure Mode 1: Serial Driver Starvation / Blocking
 * **The Bug**: If `TASK_SERIAL` enters a blocking `while()` loop waiting for a full MSP command frame to arrive over UART, it stalls the scheduler, preventing `TASK_GYROPID` from running and causing motor pulse jitter.
-* **Overcome By**: From [15_MSP_SERIAL_PARSER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/15_MSP_SERIAL_PARSER.md) and [16_SCHEDULER_CORE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/16_SCHEDULER_CORE.md), the serial parser is implemented as a **zero-allocation finite state machine**:
+* **Overcome By**: From [15_MSP_SERIAL_PARSER.md](../../logs/hardware_inspection/15_MSP_SERIAL_PARSER.md) and [16_SCHEDULER_CORE.md](../../logs/hardware_inspection/16_SCHEDULER_CORE.md), the serial parser is implemented as a **zero-allocation finite state machine**:
   ```c
   void mspSerialProcess(void) {
       while (uart0_is_data_available()) {
@@ -85,7 +85,7 @@ Backed directly by [14_MAIN_STARTUP_FLOW.md](file:///home/ivan/Desktop/betafligh
 
 ### Failure Mode 2: Premature Subsystem Access During Boot
 * **The Bug**: Accessing peripheral drivers (e.g. writing to motor PWM or reading SPI flash) before their underlying clocks and GPIO pins are configured results in bus faults.
-* **Overcome By**: The strictly partitioned 3-phase boot sequence in [14_MAIN_STARTUP_FLOW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/14_MAIN_STARTUP_FLOW.md):
+* **Overcome By**: The strictly partitioned 3-phase boot sequence in [14_MAIN_STARTUP_FLOW.md](../../logs/hardware_inspection/14_MAIN_STARTUP_FLOW.md):
   1. `initPhase1`: Clocks, UART0, Parameter Groups. (Configurator can now connect!)
   2. `initPhase2`: Bus peripherals (SPI, I2C), PWM Motor controllers.
   3. `initPhase3`: Battery monitoring, sensor calibrations, arming checks, scheduler start.

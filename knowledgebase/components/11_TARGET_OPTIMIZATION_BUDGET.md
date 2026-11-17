@@ -1,11 +1,11 @@
 # Porting Component Knowledge Node: Target Optimization & 128KB Memory Budget
 **Component ID**: `PORT-COMP-11`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [TARGET_OPTIMIZATION_128KB.md](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md) (Target optimization strategy under 128 KB)
-* [13_STM32_BUILD_MAKEFILE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md) (Multi-tier optimization `-O3` vs `-Os` & modular stripping)
-* [25_ESP32_BUILD_AND_LINKER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md) (`dma_stub` mechanics & RISC-V sizing)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (250 KB internal SRAM constraint)
+* [TARGET_OPTIMIZATION_128KB.md](../TARGET_OPTIMIZATION_128KB.md) (Target optimization strategy under 128 KB)
+* [13_STM32_BUILD_MAKEFILE.md](../../logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md) (Multi-tier optimization `-O3` vs `-Os` & modular stripping)
+* [25_ESP32_BUILD_AND_LINKER.md](../../logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md) (`dma_stub` mechanics & RISC-V sizing)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (250 KB internal SRAM constraint)
 
 ---
 
@@ -29,7 +29,7 @@ The primary objective for the initial ARIES v3.0 port is compiling a fully modul
 
 ## 2. Modular Feature Stripping Breakdown
 
-Backed directly by [TARGET_OPTIMIZATION_128KB.md](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md) and [13_STM32_BUILD_MAKEFILE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md):
+Backed directly by [TARGET_OPTIMIZATION_128KB.md](../TARGET_OPTIMIZATION_128KB.md) and [13_STM32_BUILD_MAKEFILE.md](../../logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md):
 
 | Excluded Feature / Subsystem | Configuration Macro Omitted | Flash/Code Savings | Rationale & Architectural Alternative |
 | :--- | :--- | :---: | :--- |

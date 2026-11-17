@@ -1,7 +1,7 @@
 # Code Critique: `src/platform/ARIES/stub_drivers.c`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/stub_drivers.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c)
+- **Source File**: [`src/platform/ARIES/stub_drivers.c`](../../src/platform/ARIES/stub_drivers.c)
 - **Component**: Linker stubs, non-atomic CPU emulation (`__atomic_fetch_add_4`), DMA stubs, unused timer APIs, ADC fallback, persistent object RAM storage.
 
 ---

@@ -1,8 +1,8 @@
 # Code Critique: `src/platform/ARIES/config_flash_aries.c` vs `lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/config_flash_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/config_flash_aries.c)
-- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h)
+- **Source File**: [`src/platform/ARIES/config_flash_aries.c`](../../src/platform/ARIES/config_flash_aries.c)
+- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h`](../../lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h)
 - **Component**: Parameter Group non-volatile persistence, Winbond W25Q128 / Micron M25P80 SPI NOR flash commands, sector erase (0x20), page program (0x02), status register polling (0x05).
 
 ---

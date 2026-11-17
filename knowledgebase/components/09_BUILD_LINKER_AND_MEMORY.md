@@ -1,12 +1,12 @@
 # Porting Component Knowledge Node: Build System, Linker Script & Memory Architecture
 **Component ID**: `PORT-COMP-09`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [12_STM32_LINKER_AND_SECTIONS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md) (Uneven Flash sector splitting & hot reboot flag reservation)
-* [13_STM32_BUILD_MAKEFILE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md) (Optimization tiers & native USB middleware savings)
-* [25_ESP32_BUILD_AND_LINKER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md) (RISC-V 32-bit RV32IM flags, PG anchors & single-allocator RAM)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (250 KB internal SRAM at `0x00200000`)
-* [TARGET_OPTIMIZATION_128KB.md](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md) (Target sizing strategy under 128 KB)
+* [12_STM32_LINKER_AND_SECTIONS.md](../../logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md) (Uneven Flash sector splitting & hot reboot flag reservation)
+* [13_STM32_BUILD_MAKEFILE.md](../../logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md) (Optimization tiers & native USB middleware savings)
+* [25_ESP32_BUILD_AND_LINKER.md](../../logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md) (RISC-V 32-bit RV32IM flags, PG anchors & single-allocator RAM)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (250 KB internal SRAM at `0x00200000`)
+* [TARGET_OPTIMIZATION_128KB.md](../TARGET_OPTIMIZATION_128KB.md) (Target sizing strategy under 128 KB)
 
 ---
 
@@ -61,7 +61,7 @@ graph TD
 
 ## 2. Hardware Comparison: STM32 vs. ESP32 vs. THEJAS32
 
-Backed directly by [12_STM32_LINKER_AND_SECTIONS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md) and [25_ESP32_BUILD_AND_LINKER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md):
+Backed directly by [12_STM32_LINKER_AND_SECTIONS.md](../../logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md) and [25_ESP32_BUILD_AND_LINKER.md](../../logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md):
 
 | Feature | STM32 (`12_STM32_...`, `13_STM32_...`) | ESP32-C5 (`25_ESP32_BUILD_AND_LINKER.md`) | THEJAS32 / ARIES v3.0 |
 | :--- | :--- | :--- | :--- |
@@ -77,7 +77,7 @@ Backed directly by [12_STM32_LINKER_AND_SECTIONS.md](file:///home/ivan/Desktop/b
 
 ### Failure Mode 1: The Missing `.pg_registry` Linker Anchor Crash
 * **The Bug**: Betaflight uses distributed macros (`PG_REGISTER`) to register configuration objects into a special linker section (`.pg_registry`). If the linker script does not declare `__pg_registry_start` and `__pg_registry_end`, or if the linker strips them during garbage collection (`--gc-sections`), `pgResetAll()` iterates over invalid pointers and crashes the MCU during the very first boot loop!
-* **Overcome By**: From [25_ESP32_BUILD_AND_LINKER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md), explicit `KEEP()` guards and boundary symbols are defined:
+* **Overcome By**: From [25_ESP32_BUILD_AND_LINKER.md](../../logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md), explicit `KEEP()` guards and boundary symbols are defined:
   ```ld
   .pg_registry : {
       PROVIDE_HIDDEN (__pg_registry_start = .);
@@ -90,7 +90,7 @@ Backed directly by [12_STM32_LINKER_AND_SECTIONS.md](file:///home/ivan/Desktop/b
 
 ### Failure Mode 2: Dual IRAM/DRAM Overlap Memory Corruption
 * **The Bug**: On Harvard-architecture SoCs, internal SRAM can be accessed via an instruction bus port and a data bus port. If a linker script declares two overlapping memory segments at the same physical address (e.g. `iram (RX)` and `dram (RW)`), the linker assigns identical addresses to code and variables, causing variables to overwrite executable functions!
-* **Overcome By**: From [25_ESP32_BUILD_AND_LINKER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md), declared a **single unified allocator**:
+* **Overcome By**: From [25_ESP32_BUILD_AND_LINKER.md](../../logs/hardware_inspection/25_ESP32_BUILD_AND_LINKER.md), declared a **single unified allocator**:
   ```ld
   RAM (RWX) : org = 0x00200000, len = 250K
   ```

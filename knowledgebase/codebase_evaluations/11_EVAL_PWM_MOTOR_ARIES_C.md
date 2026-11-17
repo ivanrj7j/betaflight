@@ -1,11 +1,11 @@
 # Evaluation Node 11: Multi-Channel PWM Motor Driver (`pwm_motor_aries.c`)
 
 ## 1. Executive Summary & File Traceability
-- **Evaluated File**: [`src/platform/ARIES/pwm_motor_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/pwm_motor_aries.c)
-- **Source Log**: [`logs/code_critique/11_PWM_MOTOR_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/11_PWM_MOTOR_ARIES_C.md)
+- **Evaluated File**: [`src/platform/ARIES/pwm_motor_aries.c`](../../src/platform/ARIES/pwm_motor_aries.c)
+- **Source Log**: [`logs/code_critique/11_PWM_MOTOR_ARIES_C.md`](../../logs/code_critique/11_PWM_MOTOR_ARIES_C.md)
 - **Upstream References**:
-  - [`src/main/drivers/pwm_output.h`](file:///home/ivan/Desktop/betaflight/src/main/drivers/pwm_output.h)
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)
+  - [`src/main/drivers/pwm_output.h`](../../src/main/drivers/pwm_output.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)
 - **Domain**: 4-channel ESC pulse generation (Standard PWM & OneShot125), Synopsys DW_apb_timers IP, non-blocking ascending deadline scheduler.
 
 ---
@@ -26,7 +26,7 @@
 
 ### What Went Wrong
 1. **Timer 1 Race Window during Motor Pulse Initialization**:
-   - In [`src/platform/ARIES/pwm_motor_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/pwm_motor_aries.c#L140-L155):
+   - In [`src/platform/ARIES/pwm_motor_aries.c`](../../src/platform/ARIES/pwm_motor_aries.c#L140-L155):
      ```c
      for (uint8_t i = 0; i < count; i++) {
          IOHi(pwmMotors[sortedMotors[i].index].io);

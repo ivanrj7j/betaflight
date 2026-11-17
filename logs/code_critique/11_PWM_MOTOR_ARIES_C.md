@@ -1,8 +1,8 @@
 # Code Critique: `src/platform/ARIES/pwm_motor_aries.c` vs `lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/pwm_motor_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/pwm_motor_aries.c)
-- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)
+- **Source File**: [`src/platform/ARIES/pwm_motor_aries.c`](../../src/platform/ARIES/pwm_motor_aries.c)
+- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)
 - **Component**: 4-Channel motor PWM scheduler, Standard PWM (400 Hz) & OneShot125 support, Hardware Timer 1 (IRQ 8) non-blocking pulse deadline sequencer.
 
 ---

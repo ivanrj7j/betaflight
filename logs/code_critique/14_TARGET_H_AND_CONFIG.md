@@ -2,8 +2,8 @@
 
 ## 1. File Metadata & Overview
 - **Source Files**:
-  - [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h)
-  - [`src/platform/ARIES/target/ARIESV3/config.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/config.h)
+  - [`src/platform/ARIES/target/ARIESV3/target.h`](../../src/platform/ARIES/target/ARIESV3/target.h)
+  - [`src/platform/ARIES/target/ARIESV3/config.h`](../../src/platform/ARIES/target/ARIESV3/config.h)
 - **Component**: Board identification, hardware pin mapping, feature gatekeeper, soft-float PID loop rate clamping, memory budget controls.
 
 ---

@@ -1,12 +1,12 @@
 # Evaluation Node 10: Non-Volatile Flash Configuration Driver (`config_flash_aries.c`)
 
 ## 1. Executive Summary & File Traceability
-- **Evaluated File**: [`src/platform/ARIES/config_flash_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/config_flash_aries.c)
-- **Source Log**: [`logs/code_critique/10_CONFIG_FLASH_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/10_CONFIG_FLASH_ARIES_C.md)
+- **Evaluated File**: [`src/platform/ARIES/config_flash_aries.c`](../../src/platform/ARIES/config_flash_aries.c)
+- **Source Log**: [`logs/code_critique/10_CONFIG_FLASH_ARIES_C.md`](../../logs/code_critique/10_CONFIG_FLASH_ARIES_C.md)
 - **Upstream References**:
-  - [`src/main/drivers/flash.h`](file:///home/ivan/Desktop/betaflight/src/main/drivers/flash.h)
-  - [`lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h)
-  - [`src/main/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/main/target/ARIESV3/target.h)
+  - [`src/main/drivers/flash.h`](../../src/main/drivers/flash.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h`](../../lib/vega-sdk/vega-sdk/bsp/include/m25p80_eeprom.h)
+  - [`src/main/target/ARIESV3/target.h`](../../src/main/target/ARIESV3/target.h)
 - **Domain**: Parameter Group persistence, JEDEC SPI NOR Flash commands, hardware XIP limitations, `CONFIG_IN_RAM` fallback.
 
 ---
@@ -27,7 +27,7 @@
 
 ### What Went Wrong
 1. **The XIP Illusion and Store Access Fault (`mcause = 7`)**:
-   - In [`src/platform/ARIES/config_flash_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/config_flash_aries.c#L125-L135):
+   - In [`src/platform/ARIES/config_flash_aries.c`](../../src/platform/ARIES/config_flash_aries.c#L125-L135):
      ```c
      // Also update memory-mapped shadow for simulation / immediate coherent reads
      memset((void *)(0x20000000UL + sectorAddr), 0xFF, FLASH_SECTOR_SIZE);

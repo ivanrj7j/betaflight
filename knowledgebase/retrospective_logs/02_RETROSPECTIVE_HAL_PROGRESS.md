@@ -1,6 +1,6 @@
 # Retrospective Log 02: HAL Progress & Hardware Hurdles (H1–H22)
 
-> **Source File:** [`oldfiles/logs/HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/HAL_PROGRESS.md)  
+> **Source File:** [`oldfiles/logs/HAL_PROGRESS.md`](../../oldfiles/logs/HAL_PROGRESS.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RISC-V RV32IM @ 100 MHz, 256 KB SRAM, no XIP Flash)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

@@ -1,12 +1,12 @@
 # Knowledge Evaluation Node: `src/platform/ARIES/include/platform/bsp_thejas32.h`
-**Evaluated Log**: [`logs/code_critique/03_BSP_THEJAS32_H.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/03_BSP_THEJAS32_H.md)  
-**Target Code**: [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h)  
+**Evaluated Log**: [`logs/code_critique/03_BSP_THEJAS32_H.md`](../../logs/code_critique/03_BSP_THEJAS32_H.md)  
+**Target Code**: [`src/platform/ARIES/include/platform/bsp_thejas32.h`](../../src/platform/ARIES/include/platform/bsp_thejas32.h)  
 **Reference Code**:
-- [`lib/vega-sdk/vega-sdk/bsp/include/config.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/config.h)
-- [`lib/vega-sdk/vega-sdk/bsp/include/uart.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/uart.h)
-- [`lib/vega-sdk/vega-sdk/bsp/include/interrupt.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/interrupt.h)
-- [`lib/vega-sdk/vega-sdk/bsp/include/timer.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/timer.h)
-- [`lib/vega-sdk/vega-sdk/bsp/include/spi.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/spi.h)  
+- [`lib/vega-sdk/vega-sdk/bsp/include/config.h`](../../lib/vega-sdk/vega-sdk/bsp/include/config.h)
+- [`lib/vega-sdk/vega-sdk/bsp/include/uart.h`](../../lib/vega-sdk/vega-sdk/bsp/include/uart.h)
+- [`lib/vega-sdk/vega-sdk/bsp/include/interrupt.h`](../../lib/vega-sdk/vega-sdk/bsp/include/interrupt.h)
+- [`lib/vega-sdk/vega-sdk/bsp/include/timer.h`](../../lib/vega-sdk/vega-sdk/bsp/include/timer.h)
+- [`lib/vega-sdk/vega-sdk/bsp/include/spi.h`](../../lib/vega-sdk/vega-sdk/bsp/include/spi.h)  
 **Component**: Peripheral Memory Map, Struct Typings, Interrupt Numbers (IRQ 0–11).
 
 ---
@@ -20,11 +20,11 @@
 
 | Decision / Action Taken | Score (0-10) | Category | Technical Analysis & Rationale | References |
 | :--- | :---: | :---: | :--- | :--- |
-| **Exact Peripheral Base Address & Stride Alignment** | **9.5 / 10** | **Brilliant** | All peripheral base addresses (`UART 0x10000100`, `SPI0 0x10000600`, `SPI2 0x10200100`, `TIMER 0x10000A00`, `GPIO 0x10080000`, `INTR 0x20010000`) perfectly match C-DAC's authoritative hardware memory map. | [`bsp_thejas32.h#L18-L29`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h#L18-L29) vs [`config.h#L19-L24`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/config.h#L19-L24) |
-| **Exact 32-bit THEJAS32 IRQ Number Mapping (0–11)** | **9.5 / 10** | **Brilliant** | Mapping UART0..2 to IRQ 0..2, SPI to IRQ 3..4, Timers to IRQ 7..9, and GPIOs to IRQ 10..11 matches C-DAC's 32-bit hardware interrupt table. | [`bsp_thejas32.h#L43-L56`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h#L43-L56) vs [`interrupt.c#L83-L87`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c#L83-L87) |
-| **Volatile Register Struct Definitions** | **9.0 / 10** | **Good** | Accurately models the register word offsets for 16550 UART, Synopsys APB Timer, and Interrupt Controller, allowing structured pointer access. | [`bsp_thejas32.h#L33-L107`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h#L33-L107) |
-| **Defining `THEJAS32_RAM_BASE` as `0x10000000UL`** | **2.0 / 10** | **Stupid** | `0x10000000` is peripheral MMIO space, not RAM. Physical SRAM starts at `0x00200000`. This misleading definition previously confused developers into thinking RAM was mapped into MMIO. | [`bsp_thejas32.h#L15`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h#L15) |
-| **Using Undeclared `spiResource_t` Without Forward Declaration** | **4.0 / 10** | **Flawed** | `#define SPI1 ((spiResource_t *)THEJAS32_SPI_0_1_BASE)` references a Betaflight typedef from `drivers/bus_spi.h`. Including `bsp_thejas32.h` standalone in low-level tools causes compilation errors. | [`bsp_thejas32.h#L110`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h#L110) |
+| **Exact Peripheral Base Address & Stride Alignment** | **9.5 / 10** | **Brilliant** | All peripheral base addresses (`UART 0x10000100`, `SPI0 0x10000600`, `SPI2 0x10200100`, `TIMER 0x10000A00`, `GPIO 0x10080000`, `INTR 0x20010000`) perfectly match C-DAC's authoritative hardware memory map. | [`bsp_thejas32.h#L18-L29`](../../src/platform/ARIES/include/platform/bsp_thejas32.h#L18-L29) vs [`config.h#L19-L24`](../../lib/vega-sdk/vega-sdk/bsp/include/config.h#L19-L24) |
+| **Exact 32-bit THEJAS32 IRQ Number Mapping (0–11)** | **9.5 / 10** | **Brilliant** | Mapping UART0..2 to IRQ 0..2, SPI to IRQ 3..4, Timers to IRQ 7..9, and GPIOs to IRQ 10..11 matches C-DAC's 32-bit hardware interrupt table. | [`bsp_thejas32.h#L43-L56`](../../src/platform/ARIES/include/platform/bsp_thejas32.h#L43-L56) vs [`interrupt.c#L83-L87`](../../lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c#L83-L87) |
+| **Volatile Register Struct Definitions** | **9.0 / 10** | **Good** | Accurately models the register word offsets for 16550 UART, Synopsys APB Timer, and Interrupt Controller, allowing structured pointer access. | [`bsp_thejas32.h#L33-L107`](../../src/platform/ARIES/include/platform/bsp_thejas32.h#L33-L107) |
+| **Defining `THEJAS32_RAM_BASE` as `0x10000000UL`** | **2.0 / 10** | **Stupid** | `0x10000000` is peripheral MMIO space, not RAM. Physical SRAM starts at `0x00200000`. This misleading definition previously confused developers into thinking RAM was mapped into MMIO. | [`bsp_thejas32.h#L15`](../../src/platform/ARIES/include/platform/bsp_thejas32.h#L15) |
+| **Using Undeclared `spiResource_t` Without Forward Declaration** | **4.0 / 10** | **Flawed** | `#define SPI1 ((spiResource_t *)THEJAS32_SPI_0_1_BASE)` references a Betaflight typedef from `drivers/bus_spi.h`. Including `bsp_thejas32.h` standalone in low-level tools causes compilation errors. | [`bsp_thejas32.h#L110`](../../src/platform/ARIES/include/platform/bsp_thejas32.h#L110) |
 
 ---
 

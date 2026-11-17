@@ -4,14 +4,14 @@
 * **File Paths**: `src/platform/ESP32/system.c` and `src/platform/ESP32/timer_esp32.c`
 * **Subsystem**: System Lifecycle, Timebase Generation (`micros()`, `millis()`), and Hardware Timer Abstraction on Non-ARM / RISC-V Architectures (ESP32-S3, ESP32-C5).
 * **Consulted Log Comparison**:
-  * [01_STM32_COMMON_SYSTEM.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md) (STM32 Clock tree, SysTick down-counter race condition, DWT lock)
-  * [09_STM32_TIMER_PWM_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md) (STM32 14-timer table, APB prescalers, DMA collisions)
+  * [01_STM32_COMMON_SYSTEM.md](01_STM32_COMMON_SYSTEM.md) (STM32 Clock tree, SysTick down-counter race condition, DWT lock)
+  * [09_STM32_TIMER_PWM_HW.md](09_STM32_TIMER_PWM_HW.md) (STM32 14-timer table, APB prescalers, DMA collisions)
 
 ---
 
 ## 2. Similarities & Differences: STM32 vs ESP32
 
-| Dimension | STM32 Implementation ([Log 01](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md) & [Log 09](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md)) | ESP32 Implementation (`system.c` & `timer_esp32.c`) | Porting Implication for ARIES v3.0 (THEJAS32) |
+| Dimension | STM32 Implementation ([Log 01](01_STM32_COMMON_SYSTEM.md) & [Log 09](09_STM32_TIMER_PWM_HW.md)) | ESP32 Implementation (`system.c` & `timer_esp32.c`) | Porting Implication for ARIES v3.0 (THEJAS32) |
 | :--- | :--- | :--- | :--- |
 | **Microsecond Timebase (`micros()`)** | Complex 24-bit down-counter SysTick with rollover flag checking (`COUNTFLAG`) and pending millisecond arithmetic. | Monotonic 64-bit hardware counter (`SYSTIMER`) ticking at 16 MHz; divided directly into microseconds (`ticks / 16`). | Follows the **ESP32 model**: RISC-V 64-bit `mtime` up-counter divided by 100 (for 100MHz). Zero rollover races. |
 | **Cycle Counting** | ARM CoreSight DWT hardware cycle counter with magic unlock register (`0xC5ACCE55`). | Xtensa `ccount` or RISC-V `cycle` CSR / `SYSTIMER` counter. | Use standard RISC-V CSR `cycle` / `cycleh` via `csrr`. |

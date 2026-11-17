@@ -1,6 +1,6 @@
 # Retrospective Log 11: Automated Build & Benchmark Script
 
-> **Source File:** [`oldfiles/logs/buildAndBenchmark.sh`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/buildAndBenchmark.sh)  
+> **Source File:** [`oldfiles/logs/buildAndBenchmark.sh`](../../oldfiles/logs/buildAndBenchmark.sh)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

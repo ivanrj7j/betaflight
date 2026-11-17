@@ -1,10 +1,10 @@
 # Hardware Inspection Log: `src/platform/ESP32/pwm_motor_esp32.c` & `dshot_esp32.c`
-**Consulted Log**: [09_STM32_TIMER_PWM_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md)
+**Consulted Log**: [09_STM32_TIMER_PWM_HW.md](09_STM32_TIMER_PWM_HW.md)
 
 ## 1. File Purpose & Role in Architecture
 * **File Paths**:
-  * [src/platform/ESP32/pwm_motor_esp32.c](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/pwm_motor_esp32.c)
-  * [src/platform/ESP32/dshot_esp32.c](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/dshot_esp32.c)
+  * [src/platform/ESP32/pwm_motor_esp32.c](../../src/platform/ESP32/pwm_motor_esp32.c)
+  * [src/platform/ESP32/dshot_esp32.c](../../src/platform/ESP32/dshot_esp32.c)
 * **Subsystem**: Motor Output Subsystem. Implements standard analog PWM, OneShot125/42, MultiShot, and digital DShot150/300/600 motor protocols.
 * **Key Components**:
   * `motorPwmDevInit()`: Configures the ESP32 LED Controller (`LEDC`) peripheral for driving 8 motor channels with fractional clock division.

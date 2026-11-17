@@ -1,8 +1,8 @@
 # Code Critique: `src/platform/ARIES/include/platform/platform.h`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/include/platform/platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/platform.h)
-- **Betaflight Core Dependency**: [`src/main/build/atomic.h`](file:///home/ivan/Desktop/betaflight/src/main/build/atomic.h)
+- **Source File**: [`src/platform/ARIES/include/platform/platform.h`](../../src/platform/ARIES/include/platform/platform.h)
+- **Betaflight Core Dependency**: [`src/main/build/atomic.h`](../../src/main/build/atomic.h)
 - **Component**: Platform abstraction, interrupt control (`__disable_irq`, `__enable_irq`), BASEPRI/atomic emulation, GPIO modes, device limits, early diagnostic logging macros.
 
 ---

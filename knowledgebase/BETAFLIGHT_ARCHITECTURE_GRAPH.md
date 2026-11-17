@@ -5,13 +5,13 @@
 Betaflight is structured into modular layers spanning from hardware abstraction up to application and serial protocol handlers.
 
 ### Connected Knowledge Nodes
-* **Hardware Physical Platform**: [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md)
-* **SoC & Memory Layout**: [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md)
-* **Hardware Visual Graph**: [ARIES_V3_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_KNOWLEDGE_GRAPH.md)
-* **Serial MSP & Configurator Handshake**: [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md)
-* **128 KB Optimization Strategy**: [TARGET_OPTIMIZATION_128KB.md](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md)
-* **Master Knowledge Index**: [INDEX.md](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md)
-* **Betaflight Docs Reference**: [betaflight.com App Architecture](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/App-Architecture.mdx) | [Bus Drivers](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/API/BusDrivers.md)
+* **Hardware Physical Platform**: [ARIES_V3_DATASHEET_ANALYSIS.md](ARIES_V3_DATASHEET_ANALYSIS.md)
+* **SoC & Memory Layout**: [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md)
+* **Hardware Visual Graph**: [ARIES_V3_KNOWLEDGE_GRAPH.md](ARIES_V3_KNOWLEDGE_GRAPH.md)
+* **Serial MSP & Configurator Handshake**: [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md)
+* **128 KB Optimization Strategy**: [TARGET_OPTIMIZATION_128KB.md](TARGET_OPTIMIZATION_128KB.md)
+* **Master Knowledge Index**: [INDEX.md](INDEX.md)
+* **Betaflight Docs Reference**: [betaflight.com App Architecture](betaflight.com/docs/development/App-Architecture.mdx) | [Bus Drivers](betaflight.com/docs/development/API/BusDrivers.md)
 
 ---
 
@@ -115,7 +115,7 @@ stateDiagram-v2
 
 ## 4. Bus Abstraction Pattern (`extDevice_t` and `busDevice_t`)
 
-As documented in [BusDrivers.md](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/API/BusDrivers.md), Betaflight completely decouples high-level sensor drivers (gyro, accelerometer, compass, barometer, flash memory) from the underlying bus hardware:
+As documented in [BusDrivers.md](betaflight.com/docs/development/API/BusDrivers.md), Betaflight completely decouples high-level sensor drivers (gyro, accelerometer, compass, barometer, flash memory) from the underlying bus hardware:
 
 ```mermaid
 classDiagram

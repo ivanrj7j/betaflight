@@ -1,6 +1,6 @@
 # Retrospective Log 04: Test Logs & Hardware Reality Verification
 
-> **Source File:** [`oldfiles/logs/TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/TEST_LOGS.md)  
+> **Source File:** [`oldfiles/logs/TEST_LOGS.md`](../../oldfiles/logs/TEST_LOGS.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

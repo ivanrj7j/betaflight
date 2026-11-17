@@ -1,10 +1,10 @@
 # Code Critique: `src/platform/ARIES/bus_spi_aries.c` vs `lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c` & `include/spi.h`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/bus_spi_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/bus_spi_aries.c)
+- **Source File**: [`src/platform/ARIES/bus_spi_aries.c`](../../src/platform/ARIES/bus_spi_aries.c)
 - **Reference Files**:
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c)
-  - [`lib/vega-sdk/vega-sdk/bsp/include/spi.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/spi.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c)
+  - [`lib/vega-sdk/vega-sdk/bsp/include/spi.h`](../../lib/vega-sdk/vega-sdk/bsp/include/spi.h)
 - **Component**: SPI0 master hardware driver (`SPIDEV_1`), clock dividers, Mode 0 / Mode 3 configuration, polled byte transfer engine, Betaflight bus segment dispatch.
 
 ---

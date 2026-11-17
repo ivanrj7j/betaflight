@@ -5,11 +5,11 @@
 The user target requirement is to compile a working Betaflight build within approximately **128 KB** on the **ARIES v3.0 (THEJAS32 / VEGA ET1031)** platform that connects directly to the Betaflight Configurator.
 
 ### Connected Knowledge Nodes
-* **Memory Map & Linker Layout**: [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md#3-memory-map--address-space-layout) (`IRAM` origin at `0x200000`, size 250KB)
-* **Hardware Specs**: [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md#1-executive-summary--hardware-overview) (256 KB internal SRAM, 2 MB external Flash)
-* **Handshake Requirements**: [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md#5-minimum-implementation-checklist-for-aries-v30) (Minimal 7 MSP commands)
-* **Master Knowledge Index**: [INDEX.md](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md)
-* **Betaflight Defines Reference**: [betaflight.com Defines.md](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/Defines.md)
+* **Memory Map & Linker Layout**: [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md#3-memory-map--address-space-layout) (`IRAM` origin at `0x200000`, size 250KB)
+* **Hardware Specs**: [ARIES_V3_DATASHEET_ANALYSIS.md](ARIES_V3_DATASHEET_ANALYSIS.md#1-executive-summary--hardware-overview) (256 KB internal SRAM, 2 MB external Flash)
+* **Handshake Requirements**: [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md#5-minimum-implementation-checklist-for-aries-v30) (Minimal 7 MSP commands)
+* **Master Knowledge Index**: [INDEX.md](INDEX.md)
+* **Betaflight Defines Reference**: [betaflight.com Defines.md](betaflight.com/docs/development/Defines.md)
 
 ---
 
@@ -44,7 +44,7 @@ flowchart TD
 
 ## 3. Feature Elimination Matrix (`USE_` / `ENABLE_` Flags)
 
-Betaflight conditionally compiles subsystem modules using `USE_` and `ENABLE_` macro definitions (detailed in [Defines.md](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/Defines.md)).
+Betaflight conditionally compiles subsystem modules using `USE_` and `ENABLE_` macro definitions (detailed in [Defines.md](betaflight.com/docs/development/Defines.md)).
 
 ### 3.1 Modules to Disable (Stripped for <128 KB Build)
 By defining these flags as disabled in `target.h` / compiler flags, large portions of code and lookup tables are eliminated:

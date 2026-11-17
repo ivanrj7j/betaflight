@@ -1,14 +1,14 @@
 # Domain Plan 04: GPIO, EXTI & Hardware Timers
 
 > **Component Plan ID**: `PLAN-DOM-04`  
-> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](file:///home/ivan/Desktop/betaflight/PLAN/00_MASTER_PLAN_OVERVIEW.md)  
+> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](00_MASTER_PLAN_OVERVIEW.md)  
 > **Primary Knowledge References**:
-> - [`knowledgebase/codebase_evaluations/07_EVAL_IO_ARIES_C_AND_DEF.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/07_EVAL_IO_ARIES_C_AND_DEF.md)
-> - [`knowledgebase/codebase_evaluations/08_EVAL_EXTI_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/08_EVAL_EXTI_ARIES_C.md)
-> - [`knowledgebase/codebase_evaluations/11_EVAL_PWM_MOTOR_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/11_EVAL_PWM_MOTOR_ARIES_C.md)
-> - [`knowledgebase/components/04_GPIO_AND_PIN_IO.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/04_GPIO_AND_PIN_IO.md)
-> - [`knowledgebase/components/05_TIMER_AND_MOTOR_PWM.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/05_TIMER_AND_MOTOR_PWM.md)
-> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
+> - [`knowledgebase/codebase_evaluations/07_EVAL_IO_ARIES_C_AND_DEF.md`](../knowledgebase/codebase_evaluations/07_EVAL_IO_ARIES_C_AND_DEF.md)
+> - [`knowledgebase/codebase_evaluations/08_EVAL_EXTI_ARIES_C.md`](../knowledgebase/codebase_evaluations/08_EVAL_EXTI_ARIES_C.md)
+> - [`knowledgebase/codebase_evaluations/11_EVAL_PWM_MOTOR_ARIES_C.md`](../knowledgebase/codebase_evaluations/11_EVAL_PWM_MOTOR_ARIES_C.md)
+> - [`knowledgebase/components/04_GPIO_AND_PIN_IO.md`](../knowledgebase/components/04_GPIO_AND_PIN_IO.md)
+> - [`knowledgebase/components/05_TIMER_AND_MOTOR_PWM.md`](../knowledgebase/components/05_TIMER_AND_MOTOR_PWM.md)
+> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
 
 ---
 
@@ -118,7 +118,7 @@ PLAN/04_GPIO_EXTI_AND_HARDWARE_TIMERS.md
 
 #### 1. Why (Silicon Necessity & Architectural Traceability)
 * **The High-Frequency Gyro ISR**: The ICM-42688P IMU asserts its Data Ready (`DRDY`) interrupt pin (`PA0`) at 1.0 kHz (every $1000\,\mu\text{s}$) to trigger the flight controller PID calculation.
-* **Linear Iteration Bottleneck**: In earlier code ([`src/platform/ARIES/exti_aries.c#L26-L34`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/exti_aries.c#L26-L34)), the EXTI handler looped through all 16 pins linearly, executing 15 useless branch checks on every single gyro interrupt.
+* **Linear Iteration Bottleneck**: In earlier code ([`src/platform/ARIES/exti_aries.c#L26-L34`](../src/platform/ARIES/exti_aries.c#L26-L34)), the EXTI handler looped through all 16 pins linearly, executing 15 useless branch checks on every single gyro interrupt.
 * **Silicon Topology**:
   - Bank 0 (Pins 0..15): Mapped to PLIC IRQ 10.
   - Bank 1 (Pins 16..31): Mapped to PLIC IRQ 11.

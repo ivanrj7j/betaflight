@@ -1,12 +1,12 @@
 # Evaluation Node 09: SPI Bus Master Driver (`bus_spi_aries.c`)
 
 ## 1. Executive Summary & File Traceability
-- **Evaluated File**: [`src/platform/ARIES/bus_spi_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/bus_spi_aries.c)
-- **Source Log**: [`logs/code_critique/09_BUS_SPI_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/09_BUS_SPI_ARIES_C.md)
+- **Evaluated File**: [`src/platform/ARIES/bus_spi_aries.c`](../../src/platform/ARIES/bus_spi_aries.c)
+- **Source Log**: [`logs/code_critique/09_BUS_SPI_ARIES_C.md`](../../logs/code_critique/09_BUS_SPI_ARIES_C.md)
 - **Upstream References**:
-  - [`src/main/drivers/bus_spi.h`](file:///home/ivan/Desktop/betaflight/src/main/drivers/bus_spi.h)
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c)
-  - [`lib/vega-sdk/vega-sdk/bsp/include/spi.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/spi.h)
+  - [`src/main/drivers/bus_spi.h`](../../src/main/drivers/bus_spi.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/spi/spi.c)
+  - [`lib/vega-sdk/vega-sdk/bsp/include/spi.h`](../../lib/vega-sdk/vega-sdk/bsp/include/spi.h)
 - **Domain**: SPI0 Master Controller, Baud rate clock generation, Mode 0 / Mode 3 polarity sequencing, ICM42688P sensor telemetry.
 
 ---
@@ -28,7 +28,7 @@
 
 ### What Went Wrong
 1. **Sensor Bus Clock Ceiling Violation**:
-   - In [`src/platform/ARIES/bus_spi_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/bus_spi_aries.c#L74-L85):
+   - In [`src/platform/ARIES/bus_spi_aries.c`](../../src/platform/ARIES/bus_spi_aries.c#L74-L85):
      ```c
      if (freq >= 20000000) {
          return 0; // 25 MHz

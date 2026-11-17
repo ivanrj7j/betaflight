@@ -1,11 +1,11 @@
 # Porting Component Knowledge Node: System Clocks & Timebase
 **Component ID**: `PORT-COMP-01`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [01_STM32_COMMON_SYSTEM.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md) (STM32 Clock tree & SysTick rollover race)
-* [17_ESP32_SYSTEM_AND_TIMER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/17_ESP32_SYSTEM_AND_TIMER.md) (ESP32 64-bit SYSTIMER & empty timer tables)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (THEJAS32 Memory map & mtime registers)
-* [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md) (ARIES v3.0 100 MHz clock source)
+* [01_STM32_COMMON_SYSTEM.md](../../logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md) (STM32 Clock tree & SysTick rollover race)
+* [17_ESP32_SYSTEM_AND_TIMER.md](../../logs/hardware_inspection/17_ESP32_SYSTEM_AND_TIMER.md) (ESP32 64-bit SYSTIMER & empty timer tables)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (THEJAS32 Memory map & mtime registers)
+* [ARIES_V3_DATASHEET_ANALYSIS.md](../ARIES_V3_DATASHEET_ANALYSIS.md) (ARIES v3.0 100 MHz clock source)
 
 ---
 
@@ -67,7 +67,7 @@ graph TD
 
 ## 2. Hardware Comparison: STM32 vs. ESP32 vs. THEJAS32
 
-Backed directly by [01_STM32_COMMON_SYSTEM.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md) and [17_ESP32_SYSTEM_AND_TIMER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/17_ESP32_SYSTEM_AND_TIMER.md):
+Backed directly by [01_STM32_COMMON_SYSTEM.md](../../logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md) and [17_ESP32_SYSTEM_AND_TIMER.md](../../logs/hardware_inspection/17_ESP32_SYSTEM_AND_TIMER.md):
 
 | Feature | STM32 (`01_STM32_COMMON_SYSTEM.md`) | ESP32 (`17_ESP32_SYSTEM_AND_TIMER.md`) | THEJAS32 / ARIES v3.0 |
 | :--- | :--- | :--- | :--- |

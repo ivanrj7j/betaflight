@@ -1,10 +1,10 @@
 # Hardware Inspection Log: `src/platform/ESP32/bus_spi_esp32.c` & `bus_i2c_esp32.c`
-**Consulted Log**: [10_STM32_BUS_SPI_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/10_STM32_BUS_SPI_HW.md)
+**Consulted Log**: [10_STM32_BUS_SPI_HW.md](10_STM32_BUS_SPI_HW.md)
 
 ## 1. File Purpose & Role in Architecture
 * **File Paths**:
-  * [src/platform/ESP32/bus_spi_esp32.c](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/bus_spi_esp32.c)
-  * [src/platform/ESP32/bus_i2c_esp32.c](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/bus_i2c_esp32.c)
+  * [src/platform/ESP32/bus_spi_esp32.c](../../src/platform/ESP32/bus_spi_esp32.c)
+  * [src/platform/ESP32/bus_i2c_esp32.c](../../src/platform/ESP32/bus_i2c_esp32.c)
 * **Subsystem**: SPI & I2C Serial Bus Abstraction Layer. Manages high-speed sensor buses (IMU / Gyro / Flash / OSD) and peripheral buses (ADC / Baro / Magnetometer).
 * **Key Components**:
   * `spiInitDevice()` / `spiInitBusDMA()`: Configures peripheral clocks, resets hardware FIFOs, binds GDMA channels.

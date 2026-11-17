@@ -2,15 +2,15 @@
 
 ## 1. Metadata & Scope
 - **Target Changes**:
-  - [`src/main/config/config.c`](file:///home/ivan/Desktop/betaflight/src/main/config/config.c)
-  - [`src/main/config/config_eeprom.c`](file:///home/ivan/Desktop/betaflight/src/main/config/config_eeprom.c)
-  - [`src/main/drivers/serial_uart.c`](file:///home/ivan/Desktop/betaflight/src/main/drivers/serial_uart.c)
-  - [`src/main/fc/init.c`](file:///home/ivan/Desktop/betaflight/src/main/fc/init.c)
-  - [`src/main/fc/tasks.c`](file:///home/ivan/Desktop/betaflight/src/main/fc/tasks.c)
-  - [`src/main/main.c`](file:///home/ivan/Desktop/betaflight/src/main/main.c)
-  - [`src/main/msp/msp_serial.c`](file:///home/ivan/Desktop/betaflight/src/main/msp/msp_serial.c)
-  - [`src/main/pg/pg.c`](file:///home/ivan/Desktop/betaflight/src/main/pg/pg.c)
-  - [`src/main/target/common_pre.h`](file:///home/ivan/Desktop/betaflight/src/main/target/common_pre.h)
+  - [`src/main/config/config.c`](../../src/main/config/config.c)
+  - [`src/main/config/config_eeprom.c`](../../src/main/config/config_eeprom.c)
+  - [`src/main/drivers/serial_uart.c`](../../src/main/drivers/serial_uart.c)
+  - [`src/main/fc/init.c`](../../src/main/fc/init.c)
+  - [`src/main/fc/tasks.c`](../../src/main/fc/tasks.c)
+  - [`src/main/main.c`](../../src/main/main.c)
+  - [`src/main/msp/msp_serial.c`](../../src/main/msp/msp_serial.c)
+  - [`src/main/pg/pg.c`](../../src/main/pg/pg.c)
+  - [`src/main/target/common_pre.h`](../../src/main/target/common_pre.h)
 - **Baseline Upstream Commit**: `885f12404` (Clean upstream Betaflight master)
 - **Purpose**: Assess the necessity, architectural cleanliness, and portability of core modifications.
 

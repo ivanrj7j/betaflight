@@ -1,12 +1,12 @@
 # THEJAS32 Programmer's Manual Knowledge Base & Analysis
 
 ### Connected Knowledge Nodes
-* **Master Knowledge Index**: [INDEX.md](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md)
-* **Hardware Datasheet Specs**: [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md)
-* **Hardware Visual Graph**: [ARIES_V3_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_KNOWLEDGE_GRAPH.md)
-* **Serial Protocol & Handshake**: [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md)
-* **Subsystem Architecture**: [BETAFLIGHT_ARCHITECTURE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/BETAFLIGHT_ARCHITECTURE_GRAPH.md)
-* **128KB Optimization**: [TARGET_OPTIMIZATION_128KB.md](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md)
+* **Master Knowledge Index**: [INDEX.md](INDEX.md)
+* **Hardware Datasheet Specs**: [ARIES_V3_DATASHEET_ANALYSIS.md](ARIES_V3_DATASHEET_ANALYSIS.md)
+* **Hardware Visual Graph**: [ARIES_V3_KNOWLEDGE_GRAPH.md](ARIES_V3_KNOWLEDGE_GRAPH.md)
+* **Serial Protocol & Handshake**: [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md)
+* **Subsystem Architecture**: [BETAFLIGHT_ARCHITECTURE_GRAPH.md](BETAFLIGHT_ARCHITECTURE_GRAPH.md)
+* **128KB Optimization**: [TARGET_OPTIMIZATION_128KB.md](TARGET_OPTIMIZATION_128KB.md)
 
 ---
 

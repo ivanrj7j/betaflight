@@ -307,7 +307,7 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 ### Resolution of Discrepancy (`BUILD-07`)
 
 - **Remediation Implemented (Approved):**
-  Per the approved remediation plan in [`MICROS_DIVISION_REMEDIATION_PLAN.md`](file:///home/ivan/.gemini/antigravity-cli/brain/29bd09d8-1d46-496a-9011-bb075912d5ec/MICROS_DIVISION_REMEDIATION_PLAN.md), [`src/platform/ARIES/system.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c#L99-L110) was upgraded to use a pure 32-bit modular reciprocal division algorithm.
+  Per the approved remediation plan in [`MICROS_DIVISION_REMEDIATION_PLAN.md`](file:///home/ivan/.gemini/antigravity-cli/brain/29bd09d8-1d46-496a-9011-bb075912d5ec/MICROS_DIVISION_REMEDIATION_PLAN.md), [`src/platform/ARIES/system.c`](../../src/platform/ARIES/system.c#L99-L110) was upgraded to use a pure 32-bit modular reciprocal division algorithm.
 - **Disassembly Verification:**
   Re-inspection of `obj/main/betaflight_ARIESV3.elf` at `<micros>:`:
   ```asm
@@ -324,7 +324,7 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
   2000411c:	00008067          	ret
   ```
 - **Performance Impact:**
-  Zero external function calls; zero stack allocation; execution time reduced from ~140 cycles to ~25 cycles, recovering over 4% CPU idle headroom in the 1.0 kHz flight loop. All 8 checks in [`build_verify.sh`](file:///home/ivan/Desktop/betaflight/src/test/unit/aries/build_verify.sh) now pass cleanly.
+  Zero external function calls; zero stack allocation; execution time reduced from ~140 cycles to ~25 cycles, recovering over 4% CPU idle headroom in the 1.0 kHz flight loop. All 8 checks in [`build_verify.sh`](../../src/test/unit/aries/build_verify.sh) now pass cleanly.
 
 ---
 
@@ -385,8 +385,8 @@ Per testing protocols, if any test reveals an issue in the main platform code, t
 ### Status & Next Steps
 - Documented in `HAL_PROGRESS.md` and `TEST_LOGS.md`.
 - **Steps 1–5 Executed & Verified:**
-  - Linker script [`aries_v3.ld`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld) retargeted to `ORIGIN = 0x00202000, LENGTH = 248K`.
-  - Startup [`startup.S`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S) realigned with `_estack = 0x0023FC50` and `_start = 0x00202000`.
+  - Linker script [`aries_v3.ld`](../../src/platform/ARIES/link/aries_v3.ld) retargeted to `ORIGIN = 0x00202000, LENGTH = 248K`.
+  - Startup [`startup.S`](../../src/platform/ARIES/startup.S) realigned with `_estack = 0x0023FC50` and `_start = 0x00202000`.
   - Binary pruned via `config.h`, `target.h`, and `ARIES.mk` with `-Os` optimization.
   - Raw binary image shrunk to **220 KB** (`obj/betaflight_2026.12.0-alpha_ARIESV3.bin`), well within the bootloader's 250 KB limit.
   - Disassembly audit confirmed: zero double-precision soft-float, zero `__udivdi3`, `_start` @ `0x00202000`, `trap_entry` @ `0x002020f0`.

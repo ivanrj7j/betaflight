@@ -4,13 +4,13 @@
 * **File Path**: `src/platform/ESP32/io_esp32.c`
 * **Subsystem**: Single-Port Flat GPIO Architecture and Direct Fast Pin Access (`IORead`, `IOWrite`, `IOHi`, `IOLo`, `IOToggle`).
 * **Consulted Log Comparison**:
-  * [08_STM32_IO_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/08_STM32_IO_IMPL.md) (STM32 Multi-port GPIOA–GPIOI, sparse bitmask compression, popcount indexing)
+  * [08_STM32_IO_IMPL.md](08_STM32_IO_IMPL.md) (STM32 Multi-port GPIOA–GPIOI, sparse bitmask compression, popcount indexing)
 
 ---
 
 ## 2. Similarities & Differences: STM32 vs ESP32
 
-| Dimension | STM32 Implementation ([Log 08](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/08_STM32_IO_IMPL.md)) | ESP32 Implementation (`io_esp32.c`) | Porting Implication for ARIES v3.0 (THEJAS32) |
+| Dimension | STM32 Implementation ([Log 08](08_STM32_IO_IMPL.md)) | ESP32 Implementation (`io_esp32.c`) | Porting Implication for ARIES v3.0 (THEJAS32) |
 | :--- | :--- | :--- | :--- |
 | **Port Structure** | Multi-letter 16-pin banks (`GPIOA` through `GPIOI`). Requires tracking port base addresses spaced at `0x400` intervals. | **Single Flat GPIO Port** (`DEFIO_PORT_USED_COUNT == 1`). Pins are numbered linearly $0..N$. | **Matches ESP32 perfectly**: THEJAS32 has a single flat 32-bit GPIO controller (`GPIO0` to `GPIO31`). |
 | **Pin Lookup (`IOGetByTag`)** | Compressed bitmask with hardware `popcount` intrinsic to compute offsets without sparse gaps. | Direct $O(1)$ flat array index: `return &ioRecs[pinIdx];`. | **Adopt ESP32 pattern**: Zero bitmask calculation; direct index `ioRecs[pinIdx]` saves code size and execution time. |

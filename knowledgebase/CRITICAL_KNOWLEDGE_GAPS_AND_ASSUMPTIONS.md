@@ -113,7 +113,7 @@ graph TD
   - Active configuration uses `#define CONFIG_IN_RAM` (`EEPROM_SIZE 8192`), storing Parameter Groups in internal SRAM (`.bss`).
   - **The Trade-off:** Configuration survives warm soft-reboots (`_start`), but is lost on complete power disconnect.
 * **The Proven Solution from C-DAC SDK:**
-  - C-DAC's reference example [`lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c) proves how to access persistent storage safely:
+  - C-DAC's reference example [`lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c`](../lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c) proves how to access persistent storage safely:
     - Target controller: `MDP_SPI_3` (`0x10200100`).
     - Use `SPI_set_CSAAT_pin(MDP_SPI_3, 1)` to assert Chip Select.
     - Read via command `0x03` (`RD_DATA_BYTES_SPI_CMD`) and write via `0x02` (`BYTE_PAGE_PGM_SPI_CMD`) with `0x20` (Sector Erase).

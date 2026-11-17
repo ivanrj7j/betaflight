@@ -1,6 +1,6 @@
 # Retrospective Log 06: Low-Level Software Test Plan & Verification Specs
 
-> **Source File:** [`oldfiles/logs/SOFTWARE_TEST_PLAN.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/SOFTWARE_TEST_PLAN.md)  
+> **Source File:** [`oldfiles/logs/SOFTWARE_TEST_PLAN.md`](../../oldfiles/logs/SOFTWARE_TEST_PLAN.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

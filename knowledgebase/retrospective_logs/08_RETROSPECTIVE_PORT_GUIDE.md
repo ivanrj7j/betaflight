@@ -1,6 +1,6 @@
 # Retrospective Log 08: Initial Porting Guide & Feasibility Analysis
 
-> **Source File:** [`oldfiles/logs/PORT_GUIDE.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/PORT_GUIDE.md)  
+> **Source File:** [`oldfiles/logs/PORT_GUIDE.md`](../../oldfiles/logs/PORT_GUIDE.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

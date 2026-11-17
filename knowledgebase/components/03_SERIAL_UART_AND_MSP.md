@@ -1,14 +1,14 @@
 # Porting Component Knowledge Node: Serial UART & Configurator MSP Handshake
 **Component ID**: `PORT-COMP-03`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [05_STM32_SERIAL_UART_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md) (Hardware abstraction & line inversion constraints)
-* [06_STM32_SERIAL_UART_DRIVER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md) (Overrun Error unfreeze sequence & TX spinning fix)
-* [15_MSP_SERIAL_PARSER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/15_MSP_SERIAL_PARSER.md) (Zero-allocation heapless MSP state machine)
-* [18_ESP32_SERIAL_UART.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/18_ESP32_SERIAL_UART.md) (Hardware FIFOs & dynamic interrupt attachment)
-* [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md) (7-step handshake sequence & framing)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (16550 UART IP registers)
-* [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md) (CP2102N USB bridge wired to pins 107/108)
+* [05_STM32_SERIAL_UART_HW.md](../../logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md) (Hardware abstraction & line inversion constraints)
+* [06_STM32_SERIAL_UART_DRIVER.md](../../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md) (Overrun Error unfreeze sequence & TX spinning fix)
+* [15_MSP_SERIAL_PARSER.md](../../logs/hardware_inspection/15_MSP_SERIAL_PARSER.md) (Zero-allocation heapless MSP state machine)
+* [18_ESP32_SERIAL_UART.md](../../logs/hardware_inspection/18_ESP32_SERIAL_UART.md) (Hardware FIFOs & dynamic interrupt attachment)
+* [MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md](../MSP_CONFIGURATOR_HANDSHAKE_GRAPH.md) (7-step handshake sequence & framing)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (16550 UART IP registers)
+* [ARIES_V3_DATASHEET_ANALYSIS.md](../ARIES_V3_DATASHEET_ANALYSIS.md) (CP2102N USB bridge wired to pins 107/108)
 
 ---
 
@@ -47,7 +47,7 @@ sequenceDiagram
 
 ## 2. Hardware Comparison: STM32 vs. ESP32 vs. THEJAS32
 
-Backed directly by [05_STM32_SERIAL_UART_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md), [06_STM32_SERIAL_UART_DRIVER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), and [18_ESP32_SERIAL_UART.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/18_ESP32_SERIAL_UART.md):
+Backed directly by [05_STM32_SERIAL_UART_HW.md](../../logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md), [06_STM32_SERIAL_UART_DRIVER.md](../../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), and [18_ESP32_SERIAL_UART.md](../../logs/hardware_inspection/18_ESP32_SERIAL_UART.md):
 
 | Feature | STM32 (`05_...`, `06_...`) | ESP32 (`18_ESP32_SERIAL_UART.md`) | THEJAS32 / ARIES v3.0 |
 | :--- | :--- | :--- | :--- |
@@ -63,7 +63,7 @@ Backed directly by [05_STM32_SERIAL_UART_HW.md](file:///home/ivan/Desktop/betafl
 
 ### Failure Mode 1: Overrun Error (`ORE`) Freeze (STM32)
 * **The Bug**: On STM32 USART, if high-priority ISRs delay the UART interrupt handler, incoming bytes overflow the 1-byte receive register, asserting the Overrun Error (`ORE`) flag. On STM32, `ORE` completely blocks further receive interrupts until cleared by a specific two-step read sequence (`USART_SR` read followed by `USART_DR` read). If not cleared, Configurator communication freezes forever!
-* **Overcome By**: From [06_STM32_SERIAL_UART_DRIVER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), the STM32 ISR unconditionally checks and clears `ORE`:
+* **Overcome By**: From [06_STM32_SERIAL_UART_DRIVER.md](../../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), the STM32 ISR unconditionally checks and clears `ORE`:
   ```c
   if (sr & USART_SR_ORE) {
       volatile uint32_t dummy = s->USARTx->DR;
@@ -74,7 +74,7 @@ Backed directly by [05_STM32_SERIAL_UART_HW.md](file:///home/ivan/Desktop/betafl
 
 ### Failure Mode 2: CPU Spinning on TX Interrupt Enable (STM32)
 * **The Bug**: If software enables the Transmit Data Register Empty interrupt (`TXEIE`) while the transmit ring buffer is empty, the hardware immediately and continuously fires the ISR (because `TXE` is true), spinning the CPU at 100% load and starving all flight tasks!
-* **Overcome By**: From [06_STM32_SERIAL_UART_DRIVER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), STM32 only enables `TXEIE` when bytes exist in the buffer, and clears `TXEIE` the instant the buffer empties.
+* **Overcome By**: From [06_STM32_SERIAL_UART_DRIVER.md](../../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), STM32 only enables `TXEIE` when bytes exist in the buffer, and clears `TXEIE` the instant the buffer empties.
 * **ARIES v3.0 Resolution**: Adopt non-blocking polled or ring-buffered TX. Because the CP2102N USB bridge accepts byte bursts into its internal USB packetizer, writing directly to `THR` when `LSR & 0x20` is asserted takes $<0.1\,\mu\text{s}$, eliminating the need for TX interrupts during early bringup.
 
 ---

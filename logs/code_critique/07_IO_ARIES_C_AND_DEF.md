@@ -2,9 +2,9 @@
 
 ## 1. File Metadata & Overview
 - **Source Files**:
-  - [`src/platform/ARIES/io_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c)
-  - [`src/platform/ARIES/io_def_generated.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_def_generated.h)
-- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c)
+  - [`src/platform/ARIES/io_aries.c`](../../src/platform/ARIES/io_aries.c)
+  - [`src/platform/ARIES/io_def_generated.h`](../../src/platform/ARIES/io_def_generated.h)
+- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c)
 - **Component**: Address-decoded bit-shift GPIO driver, direction register manipulation, pin mapping table, atomic set/clear operations.
 
 ---

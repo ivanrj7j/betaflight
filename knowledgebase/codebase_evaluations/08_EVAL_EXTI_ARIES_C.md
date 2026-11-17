@@ -1,12 +1,12 @@
 # Evaluation Node 08: External Interrupt Controller (`exti_aries.c`)
 
 ## 1. Executive Summary & File Traceability
-- **Evaluated File**: [`src/platform/ARIES/exti_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/exti_aries.c)
-- **Source Log**: [`logs/code_critique/08_EXTI_ARIES_C.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/08_EXTI_ARIES_C.md)
+- **Evaluated File**: [`src/platform/ARIES/exti_aries.c`](../../src/platform/ARIES/exti_aries.c)
+- **Source Log**: [`logs/code_critique/08_EXTI_ARIES_C.md`](../../logs/code_critique/08_EXTI_ARIES_C.md)
 - **Upstream References**:
-  - [`src/main/drivers/exti.h`](file:///home/ivan/Desktop/betaflight/src/main/drivers/exti.h)
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c)
-  - [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c)
+  - [`src/main/drivers/exti.h`](../../src/main/drivers/exti.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c)
+  - [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c)
 - **Domain**: GPIO External Interrupt Dispatcher, IMU DRDY notification, bank-level IRQ demultiplexing.
 
 ---
@@ -27,7 +27,7 @@
 
 ### What Went Wrong
 1. **Linear Loop Overhead in High-Frequency ISR**:
-   - In [`src/platform/ARIES/exti_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/exti_aries.c#L26-L34), `thejas32_gpio0_isr` and `thejas32_gpio1_isr` loop through 16 iterations:
+   - In [`src/platform/ARIES/exti_aries.c`](../../src/platform/ARIES/exti_aries.c#L26-L34), `thejas32_gpio0_isr` and `thejas32_gpio1_isr` loop through 16 iterations:
      ```c
      for (int pin = 0; pin < 16; pin++) {
          if (extiChannels[pin].enabled && extiChannels[pin].handler && extiChannels[pin].handler->fn) {

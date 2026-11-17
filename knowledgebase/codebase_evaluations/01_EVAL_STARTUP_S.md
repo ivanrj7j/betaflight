@@ -1,7 +1,7 @@
 # Knowledge Evaluation Node: `src/platform/ARIES/startup.S`
-**Evaluated Log**: [`logs/code_critique/01_STARTUP_S.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/01_STARTUP_S.md)  
-**Target Code**: [`src/platform/ARIES/startup.S`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S)  
-**Reference Code**: [`lib/vega-sdk/vega-sdk/bsp/common/crt.S`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/crt.S)  
+**Evaluated Log**: [`logs/code_critique/01_STARTUP_S.md`](../../logs/code_critique/01_STARTUP_S.md)  
+**Target Code**: [`src/platform/ARIES/startup.S`](../../src/platform/ARIES/startup.S)  
+**Reference Code**: [`lib/vega-sdk/vega-sdk/bsp/common/crt.S`](../../lib/vega-sdk/vega-sdk/bsp/common/crt.S)  
 **Component**: Reset Sequence, GPR Zeroing, C Runtime Setup, and Trap Entry.
 
 ---
@@ -15,12 +15,12 @@
 
 | Decision / Action Taken | Score (0-10) | Category | Technical Analysis & Rationale | References |
 | :--- | :---: | :---: | :--- | :--- |
-| **In-SRAM Data Copy Bypass (`beq t0, t1, copy_done`)** | **9.5 / 10** | **Brilliant** | When executing in SRAM (LMA == VMA), copying `.data` over itself is redundant and dangerous. Bypassing the loop preserves pre-initialized memory and speeds up boot time. | [`startup.S#L74`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S#L74) |
-| **Trimming Trap Frame to 128 Bytes ($32 \times 4$)** | **9.0 / 10** | **Brilliant** | Official C-DAC `crt.S` allocated 272 bytes per trap entry (sized for RV64 and FPU registers). Reducing this to exactly 128 bytes (16-byte aligned for RV32) saves 144 bytes per trap frame on an 8 KB stack. | [`startup.S#L111`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S#L111) vs [`crt.S#L162`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/crt.S#L162) |
-| **Complete 32-GPR Zeroing on Boot** | **9.0 / 10** | **Good** | Iteratively clearing `x1`..`x31` prevents uninitialized register leakage, eliminating simulator warnings and undefined register states. | [`startup.S#L25-L55`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S#L25-L55) |
-| **Direct Single-Core `_estack` Assignment** | **8.5 / 10** | **Good** | Replaced C-DAC's complex multi-core `mhartid` stack shifting logic with a clean direct load (`la sp, _estack`), saving code size on single-core THEJAS32. | [`startup.S#L58`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S#L58) vs [`crt.S#L154`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/crt.S#L154) |
-| **Omitting Pre-Trap `sp` (`x2`) from Trap Frame** | **3.0 / 10** | **Flawed** | Decrementing `sp` by 128 and saving all registers except `x2` (`sp`) left the caller's stack pointer uninitialized in the frame. Exception handlers reading `frame[2]` received stale garbage. | [`startup.S#L113-L114`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S#L113-L114) |
-| **Assuming 4-Byte Word Alignment Without Assertions in Assembly** | **5.0 / 10** | **Mediocre** | Stepping loops by 4 bytes without testing alignment bits relies entirely on the linker script enforcing 4-byte boundaries on `_edata` and `_ebss`. | [`startup.S#L79-L80`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S#L79-L80) |
+| **In-SRAM Data Copy Bypass (`beq t0, t1, copy_done`)** | **9.5 / 10** | **Brilliant** | When executing in SRAM (LMA == VMA), copying `.data` over itself is redundant and dangerous. Bypassing the loop preserves pre-initialized memory and speeds up boot time. | [`startup.S#L74`](../../src/platform/ARIES/startup.S#L74) |
+| **Trimming Trap Frame to 128 Bytes ($32 \times 4$)** | **9.0 / 10** | **Brilliant** | Official C-DAC `crt.S` allocated 272 bytes per trap entry (sized for RV64 and FPU registers). Reducing this to exactly 128 bytes (16-byte aligned for RV32) saves 144 bytes per trap frame on an 8 KB stack. | [`startup.S#L111`](../../src/platform/ARIES/startup.S#L111) vs [`crt.S#L162`](../../lib/vega-sdk/vega-sdk/bsp/common/crt.S#L162) |
+| **Complete 32-GPR Zeroing on Boot** | **9.0 / 10** | **Good** | Iteratively clearing `x1`..`x31` prevents uninitialized register leakage, eliminating simulator warnings and undefined register states. | [`startup.S#L25-L55`](../../src/platform/ARIES/startup.S#L25-L55) |
+| **Direct Single-Core `_estack` Assignment** | **8.5 / 10** | **Good** | Replaced C-DAC's complex multi-core `mhartid` stack shifting logic with a clean direct load (`la sp, _estack`), saving code size on single-core THEJAS32. | [`startup.S#L58`](../../src/platform/ARIES/startup.S#L58) vs [`crt.S#L154`](../../lib/vega-sdk/vega-sdk/bsp/common/crt.S#L154) |
+| **Omitting Pre-Trap `sp` (`x2`) from Trap Frame** | **3.0 / 10** | **Flawed** | Decrementing `sp` by 128 and saving all registers except `x2` (`sp`) left the caller's stack pointer uninitialized in the frame. Exception handlers reading `frame[2]` received stale garbage. | [`startup.S#L113-L114`](../../src/platform/ARIES/startup.S#L113-L114) |
+| **Assuming 4-Byte Word Alignment Without Assertions in Assembly** | **5.0 / 10** | **Mediocre** | Stepping loops by 4 bytes without testing alignment bits relies entirely on the linker script enforcing 4-byte boundaries on `_edata` and `_ebss`. | [`startup.S#L79-L80`](../../src/platform/ARIES/startup.S#L79-L80) |
 
 ---
 

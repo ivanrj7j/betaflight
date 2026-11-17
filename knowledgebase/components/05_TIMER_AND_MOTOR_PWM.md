@@ -1,11 +1,11 @@
 # Porting Component Knowledge Node: Timer & Motor PWM Subsystem
 **Component ID**: `PORT-COMP-05`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [09_STM32_TIMER_PWM_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md) (Asymmetric APB1/APB2 clock multipliers & DMA collision matrix)
-* [22_ESP32_PWM_DSHOT.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/22_ESP32_PWM_DSHOT.md) (LEDC fractional divider & mandatory non-null VTable safety)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (Dedicated 8-Channel PWM controller at `0x10000600`)
-* [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md) (PWM pin headers: J2, J1, J3)
+* [09_STM32_TIMER_PWM_HW.md](../../logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md) (Asymmetric APB1/APB2 clock multipliers & DMA collision matrix)
+* [22_ESP32_PWM_DSHOT.md](../../logs/hardware_inspection/22_ESP32_PWM_DSHOT.md) (LEDC fractional divider & mandatory non-null VTable safety)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (Dedicated 8-Channel PWM controller at `0x10000600`)
+* [ARIES_V3_DATASHEET_ANALYSIS.md](../ARIES_V3_DATASHEET_ANALYSIS.md) (PWM pin headers: J2, J1, J3)
 
 ---
 
@@ -57,7 +57,7 @@ graph TD
 
 ## 2. Hardware Comparison: STM32 vs. ESP32 vs. THEJAS32
 
-Backed directly by [09_STM32_TIMER_PWM_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md) and [22_ESP32_PWM_DSHOT.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/22_ESP32_PWM_DSHOT.md):
+Backed directly by [09_STM32_TIMER_PWM_HW.md](../../logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md) and [22_ESP32_PWM_DSHOT.md](../../logs/hardware_inspection/22_ESP32_PWM_DSHOT.md):
 
 | Feature | STM32 (`09_STM32_TIMER_PWM_HW.md`) | ESP32 (`22_ESP32_PWM_DSHOT.md`) | THEJAS32 / ARIES v3.0 |
 | :--- | :--- | :--- | :--- |
@@ -71,7 +71,7 @@ Backed directly by [09_STM32_TIMER_PWM_HW.md](file:///home/ivan/Desktop/betaflig
 ## 3. Failure Modes & How Other Platforms Overcame Them
 
 ### Failure Mode 1: Null-Pointer VTable Panic in Configurator (ESP32)
-* **The Bug**: From [22_ESP32_PWM_DSHOT.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/22_ESP32_PWM_DSHOT.md), the Betaflight Configurator "Motors" slider tool directly calls `motorConvertFromExternal()` and `motorConvertToExternal()` through the driver's `vTable` without a `NULL` guard. If a platform port leaves these function pointers `NULL`, moving the motor slider immediately triggers an unrecoverable hard fault exception!
+* **The Bug**: From [22_ESP32_PWM_DSHOT.md](../../logs/hardware_inspection/22_ESP32_PWM_DSHOT.md), the Betaflight Configurator "Motors" slider tool directly calls `motorConvertFromExternal()` and `motorConvertToExternal()` through the driver's `vTable` without a `NULL` guard. If a platform port leaves these function pointers `NULL`, moving the motor slider immediately triggers an unrecoverable hard fault exception!
 * **Overcome By**: ESP32 implemented linear passthrough functions:
   ```c
   static float pwmMotorConvertFromExternal(uint16_t externalValue) { return (float)externalValue; }
@@ -88,7 +88,7 @@ Backed directly by [09_STM32_TIMER_PWM_HW.md](file:///home/ivan/Desktop/betaflig
 
 ## 4. Physical Pin Allocation on ARIES v3.0
 
-Backed directly by [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md):
+Backed directly by [ARIES_V3_DATASHEET_ANALYSIS.md](../ARIES_V3_DATASHEET_ANALYSIS.md):
 
 | Motor Index | Logical Signal | Hardware PWM Channel | Board Connector | Physical SoC Pin |
 | :---: | :---: | :---: | :---: | :---: |

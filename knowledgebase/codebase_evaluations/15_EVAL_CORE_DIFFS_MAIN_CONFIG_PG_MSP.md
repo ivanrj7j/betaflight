@@ -2,16 +2,16 @@
 
 ## 1. Executive Summary & File Traceability
 - **Evaluated Files**:
-  - [`src/main/main.c`](file:///home/ivan/Desktop/betaflight/src/main/main.c)
-  - [`src/main/fc/init.c`](file:///home/ivan/Desktop/betaflight/src/main/fc/init.c)
-  - [`src/main/fc/tasks.c`](file:///home/ivan/Desktop/betaflight/src/main/fc/tasks.c)
-  - [`src/main/config/config.c`](file:///home/ivan/Desktop/betaflight/src/main/config/config.c)
-  - [`src/main/config/config_eeprom.c`](file:///home/ivan/Desktop/betaflight/src/main/config/config_eeprom.c)
-  - [`src/main/msp/msp_serial.c`](file:///home/ivan/Desktop/betaflight/src/main/msp/msp_serial.c)
-  - [`src/main/drivers/serial_uart.c`](file:///home/ivan/Desktop/betaflight/src/main/drivers/serial_uart.c)
-  - [`src/main/pg/pg.c`](file:///home/ivan/Desktop/betaflight/src/main/pg/pg.c)
-  - [`src/main/target/common_pre.h`](file:///home/ivan/Desktop/betaflight/src/main/target/common_pre.h)
-- **Source Log**: [`logs/code_critique/15_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/15_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)
+  - [`src/main/main.c`](../../src/main/main.c)
+  - [`src/main/fc/init.c`](../../src/main/fc/init.c)
+  - [`src/main/fc/tasks.c`](../../src/main/fc/tasks.c)
+  - [`src/main/config/config.c`](../../src/main/config/config.c)
+  - [`src/main/config/config_eeprom.c`](../../src/main/config/config_eeprom.c)
+  - [`src/main/msp/msp_serial.c`](../../src/main/msp/msp_serial.c)
+  - [`src/main/drivers/serial_uart.c`](../../src/main/drivers/serial_uart.c)
+  - [`src/main/pg/pg.c`](../../src/main/pg/pg.c)
+  - [`src/main/target/common_pre.h`](../../src/main/target/common_pre.h)
+- **Source Log**: [`logs/code_critique/15_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md`](../../logs/code_critique/15_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)
 - **Baseline Git Commit**: `885f12404` (Clean upstream Betaflight master)
 - **Domain**: Upstream repository isolation, debug instrumentations, serial CLI ergonomics, RVC instruction avoidance shims.
 
@@ -33,7 +33,7 @@
 
 ### What Went Wrong
 1. **Intrusive Logging in Core Architecture**:
-   - In [`src/main/fc/init.c`](file:///home/ivan/Desktop/betaflight/src/main/fc/init.c), [`src/main/config/config.c`](file:///home/ivan/Desktop/betaflight/src/main/config/config.c), and [`src/main/config/config_eeprom.c`](file:///home/ivan/Desktop/betaflight/src/main/config/config_eeprom.c), numerous direct calls to `THEJAS_LOG()` were inserted:
+   - In [`src/main/fc/init.c`](../../src/main/fc/init.c), [`src/main/config/config.c`](../../src/main/config/config.c), and [`src/main/config/config_eeprom.c`](../../src/main/config/config_eeprom.c), numerous direct calls to `THEJAS_LOG()` were inserted:
      ```c
      #ifdef THEJAS32
      THEJAS_LOG("init: systemInit complete\r\n");
@@ -41,7 +41,7 @@
      ```
    - While indispensable during initial board bringup when JTAG was unavailable, leaving unconditional string literals in core files inflates flash/SRAM usage by several kilobytes and makes rebasing on newer Betaflight upstream branches messy.
 2. **Redundant Byte Copying Shims**:
-   - In [`src/main/pg/pg.c`](file:///home/ivan/Desktop/betaflight/src/main/pg/pg.c), standard `memset()` and `memcpy()` calls were replaced with explicit `for (int i = 0; i < len; i++)` byte loops.
+   - In [`src/main/pg/pg.c`](../../src/main/pg/pg.c), standard `memset()` and `memcpy()` calls were replaced with explicit `for (int i = 0; i < len; i++)` byte loops.
    - Once the build system added `-fno-builtin-memset` and `system.c` implemented pure 32-bit uncompressed routines, these manual loops became unnecessary baggage.
 
 ### What Could Have Been Done Better
@@ -55,7 +55,7 @@
 1. **The CLI Enter Key (`\r`) UX Breakthrough**:
    - Upstream Betaflight strictly requires receiving three consecutive `#` characters within a tight time window with preceding silence to activate the CLI mode.
    - For embedded developers connecting via standard serial terminals (picocom, minicom), entering CLI frequently failed.
-   - Modifying [`src/main/msp/msp_serial.c`](file:///home/ivan/Desktop/betaflight/src/main/msp/msp_serial.c#L180-L210) to accept a simple Enter (`\r` or `\n`) or `#` made the ARIES v3 CLI experience exceptionally smooth and reliable.
+   - Modifying [`src/main/msp/msp_serial.c`](../../src/main/msp/msp_serial.c#L180-L210) to accept a simple Enter (`\r` or `\n`) or `#` made the ARIES v3 CLI experience exceptionally smooth and reliable.
 2. **FIFO Polling Fallback in `serial_uart.c`**:
    - On architectures without hardware DMA, long atomic sections in Betaflight can occasionally delay the UART ISR.
    - Polling the hardware FIFO directly when `serialRxBytesWaiting()` is called prevented lost MSP commands and packet checksum errors during high-load periods.

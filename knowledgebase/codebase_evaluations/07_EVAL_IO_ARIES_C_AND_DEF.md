@@ -1,9 +1,9 @@
 # Knowledge Evaluation Node: `src/platform/ARIES/io_aries.c` & `io_def_generated.h`
-**Evaluated Log**: [`logs/code_critique/07_IO_ARIES_C_AND_DEF.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/07_IO_ARIES_C_AND_DEF.md)  
+**Evaluated Log**: [`logs/code_critique/07_IO_ARIES_C_AND_DEF.md`](../../logs/code_critique/07_IO_ARIES_C_AND_DEF.md)  
 **Target Code**:
-- [`src/platform/ARIES/io_aries.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c)
-- [`src/platform/ARIES/io_def_generated.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_def_generated.h)  
-**Reference Code**: [`lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c)  
+- [`src/platform/ARIES/io_aries.c`](../../src/platform/ARIES/io_aries.c)
+- [`src/platform/ARIES/io_def_generated.h`](../../src/platform/ARIES/io_def_generated.h)  
+**Reference Code**: [`lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c)  
 **Component**: Address-Decoded Bit-Shift GPIO Driver, Direction Register, Bank 0/1 Splitting, Tag Mapping.
 
 ---
@@ -17,11 +17,11 @@
 
 | Decision / Action Taken | Score (0-10) | Category | Technical Analysis & Rationale | References |
 | :--- | :---: | :---: | :--- | :--- |
-| **Atomic Address-Decoded Pin Setting & Clearing** | **9.8 / 10** | **Masterpiece** | Implementing `base + ((1U << pin_in_bank) << 2)` leverages the hardware decoder for single-instruction atomic pin writes, eliminating read-modify-write hazards without needing critical sections. | [`io_aries.c#L82-L84`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c#L82-L84) vs [`gpio.c#L65`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c#L65) |
-| **Enforcing Memory Barriers (`fence`) After Register Writes** | **9.5 / 10** | **Brilliant** | RISC-V memory access is weakly ordered. Inserting `__asm__ __volatile__("fence")` prevents out-of-order execution of GPIO writes (e.g. SPI Chip Select pulses firing before data bytes). | [`io_aries.c#L66`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c#L66) vs [`gpio.c#L62`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c#L62) |
-| **Bank 0 / Bank 1 Partitioning at Pin 16** | **9.0 / 10** | **Good** | Bank 0 (`0x10080000`, pins 0..15) and Bank 1 (`0x10180000`, pins 16..31) cleanly split the 32 physical pins across the SoC's two 16-bit GPIO IP blocks. | [`io_aries.c#L55-L56`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c#L55-L56) |
-| **Rigorous Pin Range & NULL Checking (`pin >= 32`)** | **9.0 / 10** | **Good** | Every entry point checks `if (!io) return;` and `if (pin >= 32) return;`, preventing memory corruptions from unmapped tags. | [`io_aries.c#L46-L53`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c#L46-L53) |
-| **Lack of Open-Drain Emulation for `IOCFG_OUT_OD`** | **5.5 / 10** | **Mediocre** | THEJAS32 IO pads are push-pull CMOS without hardware open-drain drivers. Emulating open-drain requires setting the pin to 0 and toggling the direction register, which was not implemented. | [`io_aries.c#L59-L64`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/io_aries.c#L59-L64) |
+| **Atomic Address-Decoded Pin Setting & Clearing** | **9.8 / 10** | **Masterpiece** | Implementing `base + ((1U << pin_in_bank) << 2)` leverages the hardware decoder for single-instruction atomic pin writes, eliminating read-modify-write hazards without needing critical sections. | [`io_aries.c#L82-L84`](../../src/platform/ARIES/io_aries.c#L82-L84) vs [`gpio.c#L65`](../../lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c#L65) |
+| **Enforcing Memory Barriers (`fence`) After Register Writes** | **9.5 / 10** | **Brilliant** | RISC-V memory access is weakly ordered. Inserting `__asm__ __volatile__("fence")` prevents out-of-order execution of GPIO writes (e.g. SPI Chip Select pulses firing before data bytes). | [`io_aries.c#L66`](../../src/platform/ARIES/io_aries.c#L66) vs [`gpio.c#L62`](../../lib/vega-sdk/vega-sdk/bsp/drivers/gpio/gpio.c#L62) |
+| **Bank 0 / Bank 1 Partitioning at Pin 16** | **9.0 / 10** | **Good** | Bank 0 (`0x10080000`, pins 0..15) and Bank 1 (`0x10180000`, pins 16..31) cleanly split the 32 physical pins across the SoC's two 16-bit GPIO IP blocks. | [`io_aries.c#L55-L56`](../../src/platform/ARIES/io_aries.c#L55-L56) |
+| **Rigorous Pin Range & NULL Checking (`pin >= 32`)** | **9.0 / 10** | **Good** | Every entry point checks `if (!io) return;` and `if (pin >= 32) return;`, preventing memory corruptions from unmapped tags. | [`io_aries.c#L46-L53`](../../src/platform/ARIES/io_aries.c#L46-L53) |
+| **Lack of Open-Drain Emulation for `IOCFG_OUT_OD`** | **5.5 / 10** | **Mediocre** | THEJAS32 IO pads are push-pull CMOS without hardware open-drain drivers. Emulating open-drain requires setting the pin to 0 and toggling the direction register, which was not implemented. | [`io_aries.c#L59-L64`](../../src/platform/ARIES/io_aries.c#L59-L64) |
 
 ---
 

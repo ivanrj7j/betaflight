@@ -1,6 +1,6 @@
 # Retrospective Log 07: Master Test & Validation Plan
 
-> **Source File:** [`oldfiles/logs/TEST_PLAN.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/TEST_PLAN.md)  
+> **Source File:** [`oldfiles/logs/TEST_PLAN.md`](../../oldfiles/logs/TEST_PLAN.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

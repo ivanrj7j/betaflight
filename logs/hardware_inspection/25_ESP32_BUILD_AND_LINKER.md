@@ -1,11 +1,11 @@
 # Hardware Inspection Log: `src/platform/ESP32/link/esp32c5.ld` & `mk/ESP32C5.mk`
-**Consulted Logs**: [12_STM32_LINKER_AND_SECTIONS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md) & [13_STM32_BUILD_MAKEFILE.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md)
+**Consulted Logs**: [12_STM32_LINKER_AND_SECTIONS.md](12_STM32_LINKER_AND_SECTIONS.md) & [13_STM32_BUILD_MAKEFILE.md](13_STM32_BUILD_MAKEFILE.md)
 
 ## 1. File Purpose & Role in Architecture
 * **File Paths**:
-  * [src/platform/ESP32/link/esp32c5.ld](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/link/esp32c5.ld)
-  * [src/platform/ESP32/mk/ESP32C5.mk](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/mk/ESP32C5.mk)
-  * [src/platform/ESP32/dma_stub_esp32.c](file:///home/ivan/Desktop/betaflight/src/platform/ESP32/dma_stub_esp32.c)
+  * [src/platform/ESP32/link/esp32c5.ld](../../src/platform/ESP32/link/esp32c5.ld)
+  * [src/platform/ESP32/mk/ESP32C5.mk](../../src/platform/ESP32/mk/ESP32C5.mk)
+  * [src/platform/ESP32/dma_stub_esp32.c](../../src/platform/ESP32/dma_stub_esp32.c)
 * **Subsystem**: RISC-V Toolchain Configuration, Linker Memory Mapping, and Parameter Group Anchor Table Management.
 * **Key Components**:
   * `ARCH_FLAGS`: RISC-V 32-bit architectural target flags (`-march=rv32imac... -mabi=ilp32`).

@@ -1,8 +1,8 @@
 # Code Critique: `src/platform/ARIES/startup.S` vs `lib/vega-sdk/vega-sdk/bsp/common/crt.S`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/startup.S`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S)
-- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/common/crt.S`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/crt.S)
+- **Source File**: [`src/platform/ARIES/startup.S`](../../src/platform/ARIES/startup.S)
+- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/common/crt.S`](../../lib/vega-sdk/vega-sdk/bsp/common/crt.S)
 - **Component**: Reset sequence, GPR initialization, C runtime setup, and Machine Trap Entry (`trap_entry`).
 
 ---

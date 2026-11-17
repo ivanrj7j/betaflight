@@ -1,13 +1,13 @@
 # Code Critique: `src/platform/ARIES/include/platform/bsp_thejas32.h` vs `lib/vega-sdk/vega-sdk/bsp/`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/include/platform/bsp_thejas32.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/include/platform/bsp_thejas32.h)
+- **Source File**: [`src/platform/ARIES/include/platform/bsp_thejas32.h`](../../src/platform/ARIES/include/platform/bsp_thejas32.h)
 - **Reference Files**:
-  - [`lib/vega-sdk/vega-sdk/bsp/include/config.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/config.h)
-  - [`lib/vega-sdk/vega-sdk/bsp/include/uart.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/uart.h)
-  - [`lib/vega-sdk/vega-sdk/bsp/include/interrupt.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/interrupt.h)
-  - [`lib/vega-sdk/vega-sdk/bsp/include/timer.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/timer.h)
-  - [`lib/vega-sdk/vega-sdk/bsp/include/spi.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/spi.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/include/config.h`](../../lib/vega-sdk/vega-sdk/bsp/include/config.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/include/uart.h`](../../lib/vega-sdk/vega-sdk/bsp/include/uart.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/include/interrupt.h`](../../lib/vega-sdk/vega-sdk/bsp/include/interrupt.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/include/timer.h`](../../lib/vega-sdk/vega-sdk/bsp/include/timer.h)
+  - [`lib/vega-sdk/vega-sdk/bsp/include/spi.h`](../../lib/vega-sdk/vega-sdk/bsp/include/spi.h)
 - **Component**: Memory-mapped register definitions, peripheral base addresses, IRQ numbering, peripheral register struct typings.
 
 ---

@@ -1,12 +1,12 @@
 # Domain Plan 06: Sensors, RC Telemetry & Scheduler
 
 > **Component Plan ID**: `PLAN-DOM-06`  
-> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](file:///home/ivan/Desktop/betaflight/PLAN/00_MASTER_PLAN_OVERVIEW.md)  
+> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](00_MASTER_PLAN_OVERVIEW.md)  
 > **Primary Knowledge References**:
-> - [`knowledgebase/codebase_evaluations/12_EVAL_STUB_DRIVERS_C.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/12_EVAL_STUB_DRIVERS_C.md)
-> - [`knowledgebase/components/08_ANALOG_ADC_SUBSYSTEM.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/08_ANALOG_ADC_SUBSYSTEM.md)
-> - [`knowledgebase/components/10_SCHEDULER_AND_TASK_ARCHITECTURE.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/10_SCHEDULER_AND_TASK_ARCHITECTURE.md)
-> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
+> - [`knowledgebase/codebase_evaluations/12_EVAL_STUB_DRIVERS_C.md`](../knowledgebase/codebase_evaluations/12_EVAL_STUB_DRIVERS_C.md)
+> - [`knowledgebase/components/08_ANALOG_ADC_SUBSYSTEM.md`](../knowledgebase/components/08_ANALOG_ADC_SUBSYSTEM.md)
+> - [`knowledgebase/components/10_SCHEDULER_AND_TASK_ARCHITECTURE.md`](../knowledgebase/components/10_SCHEDULER_AND_TASK_ARCHITECTURE.md)
+> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
 
 ---
 
@@ -56,7 +56,7 @@ PLAN/06_SENSORS_RC_TELEMETRY_AND_SCHEDULER.md
 
 #### 2. How (Detailed Algorithmic & Receiver Implementation)
 1. **Target Header Configuration**:
-   - In [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h):
+   - In [`src/platform/ARIES/target/ARIESV3/target.h`](../src/platform/ARIES/target/ARIESV3/target.h):
      ```c
      #define USE_SERIALRX
      #define USE_SERIALRX_CRSF
@@ -194,7 +194,7 @@ PLAN/06_SENSORS_RC_TELEMETRY_AND_SCHEDULER.md
 
 #### 1. Why (Silicon Necessity & Architectural Traceability)
 * **The Missing Atomic Extension ('A')**: The VEGA ET1031 core implements RV32IM. It does not possess hardware atomic instructions (`lr.w`/`sc.w`). Standard GCC 13+ libraries require atomic built-in functions (e.g. `__atomic_fetch_add_4`). Without custom symbols, linking fails with unresolved external references.
-* **The Interrupt Nesting Bug in Earlier Code**: In [`src/platform/ARIES/stub_drivers.c#L35-L42`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/stub_drivers.c#L35-L42), `__atomic_fetch_add_4` unconditionally executed `__enable_irq()` on exit. If called inside an active ISR, it prematurely set `mstatus.MIE = 1`, unmasking global interrupts and corrupting interrupt nesting.
+* **The Interrupt Nesting Bug in Earlier Code**: In [`src/platform/ARIES/stub_drivers.c#L35-L42`](../src/platform/ARIES/stub_drivers.c#L35-L42), `__atomic_fetch_add_4` unconditionally executed `__enable_irq()` on exit. If called inside an active ISR, it prematurely set `mstatus.MIE = 1`, unmasking global interrupts and corrupting interrupt nesting.
 * **The Solution (State-Preserving MSTATUS Atomic Sequence)**: Capture previous `MIE` status via CSR instruction `csrrci` and restore it only if it was previously set.
 
 #### 2. How (Detailed Algorithmic & CSR Implementation)

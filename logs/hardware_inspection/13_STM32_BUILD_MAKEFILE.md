@@ -47,5 +47,5 @@
                    -ffunction-sections -fdata-sections -nostdlib -nostartfiles
    TARGET_LDFLAGS = -Wl,--gc-sections -T $(PLATFORM_DIR)/link/thejas32_ram.ld
    ```
-3. **Integrating [lib/vega-sdk](file:///home/ivan/Desktop/betaflight/lib/vega-sdk)**:
+3. **Integrating [lib/vega-sdk](../../lib/vega-sdk)**:
    * Instead of CMSIS/ST HAL, the Makefile will point to `$(ROOT)/lib/vega-sdk/include` for register definitions and peripheral base addresses.

@@ -1,6 +1,6 @@
 # Retrospective Log 10: Renode Changes & The Simulation Trap
 
-> **Source File:** [`oldfiles/logs/RENODE_CHANGES.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/RENODE_CHANGES.md)  
+> **Source File:** [`oldfiles/logs/RENODE_CHANGES.md`](../../oldfiles/logs/RENODE_CHANGES.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

@@ -2,9 +2,9 @@
 
 ## 1. File Metadata & Overview
 - **Source Files**:
-  - [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk)
-  - [`src/platform/ARIES/target/ARIESV3/target.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.mk)
-- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/common/config.mk`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/config.mk)
+  - [`src/platform/ARIES/mk/ARIES.mk`](../../src/platform/ARIES/mk/ARIES.mk)
+  - [`src/platform/ARIES/target/ARIESV3/target.mk`](../../src/platform/ARIES/target/ARIESV3/target.mk)
+- **Reference File**: [`lib/vega-sdk/vega-sdk/bsp/common/config.mk`](../../lib/vega-sdk/vega-sdk/bsp/common/config.mk)
 - **Component**: Build system, compiler flags (`-march=rv32im_zicsr -mabi=ilp32`), multilib library overrides, driver exclusion lists for SRAM budget, linker arguments.
 
 ---

@@ -4,15 +4,15 @@
 * **File Path**: `src/platform/ESP32/serial_uart_esp32.c`
 * **Subsystem**: ESP32 Platform UART Low-Level Driver, GPIO Matrix Signal Routing, Hardware Inversion, and FIFO Interrupt Handling.
 * **Consulted Log Comparison**:
-  * [05_STM32_SERIAL_UART_HW.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md) (STM32 Pin AF multiplexing & external inverter requirement)
-  * [06_STM32_SERIAL_UART_DRIVER.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md) (STM32 `uartIrqHandler`, ORE recovery, TXE spinning prevention)
-  * [07_STM32_SERIAL_UART_PINCONFIG.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/07_STM32_SERIAL_UART_PINCONFIG.md) (STM32 Pin matching & silicon pin swap)
+  * [05_STM32_SERIAL_UART_HW.md](05_STM32_SERIAL_UART_HW.md) (STM32 Pin AF multiplexing & external inverter requirement)
+  * [06_STM32_SERIAL_UART_DRIVER.md](06_STM32_SERIAL_UART_DRIVER.md) (STM32 `uartIrqHandler`, ORE recovery, TXE spinning prevention)
+  * [07_STM32_SERIAL_UART_PINCONFIG.md](07_STM32_SERIAL_UART_PINCONFIG.md) (STM32 Pin matching & silicon pin swap)
 
 ---
 
 ## 2. Similarities & Differences: STM32 vs ESP32
 
-| Dimension | STM32 Implementation ([Logs 05, 06, 07](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md)) | ESP32 Implementation (`serial_uart_esp32.c`) | Porting Implication for ARIES v3.0 (THEJAS32) |
+| Dimension | STM32 Implementation ([Logs 05, 06, 07](05_STM32_SERIAL_UART_HW.md)) | ESP32 Implementation (`serial_uart_esp32.c`) | Porting Implication for ARIES v3.0 (THEJAS32) |
 | :--- | :--- | :--- | :--- |
 | **Common Abstraction (What stayed the SAME)** | Exposes `uartVTable` implementing standard `serialPort_t` interface; identical ring buffer head/tail management; disables TX interrupt on buffer empty. | **Identical**: Exposes `uartVTable`, uses standard software ring buffers (`rxBuffer`, `txBuffer`), feeds upstream MSP parser seamlessly. | **Identical**: ARIES v3.0 `UART0` driver will implement the same `uartVTable` interface, ensuring zero changes to upstream Betaflight MSP/CLI code. |
 | **Pin Routing Architecture** | Rigid silicon Alternate Function (AF) table. Each UART is locked to 2–3 specific pin choices. | **Fully Flexible GPIO Matrix**: `esp_rom_gpio_connect_out_signal()` can route any internal UART signal to literally any chip GPIO pad. | **Fixed Routing**: ARIES v3.0 has fixed board headers (`UART0` on CP2102N, `UART1` on J2, `UART2` on J5). No dynamic matrix mapping needed. |

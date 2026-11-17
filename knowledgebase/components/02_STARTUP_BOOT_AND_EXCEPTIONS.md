@@ -1,12 +1,12 @@
 # Porting Component Knowledge Node: Startup Boot & Exception Traps
 **Component ID**: `PORT-COMP-02`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [02_STM32_SYSTEM_INIT.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/02_STM32_SYSTEM_INIT.md) (Persistent boot tokens, VTOR relocation)
-* [03_STM32_STARTUP_ASSEMBLY.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md) (Stack watermarking `0xA5A5A5A5`, DFU hook)
-* [04_STM32_FAULT_HANDLERS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md) (Naked fault handlers, register frame extraction)
-* [20_ESP32_INTERRUPT_MODEL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/20_ESP32_INTERRUPT_MODEL.md) (Interrupt routing vs static vector table)
-* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (RISC-V Machine-mode CSRs: `mstatus`, `mtvec`, `mcause`, `mepc`, `sp`)
+* [02_STM32_SYSTEM_INIT.md](../../logs/hardware_inspection/02_STM32_SYSTEM_INIT.md) (Persistent boot tokens, VTOR relocation)
+* [03_STM32_STARTUP_ASSEMBLY.md](../../logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md) (Stack watermarking `0xA5A5A5A5`, DFU hook)
+* [04_STM32_FAULT_HANDLERS.md](../../logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md) (Naked fault handlers, register frame extraction)
+* [20_ESP32_INTERRUPT_MODEL.md](../../logs/hardware_inspection/20_ESP32_INTERRUPT_MODEL.md) (Interrupt routing vs static vector table)
+* [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md) (RISC-V Machine-mode CSRs: `mstatus`, `mtvec`, `mcause`, `mepc`, `sp`)
 
 ---
 
@@ -47,7 +47,7 @@ sequenceDiagram
 
 ## 2. Hardware Comparison: ARM Cortex-M vs. RISC-V THEJAS32
 
-Backed directly by [03_STM32_STARTUP_ASSEMBLY.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md), [04_STM32_FAULT_HANDLERS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md), and [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md):
+Backed directly by [03_STM32_STARTUP_ASSEMBLY.md](../../logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md), [04_STM32_FAULT_HANDLERS.md](../../logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md), and [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](../THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md):
 
 | Feature | ARM Cortex-M (`03_STM32_...`, `04_STM32_...`) | RISC-V RV32IM (THEJAS32 / VEGA ET1031) |
 | :--- | :--- | :--- |
@@ -63,7 +63,7 @@ Backed directly by [03_STM32_STARTUP_ASSEMBLY.md](file:///home/ivan/Desktop/beta
 
 ### Failure Mode 1: Corrupting Hot Reboot Reason Tokens (STM32)
 * **The Bug**: On STM32, `persistentObjectWrite()` writes soft-reboot flags (e.g. `BOOTLOADER_REQUEST_ROM`) at the very top of SRAM (`0x20000000 + RAM_SIZE`). When the chip resets, `Reset_Handler` points `sp` to the very top of RAM. The initial function call immediately pushes registers and destroys the reboot token before `systemInit()` can read it!
-* **Overcome By**: From [12_STM32_LINKER_AND_SECTIONS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md), STM32 offsets `_estack` by 16 bytes:
+* **Overcome By**: From [12_STM32_LINKER_AND_SECTIONS.md](../../logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md), STM32 offsets `_estack` by 16 bytes:
   ```ld
   _Hot_Reboot_Flags_Size = 16;
   _estack = ORIGIN(RAM) + LENGTH(RAM) - _Hot_Reboot_Flags_Size;

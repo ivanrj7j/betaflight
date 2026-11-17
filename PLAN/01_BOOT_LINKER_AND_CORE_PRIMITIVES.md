@@ -4,11 +4,11 @@
 > **TARGET SILICON:** C-DAC THEJAS32 SoC (VEGA ET1031 RISC-V RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **ACTIVE BRANCH:** `rebuild`  
 > **KNOWLEDGE BASE CITATIONS:**
-> - Evaluations: [`01_EVAL_STARTUP_S.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/01_EVAL_STARTUP_S.md), [`02_EVAL_LINKER_ARIES_V3_LD.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/02_EVAL_LINKER_ARIES_V3_LD.md), [`04_EVAL_PLATFORM_H.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/04_EVAL_PLATFORM_H.md), [`05_EVAL_SYSTEM_C.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/05_EVAL_SYSTEM_C.md)
-> - Component Blueprints: [`01_SYSTEM_AND_CLOCKS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/01_SYSTEM_AND_CLOCKS.md), [`02_STARTUP_BOOT_AND_EXCEPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/02_STARTUP_BOOT_AND_EXCEPTIONS.md), [`09_BUILD_LINKER_AND_MEMORY.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/09_BUILD_LINKER_AND_MEMORY.md)
-> - Hardware Inspections: [`01_STM32_COMMON_SYSTEM.md`](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md), [`03_STM32_STARTUP_ASSEMBLY.md`](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md), [`04_STM32_FAULT_HANDLERS.md`](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md), [`12_STM32_LINKER_AND_SECTIONS.md`](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md), [`17_ESP32_SYSTEM_AND_TIMER.md`](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/17_ESP32_SYSTEM_AND_TIMER.md)
-> - Source Files: [`startup.S`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S), [`aries_v3.ld`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/linker/aries_v3.ld), [`platform.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/platform.h), [`system.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c)
-> - C-DAC Baseline: [`crt.S`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/crt.S), [`link1.lds`](file:///home/ivan/Desktop/betaflight/lib/vega-bsp/thejas32/link1.lds), [`encoding.h`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/include/encoding.h), [`timer.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)
+> - Evaluations: [`01_EVAL_STARTUP_S.md`](../knowledgebase/codebase_evaluations/01_EVAL_STARTUP_S.md), [`02_EVAL_LINKER_ARIES_V3_LD.md`](../knowledgebase/codebase_evaluations/02_EVAL_LINKER_ARIES_V3_LD.md), [`04_EVAL_PLATFORM_H.md`](../knowledgebase/codebase_evaluations/04_EVAL_PLATFORM_H.md), [`05_EVAL_SYSTEM_C.md`](../knowledgebase/codebase_evaluations/05_EVAL_SYSTEM_C.md)
+> - Component Blueprints: [`01_SYSTEM_AND_CLOCKS.md`](../knowledgebase/components/01_SYSTEM_AND_CLOCKS.md), [`02_STARTUP_BOOT_AND_EXCEPTIONS.md`](../knowledgebase/components/02_STARTUP_BOOT_AND_EXCEPTIONS.md), [`09_BUILD_LINKER_AND_MEMORY.md`](../knowledgebase/components/09_BUILD_LINKER_AND_MEMORY.md)
+> - Hardware Inspections: [`01_STM32_COMMON_SYSTEM.md`](../logs/hardware_inspection/01_STM32_COMMON_SYSTEM.md), [`03_STM32_STARTUP_ASSEMBLY.md`](../logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md), [`04_STM32_FAULT_HANDLERS.md`](../logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md), [`12_STM32_LINKER_AND_SECTIONS.md`](../logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md), [`17_ESP32_SYSTEM_AND_TIMER.md`](../logs/hardware_inspection/17_ESP32_SYSTEM_AND_TIMER.md)
+> - Source Files: [`startup.S`](../src/platform/ARIES/startup.S), [`aries_v3.ld`](../src/platform/ARIES/linker/aries_v3.ld), [`platform.h`](../src/platform/ARIES/platform.h), [`system.c`](../src/platform/ARIES/system.c)
+> - C-DAC Baseline: [`crt.S`](../lib/vega-sdk/vega-sdk/bsp/common/crt.S), [`link1.lds`](../lib/vega-bsp/thejas32/link1.lds), [`encoding.h`](../lib/vega-sdk/vega-sdk/bsp/include/encoding.h), [`timer.c`](../lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ### Why (Architectural Necessity & Silicon Ground Truth)
 1. **Cold-Boot Register Indeterminism:** On physical RISC-V cores upon power-on reset, general-purpose registers (`x1`–`x31`) power up with random bit patterns. If uninitialized registers are accessed prior to C runtime variable zeroing, undefined conditional branches and simulator warnings occur.
-2. **Missing Trap Frame `x2` (`sp`) Preservation Bug:** In the previous port ([`01_EVAL_STARTUP_S.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/01_EVAL_STARTUP_S.md)), `trap_entry` decremented `sp` by 128 bytes and saved registers `x1` and `x3`–`x31`, but explicitly skipped register `x2` (`sp`). When an exception occurred, `system.c`'s `handle_trap()` received a corrupted stack pointer in argument `a2`, making stack backtraces impossible.
+2. **Missing Trap Frame `x2` (`sp`) Preservation Bug:** In the previous port ([`01_EVAL_STARTUP_S.md`](../knowledgebase/codebase_evaluations/01_EVAL_STARTUP_S.md)), `trap_entry` decremented `sp` by 128 bytes and saved registers `x1` and `x3`–`x31`, but explicitly skipped register `x2` (`sp`). When an exception occurred, `system.c`'s `handle_trap()` received a corrupted stack pointer in argument `a2`, making stack backtraces impossible.
 3. **256-Byte Trap Vector Base Alignment:** In the RISC-V privileged architecture, the Machine Trap Vector Base Address register (`mtvec`) in Direct Mode requires 4-byte alignment, and in Vectored Mode requires 256-byte alignment (`.align 8`). Without strict alignment, hardware masks lower bits, branching traps into unexecutable memory.
 4. **LMA == VMA In-SRAM Data Optimization:** Because THEJAS32 boots directly from internal SRAM, the Load Memory Address (LMA) equals the Virtual Memory Address (VMA). Executing an unoptimized copy loop that writes `.data` over itself is redundant; bypassing the copy when `_sdata == _sidata` saves boot cycles and preserves initialized memory integrity.
 
@@ -66,7 +66,7 @@
    - Physical THEJAS32 silicon contains 256 KB of SRAM spanning `0x00200000` to `0x0023FFFF`. The C-DAC on-chip ROM bootloader reserves the first 8 KB (`0x00200000`–`0x00201FFF`) for vector tables, XMODEM transfer buffers, and stack.
    - User code starts at **`0x00202000`**, leaving exactly **$248\text{ KB}$** ($253{,}952\text{ bytes}$) for all code, read-only data, BSS, Parameter Groups, and execution stack.
 2. **Preventing the .init Precedence Trap:**
-   - In [`02_EVAL_LINKER_ARIES_V3_LD.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/02_EVAL_LINKER_ARIES_V3_LD.md), placing `.init` before `.text.startup` in the linker script meant that if any library introduced a `.init` section, it usurped address `0x00202000`, displacing `_start` and causing CPU boot failures.
+   - In [`02_EVAL_LINKER_ARIES_V3_LD.md`](../knowledgebase/codebase_evaluations/02_EVAL_LINKER_ARIES_V3_LD.md), placing `.init` before `.text.startup` in the linker script meant that if any library introduced a `.init` section, it usurped address `0x00202000`, displacing `_start` and causing CPU boot failures.
 3. **Parameter Group Discovery Anchors (`.pg_registry`):**
    - Betaflight uses a specialized linker section to auto-discover configuration modules. If `__pg_registry_start` or `__pg_registry_end` are stripped or misaligned, the Parameter Group registry fails to initialize on boot.
 4. **Compile-Time Memory Boundary Assertion:**
@@ -148,7 +148,7 @@
 
 ### Why (Architectural Necessity & Silicon Ground Truth)
 1. **The Phantom `BASEPRI` Catastrophe:**
-   - In [`04_EVAL_PLATFORM_H.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/04_EVAL_PLATFORM_H.md), `platform.h` previously defined `__set_BASEPRI(basePri) { (void)basePri; }`. Because RISC-V lacks ARM NVIC `BASEPRI` registers, every `ATOMIC_BLOCK()` critical section in Betaflight executed with interrupts fully unmasked.
+   - In [`04_EVAL_PLATFORM_H.md`](../knowledgebase/codebase_evaluations/04_EVAL_PLATFORM_H.md), `platform.h` previously defined `__set_BASEPRI(basePri) { (void)basePri; }`. Because RISC-V lacks ARM NVIC `BASEPRI` registers, every `ATOMIC_BLOCK()` critical section in Betaflight executed with interrupts fully unmasked.
    - High-rate Timer 1 and UART RX interrupts fired mid-way through scheduler task updates and circular ring buffer writes, causing intermittent memory corruption and task hangs.
 2. **RV32IM Software Atomic Emulation:**
    - THEJAS32 implements the integer multiply/divide extensions (`RV32IM`), but omits the Atomic ('A') extension (`lr.w`/`sc.w`). Standard GCC atomic built-ins (such as `__atomic_fetch_add_4`) emit unresolved symbols unless provided by a target platform shim.
@@ -209,7 +209,7 @@
 
 ### Why (Architectural Necessity & Silicon Ground Truth)
 1. **The 42.95-Second 32-Bit Rollover:**
-   - At 100 MHz clock speed, a 32-bit cycle register rolls over after $(2^{32}-1) / 100\text{ MHz} \approx 42.949\text{ seconds}$. In earlier tests ([`04_RETROSPECTIVE_TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md)), scheduler tasks suffered huge negative time deltas at second 43, causing PID divergence and watchdog lockup.
+   - At 100 MHz clock speed, a 32-bit cycle register rolls over after $(2^{32}-1) / 100\text{ MHz} \approx 42.949\text{ seconds}$. In earlier tests ([`04_RETROSPECTIVE_TEST_LOGS.md`](../knowledgebase/retrospective_logs/04_RETROSPECTIVE_TEST_LOGS.md)), scheduler tasks suffered huge negative time deltas at second 43, causing PID divergence and watchdog lockup.
 2. **Avoiding 64-Bit Software Division (`__udivdi3`):**
    - Converting a 64-bit cycle count to microseconds via `cycles / 100ULL` invokes `__udivdi3` from `libgcc.a`, taking $150\text{--}200$ clock cycles. Calling `micros()` dozens of times per millisecond consumes $> 15\%$ of total CPU budget.
 3. **Pure 32-Bit Memory Operations:**

@@ -1,6 +1,6 @@
 # Retrospective Log 03: GEMINI Project Documentation & Agent Handoff
 
-> **Source File:** [`oldfiles/logs/GEMINI.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/GEMINI.md)  
+> **Source File:** [`oldfiles/logs/GEMINI.md`](../../oldfiles/logs/GEMINI.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

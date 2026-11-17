@@ -4,14 +4,14 @@
 * **File Path**: `src/platform/ESP32/interrupt_esp32.c`
 * **Subsystem**: Dynamic Interrupt Matrix Routing, ISR Table Registration, and Interrupt Masking on Non-ARM Architectures.
 * **Consulted Log Comparison**:
-  * [03_STM32_STARTUP_ASSEMBLY.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md) (STM32 Fixed hardware NVIC vector table, `.weak` handler aliasing)
-  * [04_STM32_FAULT_HANDLERS.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/04_STM32_FAULT_HANDLERS.md) (STM32 HardFault / Exception trap models)
+  * [03_STM32_STARTUP_ASSEMBLY.md](03_STM32_STARTUP_ASSEMBLY.md) (STM32 Fixed hardware NVIC vector table, `.weak` handler aliasing)
+  * [04_STM32_FAULT_HANDLERS.md](04_STM32_FAULT_HANDLERS.md) (STM32 HardFault / Exception trap models)
 
 ---
 
 ## 2. Similarities & Differences: STM32 vs ESP32
 
-| Dimension | STM32 Implementation ([Logs 03, 04](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/03_STM32_STARTUP_ASSEMBLY.md)) | ESP32 Implementation (`interrupt_esp32.c`) | Porting Implication for ARIES v3.0 (THEJAS32) |
+| Dimension | STM32 Implementation ([Logs 03, 04](03_STM32_STARTUP_ASSEMBLY.md)) | ESP32 Implementation (`interrupt_esp32.c`) | Porting Implication for ARIES v3.0 (THEJAS32) |
 | :--- | :--- | :--- | :--- |
 | **Interrupt Controller Silicon** | Hardware **NVIC** (Nested Vectored Interrupt Controller). | **Interrupt Matrix** routing peripheral sources to internal CPU interrupt lines. | **RISC-V PLIC** (Platform-Level Interrupt Controller) multiplexing peripheral IRQs into core `MEIP`. |
 | **Vector Table Binding** | Static assembly table (`g_pfnVectors`) with compile-time weak symbols. | Dynamic software registration table using function pointers (`esp32IntrRegister()`). | **Adopt Dynamic Registration**: A central RISC-V PLIC dispatcher calls registered function pointers based on claimed IRQ ID. |

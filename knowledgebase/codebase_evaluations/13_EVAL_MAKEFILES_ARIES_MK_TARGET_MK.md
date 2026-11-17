@@ -2,12 +2,12 @@
 
 ## 1. Executive Summary & File Traceability
 - **Evaluated Files**:
-  - [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk)
-  - [`src/platform/ARIES/target/ARIESV3/target.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.mk)
-- **Source Log**: [`logs/code_critique/13_MAKEFILES_ARIES_MK_TARGET_MK.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/13_MAKEFILES_ARIES_MK_TARGET_MK.md)
+  - [`src/platform/ARIES/mk/ARIES.mk`](../../src/platform/ARIES/mk/ARIES.mk)
+  - [`src/platform/ARIES/target/ARIESV3/target.mk`](../../src/platform/ARIES/target/ARIESV3/target.mk)
+- **Source Log**: [`logs/code_critique/13_MAKEFILES_ARIES_MK_TARGET_MK.md`](../../logs/code_critique/13_MAKEFILES_ARIES_MK_TARGET_MK.md)
 - **Upstream References**:
-  - [`Makefile`](file:///home/ivan/Desktop/betaflight/Makefile)
-  - [`lib/vega-sdk/vega-sdk/bsp/common/config.mk`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/config.mk)
+  - [`Makefile`](../../Makefile)
+  - [`lib/vega-sdk/vega-sdk/bsp/common/config.mk`](../../lib/vega-sdk/vega-sdk/bsp/common/config.mk)
 - **Domain**: Cross-compilation flags, multilib library paths, GCC 13+ ISA specifications, dead-code elimination, SRAM budget enforcement.
 
 ---
@@ -28,7 +28,7 @@
 
 ### What Went Wrong
 1. **Hardcoded User Environment Paths**:
-   - In [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk#L3-L9):
+   - In [`src/platform/ARIES/mk/ARIES.mk`](../../src/platform/ARIES/mk/ARIES.mk#L3-L9):
      ```make
      ARM_SDK_PREFIX ?= /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-
      TOOLCHAIN_RV32I_LIB := /home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/riscv32-esp-elf/lib/rv32i_zicsr_zifencei/ilp32

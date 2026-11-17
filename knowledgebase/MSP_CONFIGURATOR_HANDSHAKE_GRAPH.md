@@ -5,11 +5,11 @@
 This knowledge base document defines the protocol layer, packet formats, and exact handshake transactions between the **Betaflight Configurator** and the **Betaflight Firmware** on the **ARIES v3.0 (THEJAS32)** platform.
 
 ### Connected Knowledge Nodes
-* **Hardware Physical Link**: [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md#31-serial-interfaces-uart) (CP2102N USB-to-UART bridge on `UART0`)
-* **SoC Low-Level Registers**: [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md#4-hardware-peripheral-register-map--direct-access) (`UART0_TX` at `0x10000100`, `LSR` at `0x10000114`)
-* **Target Memory Constraints**: [TARGET_OPTIMIZATION_128KB.md](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md) (Minimal feature set for <128KB binary)
-* **Master Knowledge Index**: [INDEX.md](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md)
-* **Betaflight Docs Reference**: [betaflight.com MSP Protocol Reference](file:///home/ivan/Desktop/betaflight/knowledgebase/betaflight.com/docs/development/MSP-Protocol-Reference-Dev.md)
+* **Hardware Physical Link**: [ARIES_V3_DATASHEET_ANALYSIS.md](ARIES_V3_DATASHEET_ANALYSIS.md#31-serial-interfaces-uart) (CP2102N USB-to-UART bridge on `UART0`)
+* **SoC Low-Level Registers**: [THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md](THEJAS32_PROGRAMMER_MANUAL_ANALYSIS.md#4-hardware-peripheral-register-map--direct-access) (`UART0_TX` at `0x10000100`, `LSR` at `0x10000114`)
+* **Target Memory Constraints**: [TARGET_OPTIMIZATION_128KB.md](TARGET_OPTIMIZATION_128KB.md) (Minimal feature set for <128KB binary)
+* **Master Knowledge Index**: [INDEX.md](INDEX.md)
+* **Betaflight Docs Reference**: [betaflight.com MSP Protocol Reference](betaflight.com/docs/development/MSP-Protocol-Reference-Dev.md)
 
 ---
 

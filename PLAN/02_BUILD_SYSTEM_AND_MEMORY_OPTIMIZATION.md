@@ -1,13 +1,13 @@
 # Domain Plan 02: Build System & Memory Optimization
 
 > **Component Plan ID**: `PLAN-DOM-02`  
-> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](file:///home/ivan/Desktop/betaflight/PLAN/00_MASTER_PLAN_OVERVIEW.md)  
+> **Parent Architecture Document**: [`PLAN/00_MASTER_PLAN_OVERVIEW.md`](00_MASTER_PLAN_OVERVIEW.md)  
 > **Primary Knowledge References**:
-> - [`knowledgebase/codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md)
-> - [`knowledgebase/codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md)
-> - [`knowledgebase/components/11_TARGET_OPTIMIZATION_BUDGET.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/components/11_TARGET_OPTIMIZATION_BUDGET.md)
-> - [`knowledgebase/TARGET_OPTIMIZATION_128KB.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md)
-> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
+> - [`knowledgebase/codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md`](../knowledgebase/codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md)
+> - [`knowledgebase/codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md`](../knowledgebase/codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md)
+> - [`knowledgebase/components/11_TARGET_OPTIMIZATION_BUDGET.md`](../knowledgebase/components/11_TARGET_OPTIMIZATION_BUDGET.md)
+> - [`knowledgebase/TARGET_OPTIMIZATION_128KB.md`](../knowledgebase/TARGET_OPTIMIZATION_128KB.md)
+> - [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
 
 ---
 
@@ -39,7 +39,7 @@ PLAN/02_BUILD_SYSTEM_AND_MEMORY_OPTIMIZATION.md
 #### 1. Why (Silicon Necessity & Architectural Traceability)
 * **The Multilib Trap**: The VEGA ET1031 processor core is RV32IM. It does not implement the standard RISC-V Compressed Instruction extension ('C'). Any execution of a 16-bit opcode raises an unhandled Illegal Instruction Trap (`mcause = 2`).
 * **Toolchain Defaults**: Modern cross-compilers (such as `riscv32-esp-elf-gcc` or `riscv-none-elf-gcc` 13+) default to multilib variants containing compressed code (`rv32imafc`) unless specifically directed. Standard runtime helpers like 64-bit integer division (`__divsi3`, `__udivdi3` in `libgcc.a`) and memory routines (`memset`, `memcpy` in `libc.a`) will silently crash the CPU if pulled from compressed multilib archives.
-* **Environment Portability**: Previous iterations hardcoded workstation paths (`/home/ivan/...`) in [`src/platform/ARIES/mk/ARIES.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/mk/ARIES.mk#L3-L9), breaking builds in CI/CD containers or across different developer machines.
+* **Environment Portability**: Previous iterations hardcoded workstation paths (`/home/ivan/...`) in [`src/platform/ARIES/mk/ARIES.mk`](../src/platform/ARIES/mk/ARIES.mk#L3-L9), breaking builds in CI/CD containers or across different developer machines.
 
 #### 2. How (Detailed Algorithmic & Makefile Logic)
 1. **Dynamic Toolchain Discovery**:
@@ -86,7 +86,7 @@ PLAN/02_BUILD_SYSTEM_AND_MEMORY_OPTIMIZATION.md
    - Specify platform directories: `SRC_DIR += src/platform/ARIES/`.
    - Include core device drivers: `serial_uart_aries.c`, `io_aries.c`, `exti_aries.c`, `bus_spi_aries.c`, `pwm_motor_aries.c`, `system.c`, `stub_drivers.c`.
 2. **Aggressive Dead-Code Pruning via `MCU_EXCLUDES`**:
-   - In [`src/platform/ARIES/target/ARIESV3/target.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.mk), define explicit exclusion patterns:
+   - In [`src/platform/ARIES/target/ARIESV3/target.mk`](../src/platform/ARIES/target/ARIESV3/target.mk), define explicit exclusion patterns:
      ```make
      MCU_EXCLUDES += \
          drivers/display \
@@ -128,7 +128,7 @@ PLAN/02_BUILD_SYSTEM_AND_MEMORY_OPTIMIZATION.md
 
 #### 2. How (Detailed Algorithmic & Header Configuration)
 1. **Flight Loop Clamping**:
-   - In [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h):
+   - In [`src/platform/ARIES/target/ARIESV3/target.h`](../src/platform/ARIES/target/ARIESV3/target.h):
      ```c
      #define DEFAULT_PID_PROCESS_DENOM 8 // Clamps 8 kHz gyro to 1.0 kHz PID loop
      ```

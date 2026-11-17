@@ -164,10 +164,10 @@ flowchart TD
 
 ## 5. Artifact Deliverables Checklist
 
-- [x] Updated Linker Script: [`src/platform/ARIES/link/aries_v3.ld`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld) (Base: `0x00202000`, Length: `248K`)
-- [x] Updated Startup Assembly: [`src/platform/ARIES/startup.S`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/startup.S) (`_estack = 0x0023FC50`, `_start = 0x00202000`, in-RAM copy bypass)
-- [x] Updated Target Configuration: [`src/platform/ARIES/target/ARIESV3/target.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.h), [`config.h`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/config.h), & [`target.mk`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/target/ARIESV3/target.mk)
+- [x] Updated Linker Script: [`src/platform/ARIES/link/aries_v3.ld`](../../src/platform/ARIES/link/aries_v3.ld) (Base: `0x00202000`, Length: `248K`)
+- [x] Updated Startup Assembly: [`src/platform/ARIES/startup.S`](../../src/platform/ARIES/startup.S) (`_estack = 0x0023FC50`, `_start = 0x00202000`, in-RAM copy bypass)
+- [x] Updated Target Configuration: [`src/platform/ARIES/target/ARIESV3/target.h`](../../src/platform/ARIES/target/ARIESV3/target.h), [`config.h`](../../src/platform/ARIES/target/ARIESV3/config.h), & [`target.mk`](../../src/platform/ARIES/target/ARIESV3/target.mk)
 - [x] Fresh Intel HEX & Binary Artifacts: `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` (619 KB) & `bin` (**220 KB** < 248 KB limit)
 - [x] Automated Regression Verification: `build_verify.sh` (8/8) + Google Test (127/127) = **135/135 PASSED (100%)**
-- [x] Verification Logs updated in [`HAL_PROGRESS.md`](file:///home/ivan/Desktop/betaflight/HAL_PROGRESS.md) and [`TEST_LOGS.md`](file:///home/ivan/Desktop/betaflight/TEST_LOGS.md)
+- [x] Verification Logs updated in [`HAL_PROGRESS.md`](../../HAL_PROGRESS.md) and [`TEST_LOGS.md`](../../TEST_LOGS.md)
 - [ ] Physical Flashing on ARIES v3 Board via `flasher.bat` & Live Serial/CLI Verification (Step 6)

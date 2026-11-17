@@ -1,6 +1,6 @@
 # Retrospective Log 12: Renode Simulation Runner Script
 
-> **Source File:** [`oldfiles/logs/runSimulation.sh`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/runSimulation.sh)  
+> **Source File:** [`oldfiles/logs/runSimulation.sh`](../../oldfiles/logs/runSimulation.sh)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

@@ -1,10 +1,10 @@
 # Code Critique: `src/platform/ARIES/link/aries_v3.ld` vs `lib/vega-bsp/thejas32/link1.lds` & `lib/vega-sdk/bsp/common/mbl.lds`
 
 ## 1. File Metadata & Overview
-- **Source File**: [`src/platform/ARIES/link/aries_v3.ld`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/link/aries_v3.ld)
+- **Source File**: [`src/platform/ARIES/link/aries_v3.ld`](../../src/platform/ARIES/link/aries_v3.ld)
 - **Reference Files**:
-  - [`lib/vega-bsp/thejas32/link1.lds`](file:///home/ivan/Desktop/betaflight/lib/vega-bsp/thejas32/link1.lds) (Official C-DAC BSP RAM Linker Script)
-  - [`lib/vega-sdk/vega-sdk/bsp/common/mbl.lds`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/common/mbl.lds)
+  - [`lib/vega-bsp/thejas32/link1.lds`](../../lib/vega-bsp/thejas32/link1.lds) (Official C-DAC BSP RAM Linker Script)
+  - [`lib/vega-sdk/vega-sdk/bsp/common/mbl.lds`](../../lib/vega-sdk/vega-sdk/bsp/common/mbl.lds)
 - **Component**: Linker memory map, section layout, stack definition, symbol exports.
 
 ---

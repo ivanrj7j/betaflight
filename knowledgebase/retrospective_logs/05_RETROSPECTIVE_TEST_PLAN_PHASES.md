@@ -1,6 +1,6 @@
 # Retrospective Log 05: Phased Software Test Plan Architecture
 
-> **Source File:** [`oldfiles/logs/SOFTWARE_TEST_PLAN_PHASES.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/SOFTWARE_TEST_PLAN_PHASES.md)  
+> **Source File:** [`oldfiles/logs/SOFTWARE_TEST_PLAN_PHASES.md`](../../oldfiles/logs/SOFTWARE_TEST_PLAN_PHASES.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

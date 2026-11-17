@@ -1,9 +1,9 @@
 # Knowledge Evaluation Node: `src/platform/ARIES/system.c`
-**Evaluated Log**: [`logs/code_critique/05_SYSTEM_C.md`](file:///home/ivan/Desktop/betaflight/logs/code_critique/05_SYSTEM_C.md)  
-**Target Code**: [`src/platform/ARIES/system.c`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c)  
+**Evaluated Log**: [`logs/code_critique/05_SYSTEM_C.md`](../../logs/code_critique/05_SYSTEM_C.md)  
+**Target Code**: [`src/platform/ARIES/system.c`](../../src/platform/ARIES/system.c)  
 **Reference Code**:
-- [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c)
-- [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)  
+- [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c)
+- [`lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c)  
 **Component**: System Clocks, Cycle Counters, High-Resolution Timebase (`micros()`, `millis()`), Trap Handler (`handle_trap`), Non-RVC Memory Routines.
 
 ---
@@ -17,12 +17,12 @@
 
 | Decision / Action Taken | Score (0-10) | Category | Technical Analysis & Rationale | References |
 | :--- | :---: | :---: | :--- | :--- |
-| **Fast 32-bit Modular Reciprocal Division in `micros()`** | **9.8 / 10** | **Masterpiece** | Normal 64-bit cycle conversion requires `cycles / 100ULL`, pulling in GCC's `__udivdi3` software division (taking 150+ cycles per call). Decomposing into high/low words and modular reciprocal math reduced execution time to $< 25$ cycles. | [`system.c#L112-L124`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c#L112-L124) |
-| **Atomic 64-bit Cycle Counter Reading Loop** | **9.5 / 10** | **Brilliant** | Reading `mcycleh` and `mcycle` in a loop until `hi == hi2` prevented the catastrophic 4.29-second time warp bug that would have blown up the PID $D$-term. | [`system.c#L13-L23`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c#L13-L23) |
-| **Handcrafted Non-RVC `memset`/`memcpy` with Loop Distribution Disabled** | **9.5 / 10** | **Brilliant** | `optimize("no-tree-loop-distribute-patterns")` prevented GCC from replacing loops with recursive calls while ensuring 0 compressed instructions entered the binary on non-RVC ET1031 silicon. | [`system.c#L360-L403`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c#L360-L403) |
-| **Reading Timer 0 `EOI` in Interrupt Service Routine** | **9.0 / 10** | **Good** | Reading `THEJAS32_TIMER(0).EOI` cleared the active interrupt latch in the Synopsys DW_apb_timers IP, preventing an endless interrupt loop. | [`system.c#L50`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c#L50) vs [`timer.c#L48`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c#L48) |
-| **`systemReset()` Trapping in Infinite Loop (`while (1);`)** | **3.0 / 10** | **Flawed** | Hanging in `while(1);` on reboot meant that executing `save` in the CLI forced the user to physically button-reset the board instead of rebooting into Betaflight. | [`system.c#L330-L333`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c#L330-L333) |
-| **Linear 32-Step Loop in Machine External Interrupt Dispatch** | **5.0 / 10** | **Mediocre** | Scanning 0..31 linearly on every external interrupt wasted instructions compared to using `__builtin_ctz(status)`. | [`system.c#L292-L298`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/system.c#L292-L298) |
+| **Fast 32-bit Modular Reciprocal Division in `micros()`** | **9.8 / 10** | **Masterpiece** | Normal 64-bit cycle conversion requires `cycles / 100ULL`, pulling in GCC's `__udivdi3` software division (taking 150+ cycles per call). Decomposing into high/low words and modular reciprocal math reduced execution time to $< 25$ cycles. | [`system.c#L112-L124`](../../src/platform/ARIES/system.c#L112-L124) |
+| **Atomic 64-bit Cycle Counter Reading Loop** | **9.5 / 10** | **Brilliant** | Reading `mcycleh` and `mcycle` in a loop until `hi == hi2` prevented the catastrophic 4.29-second time warp bug that would have blown up the PID $D$-term. | [`system.c#L13-L23`](../../src/platform/ARIES/system.c#L13-L23) |
+| **Handcrafted Non-RVC `memset`/`memcpy` with Loop Distribution Disabled** | **9.5 / 10** | **Brilliant** | `optimize("no-tree-loop-distribute-patterns")` prevented GCC from replacing loops with recursive calls while ensuring 0 compressed instructions entered the binary on non-RVC ET1031 silicon. | [`system.c#L360-L403`](../../src/platform/ARIES/system.c#L360-L403) |
+| **Reading Timer 0 `EOI` in Interrupt Service Routine** | **9.0 / 10** | **Good** | Reading `THEJAS32_TIMER(0).EOI` cleared the active interrupt latch in the Synopsys DW_apb_timers IP, preventing an endless interrupt loop. | [`system.c#L50`](../../src/platform/ARIES/system.c#L50) vs [`timer.c#L48`](../../lib/vega-sdk/vega-sdk/bsp/drivers/timer/timer.c#L48) |
+| **`systemReset()` Trapping in Infinite Loop (`while (1);`)** | **3.0 / 10** | **Flawed** | Hanging in `while(1);` on reboot meant that executing `save` in the CLI forced the user to physically button-reset the board instead of rebooting into Betaflight. | [`system.c#L330-L333`](../../src/platform/ARIES/system.c#L330-L333) |
+| **Linear 32-Step Loop in Machine External Interrupt Dispatch** | **5.0 / 10** | **Mediocre** | Scanning 0..31 linearly on every external interrupt wasted instructions compared to using `__builtin_ctz(status)`. | [`system.c#L292-L298`](../../src/platform/ARIES/system.c#L292-L298) |
 
 ---
 

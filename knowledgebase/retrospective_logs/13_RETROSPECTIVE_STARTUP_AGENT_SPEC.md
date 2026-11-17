@@ -1,6 +1,6 @@
 # Retrospective Log 13: Startup Agent Specification & Epistemic Humility
 
-> **Source File:** [`oldfiles/logs/ariesv3_betaflight_startup_agent_spec.md`](file:///home/ivan/Desktop/betaflight/oldfiles/logs/ariesv3_betaflight_startup_agent_spec.md)  
+> **Source File:** [`oldfiles/logs/ariesv3_betaflight_startup_agent_spec.md`](../../oldfiles/logs/ariesv3_betaflight_startup_agent_spec.md)  
 > **Target Platform:** C-DAC THEJAS32 SoC (VEGA ET1031 RV32IM @ 100 MHz, 256 KB SRAM, No XIP)  
 > **Analysis Date:** 2026-11-17  
 > **Status:** Completed

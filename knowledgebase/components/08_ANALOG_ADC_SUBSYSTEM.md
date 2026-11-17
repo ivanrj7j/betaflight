@@ -1,11 +1,11 @@
 # Porting Component Knowledge Node: Analog-to-Digital Converter (ADC) Subsystem
 **Component ID**: `PORT-COMP-08`  
-**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  
+**Parent Knowledge Graph**: [PORTING_KNOWLEDGE_GRAPH.md](../PORTING_KNOWLEDGE_GRAPH.md)  
 **Primary References**:
-* [11_STM32_ADC_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/11_STM32_ADC_IMPL.md) (Multi-channel DMA scan sequence decoupling & factory calibration)
-* [23_ESP32_ADC.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/23_ESP32_ADC.md) (On-demand polled oneshot ADC & complete omission of DMA)
-* [ARIES_V3_DATASHEET_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/ARIES_V3_DATASHEET_ANALYSIS.md) (Hardware reality: off-chip 4-channel I2C ADC chip `U9`)
-* [TARGET_OPTIMIZATION_128KB.md](file:///home/ivan/Desktop/betaflight/knowledgebase/TARGET_OPTIMIZATION_128KB.md) (Boot telemetry mock strategy for <128KB target)
+* [11_STM32_ADC_IMPL.md](../../logs/hardware_inspection/11_STM32_ADC_IMPL.md) (Multi-channel DMA scan sequence decoupling & factory calibration)
+* [23_ESP32_ADC.md](../../logs/hardware_inspection/23_ESP32_ADC.md) (On-demand polled oneshot ADC & complete omission of DMA)
+* [ARIES_V3_DATASHEET_ANALYSIS.md](../ARIES_V3_DATASHEET_ANALYSIS.md) (Hardware reality: off-chip 4-channel I2C ADC chip `U9`)
+* [TARGET_OPTIMIZATION_128KB.md](../TARGET_OPTIMIZATION_128KB.md) (Boot telemetry mock strategy for <128KB target)
 
 ---
 
@@ -57,7 +57,7 @@ graph TD
 
 ## 2. Hardware Comparison: STM32 vs. ESP32 vs. THEJAS32
 
-Backed directly by [11_STM32_ADC_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/11_STM32_ADC_IMPL.md) and [23_ESP32_ADC.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/23_ESP32_ADC.md):
+Backed directly by [11_STM32_ADC_IMPL.md](../../logs/hardware_inspection/11_STM32_ADC_IMPL.md) and [23_ESP32_ADC.md](../../logs/hardware_inspection/23_ESP32_ADC.md):
 
 | Feature | STM32 (`11_STM32_ADC_IMPL.md`) | ESP32 (`23_ESP32_ADC.md`) | THEJAS32 / ARIES v3.0 |
 | :--- | :--- | :--- | :--- |
@@ -73,7 +73,7 @@ Backed directly by [11_STM32_ADC_IMPL.md](file:///home/ivan/Desktop/betaflight/l
 
 ### Failure Mode 1: Dynamic DMA Sequence Decoupling Hazard (STM32)
 * **The Bug**: On STM32, if a user enables Battery Voltage and Current Sensor in Configurator, the hardware DMA scans 2 channels into `adcValues[0]` and `adcValues[1]`. If the pilot later disables Current Sensor, Battery Voltage shifts from index 1 to index 0! If code read from a fixed index, it would read uninitialized memory or noise, reporting 0V and triggering false failsafe land/beeper alarms!
-* **Overcome By**: From [11_STM32_ADC_IMPL.md](file:///home/ivan/Desktop/betaflight/logs/hardware_inspection/11_STM32_ADC_IMPL.md), STM32 dynamically calculated a `dmaIndex` pointer for each enabled source at boot.
+* **Overcome By**: From [11_STM32_ADC_IMPL.md](../../logs/hardware_inspection/11_STM32_ADC_IMPL.md), STM32 dynamically calculated a `dmaIndex` pointer for each enabled source at boot.
 * **ARIES v3.0 Resolution**: Completely eliminated. The 4 channels on `U9` are fixed in hardware and mapped to dedicated slots in `aries_adc_raw[4]`:
   * Slot 0: `ADC_CH0` (Header J10 Pin 1) $\rightarrow$ Battery Voltage (`ADC_BATTERY`)
   * Slot 1: `ADC_CH1` (Header J10 Pin 2) $\rightarrow$ Current Sensor (`ADC_CURRENT`)
