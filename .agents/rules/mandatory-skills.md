@@ -4,7 +4,7 @@ Every agent operating in this repository must automatically adhere to the follow
 
 ## 1. Always-Loaded Skills
 1. **`project-onboarding`**: Required at the start of any session. Ensures the agent is on the `rebuild` branch and aware of the 248 KB SRAM boot and RV32IM constraints.
-2. **`knowledge-search`**: **MANDATORY BEFORE ANY CODE MODIFICATION.** Every driver, register address, clock divisor, and pin mapping must be cross-checked against the 50+ node knowledge base (`knowledgebase/INDEX.md`, `knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`, and `knowledgebase/codebase_evaluations/`). No guesswork is permitted. **ANTI-ASSUMPTION RULE:** Consult [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md); never guess hardware settings marked as [PENDING TEAM CONFIRMATION].
+2. **`knowledge-search`**: **MANDATORY BEFORE ANY CODE MODIFICATION.** Every driver, register address, clock divisor, and pin mapping must be cross-checked against the 50+ node knowledge base (`knowledgebase/INDEX.md`, `knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`, and `knowledgebase/codebase_evaluations/`). No guesswork is permitted. **ANTI-ASSUMPTION RULE:** Consult [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md); never guess hardware settings marked as [PENDING TEAM CONFIRMATION].
 3. **`knowledge-update`**: Required whenever evaluating code, auditing drivers, or running bench tests. Demands a 0–10 score for every decision and synchronization of `INDEX.md` and `PORTING_KNOWLEDGE_GRAPH.md`.
 
 ## 2. Silicon Constraints (THEJAS32 / VEGA ET1031)
@@ -16,3 +16,7 @@ Every agent operating in this repository must automatically adhere to the follow
 * CSR `mstatus.MIE` atomic sections (no empty `BASEPRI` stubs).
 * SPI0 clock clamped to 12.5 MHz for ICM-42688P.
 * Branch `rebuild` is the only active working branch. `master` contains discarded code.
+
+## 3. Strict Relative File Path Law
+* All markdown documentation, test logs (`logs/dev/`), evaluations, planning files, and code references MUST strictly use POSIX relative file paths.
+* Hardcoded absolute filesystem paths (such as `/home/ivan/...` or `file:///home/...`) are strictly forbidden across all branches and commits to guarantee repository portability across machines, CI/CD runners, and container environments.

@@ -151,6 +151,10 @@ Understanding the logging landscape is critical for rapid debugging and audit co
 > **After each phase, extensive logs must be preserved inside [`logs/dev/`](logs/dev).**  
 > This maintains an indisputable audit trail of hardware bringup progress and enables instant diagnosis of regressions across phases.
 
+> [!WARNING]
+> **Strict Relative File Path Policy in Dev Logs**:  
+> All file cross-references, test records, and build artifacts cited inside `logs/dev/` must strictly use POSIX relative file paths (e.g. `../../src/platform/ARIES/system.c` or `../../obj/betaflight_ARIESV3.elf`). Never record machine-specific absolute paths (such as `/home/ivan/...` or `file:///home/...`).
+
 ### 4.1 Log File Naming Convention
 Every phase must create a dedicated log file inside `logs/dev/`:
 ```text
@@ -413,3 +417,46 @@ When working on any of the 20 phases:
 - [ ] **7. Provided Device Flashing Runbook**: Delivered exact compile commands, loading instructions, and expected serial logs for the user to run on the physical device.
 - [ ] **8. Persisted Phase Log**: Saved complete verification log to **`logs/dev/phase_XX_<name>.log`**.
 - [ ] **9. Updated Knowledge Base**: Synchronized [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md) with findings.
+- [ ] **10. Strictly Relative File Paths**: Verified that all file links, documentation cross-references, test logs, and phase reports use POSIX relative paths (0 instances of `/home/...` or `file:///...`).
+
+---
+
+## 10. Mandatory File Path & Documentation Linking Rule: Strictly Relative Paths
+
+A primary defect identified during the retrospective audit of the historical `master` codebase was the proliferation of hardcoded host paths (such as `ARM_SDK_PREFIX ?= /home/ivan/...`), which rendered the project non-portable and broke CI/CD pipelines across different environments.
+
+To ensure total portability across workstations, CI runners, and container environments, all agents and developers must strictly adhere to the **Relative File Path Law**:
+
+### 10.1 The Three Inviolable Path Rules
+1. **Zero Absolute Host Paths in Committed Files**:
+   - Never commit files containing `/home/...`, `/Users/...`, `C:\...`, or `file:///home/...` paths.
+   - All links to source code, headers, test suites, and documentation must resolve relative to the directory of the document containing the link.
+2. **POSIX Forward Slashes Only**:
+   - Always format paths using POSIX forward slashes (`/`), even when developing on Windows.
+3. **Anchor Preservation**:
+   - Line number ranges (`#L10-L20`) and markdown header anchors (`#section-name`) must be appended directly to the relative path: `[system.c](../../src/platform/ARIES/system.c#L45-L60)`.
+
+### 10.2 Relative Path Resolution Examples
+
+| Referencing File Location | Referenced Target File | Correct Relative Markdown Link |
+| :--- | :--- | :--- |
+| `DEVELOPMENT_GUIDE.md` (Repo Root) | `PLAN/20_DEVELOPMENT_PHASES.md` | `[20 Phases](PLAN/20_DEVELOPMENT_PHASES.md)` |
+| `DEVELOPMENT_GUIDE.md` (Repo Root) | `src/platform/ARIES/system.c` | `[system.c](src/platform/ARIES/system.c)` |
+| `logs/dev/phase_01_toolchain.log` | `src/platform/ARIES/mk/ARIES.mk` | `[ARIES.mk](../../src/platform/ARIES/mk/ARIES.mk)` |
+| `knowledgebase/codebase_evaluations/01_EVAL.md` | `src/platform/ARIES/startup.S` | `[startup.S](../../src/platform/ARIES/startup.S)` |
+| `knowledgebase/codebase_evaluations/01_EVAL.md` | `logs/code_critique/01_STARTUP_S.md` | `[Critique](../../logs/code_critique/01_STARTUP_S.md)` |
+| `PLAN/20_DEVELOPMENT_PHASES.md` | `knowledgebase/INDEX.md` | `[Index](../knowledgebase/INDEX.md)` |
+
+### 10.3 Pre-Commit Path Normalization Tool
+A dedicated normalizer script is maintained at [`scripts/convert_paths_to_relative.py`](scripts/convert_paths_to_relative.py). Before completing any phase or submitting changes, run:
+
+```bash
+# Preview changes without modifying files
+python3 scripts/convert_paths_to_relative.py --dry-run --all-docs
+
+# Apply relative path conversion across all documentation, plans, and logs
+python3 scripts/convert_paths_to_relative.py --all-docs
+
+# Verify strictly zero absolute paths remain
+grep -rn "file:///home/" logs/ knowledgebase/ PLAN/ .agents/
+```

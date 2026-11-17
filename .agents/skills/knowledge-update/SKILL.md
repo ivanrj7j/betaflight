@@ -19,8 +19,10 @@ This skill governs the protocol for documenting engineering analyses, code criti
    - Do NOT batch read and batch write. Process one node at a time to ensure high technical depth.
 2. **0 to 10 Decision Scoring Rubric:**
    - Every architectural choice, hardware assumption, and implementation decision must be scored from 0 to 10 with clear technical justification.
-3. **Hyperlink Integrity:**
-   - All referenced files must use clickable markdown links with absolute file paths and line numbers: `[basename](file:///home/ivan/Desktop/betaflight/path/to/file#L10-L20)`.
+3. **Hyperlink Integrity & Mandatory Relative File Paths:**
+   - All referenced files inside repository markdown files and documentation MUST use POSIX relative paths with line numbers where appropriate: `[basename](relative/path/to/file#L10-L20)`.
+   - Absolute filesystem paths (such as `/home/ivan/...` or `file:///home/...`) are strictly forbidden across all committed documentation, logs, evaluations, and code comments to guarantee portability across developer workstations, containers, and CI runners.
+   - When creating or updating documents in subdirectories (e.g. `knowledgebase/codebase_evaluations/`), calculate the path relative to that document's directory (e.g. `../../src/platform/ARIES/system.c` or `../../logs/code_critique/05_SYSTEM_C.md`).
 
 ---
 
@@ -32,9 +34,9 @@ When evaluating a driver, subsystem, or test outcome, create a new file in `know
 # Evaluation Node XX: Subsystem Name (`filename.c`)
 
 ## 1. Executive Summary & File Traceability
-- **Evaluated File**: [`src/platform/ARIES/...`](file:///home/ivan/Desktop/betaflight/src/platform/ARIES/...)
-- **Source Log / Test Record**: [`logs/...`](file:///home/ivan/Desktop/betaflight/logs/...)
-- **Upstream / Reference Drivers**: [`lib/vega-sdk/...`](file:///home/ivan/Desktop/betaflight/lib/vega-sdk/...)
+- **Evaluated File**: [`src/platform/ARIES/...`](../../src/platform/ARIES/...)
+- **Source Log / Test Record**: [`logs/...`](../../logs/...)
+- **Upstream / Reference Drivers**: [`lib/vega-sdk/...`](../../lib/vega-sdk/...)
 - **Domain**: Brief functional summary.
 
 ---
@@ -70,7 +72,7 @@ When evaluating a driver, subsystem, or test outcome, create a new file in `know
 After creating an evaluation or retrospective document:
 
 ### Step 1: Update the Central Index (`knowledgebase/INDEX.md`)
-1. Open [`knowledgebase/INDEX.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md).
+1. Open [`knowledgebase/INDEX.md`](../../../knowledgebase/INDEX.md).
 2. Locate the appropriate subsection under Section 3 (e.g. *Codebase Evaluations Catalog*).
 3. Insert a new row containing:
    - Link to the evaluation document.
@@ -80,7 +82,7 @@ After creating an evaluation or retrospective document:
    - Core takeaways.
 
 ### Step 2: Update the Master Knowledge Graph (`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`)
-1. Open [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md).
+1. Open [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](../../../knowledgebase/PORTING_KNOWLEDGE_GRAPH.md).
 2. Update the Mermaid cross-reference diagram:
    - Add the node ID (e.g. `EXX["XX_Driver_Name"]`).
    - Add connection edges to relevant target modules (e.g. `EXX --> M4`).
@@ -93,5 +95,5 @@ After creating an evaluation or retrospective document:
 Before completing an update:
 - [ ] Every decision has an explicit score (0–10).
 - [ ] Analysis covers: What went wrong, What could have been done better, and Good parts.
-- [ ] All file links are formatted as `file:///home/ivan/Desktop/betaflight/...`.
-- [ ] [`INDEX.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md) and [`PORTING_KNOWLEDGE_GRAPH.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md) are both synchronized.
+- [ ] All file links are formatted as strictly relative paths (0 absolute `/home/...` or `file:///...` links).
+- [ ] [`INDEX.md`](../../../knowledgebase/INDEX.md) and [`PORTING_KNOWLEDGE_GRAPH.md`](../../../knowledgebase/PORTING_KNOWLEDGE_GRAPH.md) are both synchronized.

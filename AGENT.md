@@ -114,6 +114,7 @@ Before reporting any task complete or submitting code changes:
 - [ ] **Opcode Audit:** Run `riscv32-esp-elf-objdump -d <binary>.elf | grep -E "^\s*[0-9a-f]+:\s+[0-9a-f]{4}\s+"` and verify that the compressed instruction count is **strictly 0**.
 - [ ] **Memory Bounds Check:** Verify that the total binary artifact is **$\le 248\text{ KB}$** and execution origin is `0x00202000`.
 - [ ] **Target Branch Check:** Confirm changes are on branch **`rebuild`** (not `master`).
+- [ ] **Relative Path Integrity:** Confirm that all markdown links, test logs, documentation references, and evaluation notes strictly use POSIX relative paths (0 absolute `/home/...` or `file:///...` links).
 - [ ] **Knowledge Base Synchronization:** If any driver or architectural behavior was changed or discovered, document it in an evaluation/retrospective log and link it in [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md).
 - [ ] **Physical Hardware Safety:** Ensure propellers are removed, an external 5V BEC supplies the flight receiver/peripherals, and a low-ESR capacitor ($470\text{--}1000\,\mu\text{s}$) is installed across the ESC battery leads to protect 3.3V LVCMOS pins.
 

@@ -112,8 +112,11 @@ def main():
             "logs",
             "knowledgebase",
             "PLAN",
+            ".agents",
             "MACRO_PLAN.md",
             "DEVELOPMENT_GUIDE.md",
+            "AGENT.md",
+            "AGENTS.md",
         ]
     else:
         targets = args.targets

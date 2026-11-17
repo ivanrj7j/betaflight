@@ -18,7 +18,7 @@ This skill provides the mandatory onboarding protocol and orientation runbook fo
 * **Track:** **Mission 3: VEGAPilot Track**
 * **Initiative:** **Digital India RISC-V (DIR-V)** program under MeitY (Government of India).
 * **Goal:** Replace foreign STM32 flight controllers with an indigenous Indian RISC-V flight controller based on C-DAC's THEJAS32 SoC (VEGA ET1031 core @ 100 MHz).
-* **Primary Reference Document:** [`AGENT.md`](file:///home/ivan/Desktop/betaflight/AGENT.md)
+* **Primary Reference Document:** [`AGENT.md`](../../../AGENT.md)
 
 ---
 
@@ -78,10 +78,13 @@ Every agent must memorize and respect these physical hardware constraints:
 When joining a session or starting a new task, follow this exact procedure:
 
 1. **Verify Git Branch:** Ensure `git branch --show-current` reports `rebuild`.
-2. **Review Knowledge Base Index & Gaps:** Open [`knowledgebase/INDEX.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md), [`PORTING_KNOWLEDGE_GRAPH.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md), and check [`CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md) to avoid making assumptions on pending hardware confirmations.
-3. **Check Target Drivers:** Inspect files in `src/platform/ARIES/` and corresponding evaluation notes in [`knowledgebase/codebase_evaluations/`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/).
+2. **Review Knowledge Base Index & Gaps:** Open [`knowledgebase/INDEX.md`](../../../knowledgebase/INDEX.md), [`PORTING_KNOWLEDGE_GRAPH.md`](../../../knowledgebase/PORTING_KNOWLEDGE_GRAPH.md), and check [`CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../../../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md) to avoid making assumptions on pending hardware confirmations.
+3. **Check Target Drivers:** Inspect files in `src/platform/ARIES/` and corresponding evaluation notes in [`knowledgebase/codebase_evaluations/`](../../../knowledgebase/codebase_evaluations).
 4. **Consult Before Modifying:** If tasked with altering any peripheral, driver, or build setting, use the `knowledge-search` skill first.
 5. **Verify Electrical Safety:** If physical bench testing is planned:
    - Propellers **MUST BE OFF**.
    - External 5V BEC must power the board/peripherals.
    - Low-ESR capacitor ($470\text{--}1000\,\mu\text{F}$) must be installed to protect 3.3V LVCMOS pins from ESC voltage spikes.
+6. **Strict Relative File Path Policy:**
+   - Ensure all documentation, phase logs (`logs/dev/`), code comments, and cross-references strictly use POSIX relative file paths (`../...` or repo-relative).
+   - Hardcoded host filesystem paths (such as `/home/ivan/...` or `file:///home/...`) are strictly forbidden across all commits.
