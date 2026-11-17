@@ -78,7 +78,7 @@ Every agent must memorize and respect these physical hardware constraints:
 When joining a session or starting a new task, follow this exact procedure:
 
 1. **Verify Git Branch:** Ensure `git branch --show-current` reports `rebuild`.
-2. **Review Knowledge Base Index:** Open [`knowledgebase/INDEX.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md) and [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md).
+2. **Review Knowledge Base Index & Gaps:** Open [`knowledgebase/INDEX.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md), [`PORTING_KNOWLEDGE_GRAPH.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md), and check [`CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md) to avoid making assumptions on pending hardware confirmations.
 3. **Check Target Drivers:** Inspect files in `src/platform/ARIES/` and corresponding evaluation notes in [`knowledgebase/codebase_evaluations/`](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/).
 4. **Consult Before Modifying:** If tasked with altering any peripheral, driver, or build setting, use the `knowledge-search` skill first.
 5. **Verify Electrical Safety:** If physical bench testing is planned:

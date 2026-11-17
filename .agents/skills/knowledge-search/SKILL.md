@@ -18,10 +18,20 @@ This skill provides a fast, structured routing guide to search and navigate the 
 > [!IMPORTANT]
 > **RULE:** Never guess a register address, timing constant, pin assignment, or memory boundary. Every subsystem on the C-DAC THEJAS32 SoC has been analyzed, benchmarked, and evaluated in the knowledge base. Always consult the corresponding documents first.
 
+### 1.1 Anti-Assumption Directive for Knowledge Gaps
+> [!CAUTION]
+> **STRICT PROHIBITION ON ASSUMPTIONS:**  
+> If an item or subsystem is listed in [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md) as **[PENDING TEAM CONFIRMATION]** (e.g. physical IMU orientation, ESC protocol selection, ADC register verification), you **MUST NOT** guess or assume standard STM32/ESP32 behavior.
+> - You **MUST** state the known silicon boundaries.
+> - You **MUST** highlight the specific gap.
+> - You **MUST** ask the user or wait for verified team laboratory confirmation before committing code.
+
 ---
 
 ## 2. Master Navigation Index
 
+* **Critical Knowledge Gaps & Assumptions:** [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)  
+  *Unverified hardware boundaries, pending team inputs, and strict anti-hallucination guardrails.*
 * **Central Knowledge Index:** [`knowledgebase/INDEX.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md)  
   *High-level directory cross-linking all hardware datasheets, inspection logs, retrospective analyses, and component nodes.*
 * **Master Architectural Blueprint:** [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/PORTING_KNOWLEDGE_GRAPH.md)  

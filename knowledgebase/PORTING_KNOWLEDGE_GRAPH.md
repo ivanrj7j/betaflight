@@ -8,6 +8,7 @@ It directly rectifies the historical planning and practical implementation mista
 * [HISTORICAL_RETROSPECTIVE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/HISTORICAL_RETROSPECTIVE_GRAPH.md)
 * [Retrospective Logs 01–14 Catalog](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs)
 * [Codebase Evaluations 01–15 Catalog](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations)
+* [Critical Knowledge Gaps & Assumptions Register](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
 
 ---
 

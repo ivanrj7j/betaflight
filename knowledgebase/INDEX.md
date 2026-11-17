@@ -23,6 +23,7 @@ graph TD
         MISTAKE_GRAPH["Mistake & Rectification Graph<br/>(HISTORICAL_PLANNING_MISTAKES_GRAPH.md)"]
         RETRO_GRAPH["Retrospective Implementation Graph<br/>(HISTORICAL_RETROSPECTIVE_GRAPH.md)"]
         RETRO_LOGS["14 Retrospective Audit Logs<br/>(knowledgebase/retrospective_logs/01..14)"]
+        GAPS_LOG["Critical Gaps & Assumptions<br/>(CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)"]
     end
 
     subgraph INSPECTION_LOGS["Hardware Inspection & Comparative Logs (25 Files)"]
@@ -97,6 +98,7 @@ graph TD
 | **[PLANNING_MISTAKES_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PLANNING_MISTAKES_ANALYSIS.md)** | **Historical Planning Audit** | Deep analysis of the 7 foundational planning mistakes: XIP flash assumption, imaginary `0x10000000` SRAM base, `MCU_FLASH_SIZE := 2048` bloat, Renode simulation false security, `.hex` vs `.bin` flasher confusion, 43s `mcycle` timebase rollover. |
 | **[HISTORICAL_PLANNING_MISTAKES_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/HISTORICAL_PLANNING_MISTAKES_GRAPH.md)** | **Mistake & Rectification Graph** | Visual Mermaid cascade showing how planning flaws caused hardware failure, accompanied by an explicit old-plan vs new-architecture rectification matrix. |
 | **[HISTORICAL_RETROSPECTIVE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/HISTORICAL_RETROSPECTIVE_GRAPH.md)** | **Implementation Retrospective Graph** | Comprehensive retrospective knowledge graph mapping the 0–10 scoring spectrum, the Five Great Failure Cascades (DMA truncation, simulation trap, THRE storm, unarmed IRQs, fallback falsification), and the 128 KB rebuild rectification matrix. |
+| **[CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)** | **Knowledge Gaps & Anti-Assumption Register** | Active register of unconfirmed hardware parameters: physical IMU orientation, UART hardware inversion limits (SBUS), ESC protocols, ADC wiring (`U9` vs `0x10001000`), and SPI3 flash persistence. |
 
 ### B. Retrospective Audit Logs Catalog (`knowledgebase/retrospective_logs/`)
 | Log Document | Source Audited | Decision Scoring | Core Findings & Silicon Lessons |

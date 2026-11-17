@@ -4,7 +4,7 @@ Every agent operating in this repository must automatically adhere to the follow
 
 ## 1. Always-Loaded Skills
 1. **`project-onboarding`**: Required at the start of any session. Ensures the agent is on the `rebuild` branch and aware of the 248 KB SRAM boot and RV32IM constraints.
-2. **`knowledge-search`**: **MANDATORY BEFORE ANY CODE MODIFICATION.** Every driver, register address, clock divisor, and pin mapping must be cross-checked against the 50+ node knowledge base (`knowledgebase/INDEX.md`, `knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`, and `knowledgebase/codebase_evaluations/`). No guesswork is permitted.
+2. **`knowledge-search`**: **MANDATORY BEFORE ANY CODE MODIFICATION.** Every driver, register address, clock divisor, and pin mapping must be cross-checked against the 50+ node knowledge base (`knowledgebase/INDEX.md`, `knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`, and `knowledgebase/codebase_evaluations/`). No guesswork is permitted. **ANTI-ASSUMPTION RULE:** Consult [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md); never guess hardware settings marked as [PENDING TEAM CONFIRMATION].
 3. **`knowledge-update`**: Required whenever evaluating code, auditing drivers, or running bench tests. Demands a 0–10 score for every decision and synchronization of `INDEX.md` and `PORTING_KNOWLEDGE_GRAPH.md`.
 
 ## 2. Silicon Constraints (THEJAS32 / VEGA ET1031)
