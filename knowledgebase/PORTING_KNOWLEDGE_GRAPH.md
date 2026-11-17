@@ -1,12 +1,13 @@
 # Betaflight Porting Knowledge Graph: ARIES v3.0 (THEJAS32 / VEGA ET1031)
 
-This document synthesizes findings across all 25 hardware inspection logs and **14 retrospective logs from the previous porting attempt** into a unified, component-by-component architectural blueprint for porting Betaflight to the **ARIES v3.0** board powered by the **THEJAS32 SoC (VEGA ET1031 RISC-V RV32IM)**.
+This document synthesizes findings across all 25 hardware inspection logs, **14 retrospective logs from the previous porting attempt**, and **15 deep codebase evaluation nodes** into a unified, component-by-component architectural blueprint for porting Betaflight to the **ARIES v3.0** board powered by the **THEJAS32 SoC (VEGA ET1031 RISC-V RV32IM)**.
 
 It directly rectifies the historical planning and practical implementation mistakes documented in:
 * [PLANNING_MISTAKES_ANALYSIS.md](file:///home/ivan/Desktop/betaflight/knowledgebase/PLANNING_MISTAKES_ANALYSIS.md)
 * [HISTORICAL_PLANNING_MISTAKES_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/HISTORICAL_PLANNING_MISTAKES_GRAPH.md)
 * [HISTORICAL_RETROSPECTIVE_GRAPH.md](file:///home/ivan/Desktop/betaflight/knowledgebase/HISTORICAL_RETROSPECTIVE_GRAPH.md)
 * [Retrospective Logs 01–14 Catalog](file:///home/ivan/Desktop/betaflight/knowledgebase/retrospective_logs)
+* [Codebase Evaluations 01–15 Catalog](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations)
 
 ---
 
@@ -384,6 +385,24 @@ graph LR
         R12["12_Run_Simulation (Fallback Falsification)"]
     end
 
+    subgraph EvalNodes ["Ported Codebase Evaluations (01 - 15)"]
+        E01["01_Startup_S (Trap x2 Stack & Reset)"]
+        E02["02_Linker_Script (0x00202000 248KB Limit)"]
+        E03["03_BSP_Header (APB Peripherals & 100MHz)"]
+        E04["04_Platform_H (BASEPRI Bug & ATOMIC)"]
+        E05["05_System_C (64-bit mcycle & Non-RVC Mem)"]
+        E06["06_Serial_UART (Bounded Drain & RX Ring)"]
+        E07["07_IO_Driver (Flat 32-bit & I2C Unstick)"]
+        E08["08_EXTI_Driver (Bank 0/1 CTZ Dispatch)"]
+        E09["09_SPI_Driver (Mode 0/3 & 25MHz Clamp)"]
+        E10["10_Flash_Config (No-XIP CONFIG_IN_RAM)"]
+        E11["11_PWM_Motor (Deadline Event Scheduler)"]
+        E12["12_Stub_Drivers (RV32IM Atomic & ADC Guard)"]
+        E13["13_Makefiles (Multilib RVC & MCU_EXCLUDES)"]
+        E14["14_Target_Config (1kHz Clamping & 8KB EEPROM)"]
+        E15["15_Core_Diffs (CLI Enter & Repository Isolation)"]
+    end
+
     subgraph PortingPlan ["Target Architecture: ARIES v3.0 (THEJAS32)"]
         M1["Module 1: RV32IM Linker & SRAM Layout (0x00202000)"]
         M2["Module 2: Machine Boot & Trap Vector (__enable_irq)"]
@@ -397,22 +416,46 @@ graph LR
         M10["Module 10: <128KB Minimal Modular Stripping"]
     end
 
-    L01 & L17 & R04 --> M3
-    L02 & L03 & L04 & L20 & R01 & R02 --> M2
-    L05 & L06 & L07 & L15 & L18 & R01 & R02 & R06 --> M4
-    L08 & L19 --> M5
-    L09 & L22 & R02 --> M7
-    L10 & L21 & R02 --> M8
-    L11 & L23 --> M9
-    L12 & L13 & L25 & R02 & R10 --> M1
-    L14 & L16 & L13 & L25 & R02 & R07 --> M10
-    R02 & R05 --> M5
-    L08 & L24 --> M6
+    L01 & L17 & R04 & E05 --> M3
+    L02 & L03 & L04 & L20 & R01 & R02 & E01 & E04 --> M2
+    L05 & L06 & L07 & L15 & L18 & R01 & R02 & R06 & E06 & E15 --> M4
+    L08 & L19 & E07 --> M5
+    L09 & L22 & R02 & E11 --> M7
+    L10 & L21 & R02 & E09 --> M8
+    L11 & L23 & E12 --> M9
+    L12 & L13 & L25 & R02 & R10 & E02 & E13 --> M1
+    L14 & L16 & L13 & L25 & R02 & R07 & E10 & E14 --> M10
+    R02 & R05 & E10 & E14 --> M5
+    L08 & L24 & E08 --> M6
 ```
 
 ---
 
-## 4. First-Boot & Configurator Verification Checklist
+## 4. Ported Codebase Evaluation Matrix & Critical Scoring (Nodes 01 - 15)
+
+The following matrix synthesizes the line-by-line technical audits conducted on the actual ported C and assembly implementation in `src/platform/ARIES/` and core diffs in `src/main/`:
+
+| Node ID | Target File Evaluated | Key Architectural Decisions Scored | What Went Wrong (Vulnerabilities Found) | What Could Have Been Done Better | Brilliant Engineering Insights |
+| :---: | :--- | :---: | :--- | :--- | :--- |
+| **[E01](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/01_EVAL_STARTUP_S.md)** | `startup.S` | 5 Scored | Trap frame omitted `x2` (`sp`) save; single `sp` for machine/trap handler risking stack smash. | Separate trap handler stack (`mscratch`); explicit GPR clear on reset. | Zeroed registers `x1..x31` prevent cold boot register leakage; 256-byte trap vector alignment. |
+| **[E02](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/02_EVAL_LINKER_ARIES_V3_LD.md)** | `aries_v3.ld` | 5 Scored | Unchecked stack growth colliding with `.bss` boundary; absent flash XIP section awareness. | Compile-time stack assertion: `ASSERT(_stack_size <= (ORIGIN(RAM) + LENGTH(RAM) - .), "SRAM overflow")`. | Accurately mapped SRAM execution base `0x00202000` to `0x0023FFFF` (248 KB); clean `.pg_registry` anchoring. |
+| **[E03](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/03_EVAL_BSP_THEJAS32_H.md)** | `bsp_thejas32.h` | 5 Scored | Hardcoded crystal frequency macro without dynamic PLL detection. | Guarding with `#ifndef SYSTEM_CLOCK_HZ`; documenting APB bus divisor topology. | Bit-exact memory map for 16550 UART, Synopsys APB Timers, SPI, and dual-bank GPIO controllers. |
+| **[E04](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/04_EVAL_PLATFORM_H.md)** | `platform.h` | 5 Scored | **Critical Bug:** `__get_BASEPRI()` and `__set_BASEPRI()` were empty stubs, rendering `ATOMIC_BLOCK` completely ineffective! | Map atomic sections directly to RISC-V `csrrci %0, mstatus, 8` / `csrs mstatus, 8`. | Clean mapping of ARM CMSIS intrinsics (`__REV`, `__REV16`, `__NOP`, `__WFI`) to RISC-V instructions. |
+| **[E05](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/05_EVAL_SYSTEM_C.md)** | `system.c` | 6 Scored | Soft reboot invoked an infinite loop `while(1);` rather than jumping to `_start` or issuing software reset. | Soft jump to `_start` with trap unmasking; cycle counter overflow test harness. | Pure 32-bit `memset`/`memcpy` routines prevent multilib RVC traps; high-precision 64-bit `mcycle` timebase. |
+| **[E06](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/06_EVAL_SERIAL_UART_ARIES_C.md)** | `serial_uart_aries.c` | 6 Scored | Unbounded synchronous TX polling can stall PID flight loop during large MSP configuration dumps. | Bounded cycle limit on TX busy loop with software ring buffer fallback. | RX-only interrupt handling with dedicated ring buffers; baud rate divisor calculation at 100 MHz. |
+| **[E07](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/07_EVAL_IO_ARIES_C_AND_DEF.md)** | `io_aries.c` | 5 Scored | Missing open-drain emulation bitmask in standard output write API. | Atomic bit manipulation via hardware set/clear registers; open-drain simulation for bus unsticking. | Flat 32-bit pin tag indexing (`DEFIO_TAG_MAKE`) avoids multi-bank lookup popcount tables. |
+| **[E08](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/08_EVAL_EXTI_ARIES_C.md)** | `exti_aries.c` | 5 Scored | Linear 16-pin scanning in IRQ 10/11 ISR introduces latency on high-frequency (1 kHz) Gyro DRDY interrupts. | Track active EXTI pins in a 32-bit bitmask and dispatch using `__builtin_ctz()`. | Clean segregation of Bank 0 (pins 0..15) and Bank 1 (pins 16..31) interrupt vectors. |
+| **[E09](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/09_EVAL_BUS_SPI_ARIES_C.md)** | `bus_spi_aries.c` | 6 Scored | Divisor 0 generates 25 MHz SCK, exceeding the 24.0 MHz maximum specification of the ICM-42688P IMU by 4.1%. | Clamp sensor SPI frequency to Divisor 1 (12.5 MHz), costing $< 9\,\mu\text{s}$ per gyro read. | Bit-exact shift-by-4 divisor mapping (`bBaudCFD << 4`); seamless Mode 0 and Mode 3 polarity control. |
+| **[E10](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/10_EVAL_CONFIG_FLASH_ARIES_C.md)** | `config_flash_aries.c` | 5 Scored | **Critical Bug:** Dereferencing memory-mapped SPI flash `0x20000000` triggers Store Access Fault (`mcause = 7`) on real silicon. | Adopt `#define CONFIG_IN_RAM` (`EEPROM_SIZE 8192`) in internal SRAM, completely avoiding external flash XIP. | Clean JEDEC 4 KB sector erase (`0x20`) and page program (`0x02`) command sequencing. |
+| **[E11](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/11_EVAL_PWM_MOTOR_ARIES_C.md)** | `pwm_motor_aries.c` | 5 Scored | Race condition in `pwmCompleteMotorUpdate`: Timer 1 was left active while setting motor pins HIGH. | Disable Timer 1 at entrance of motor update; group deadlines $< 100$ cycles together. | **Ascending deadline event scheduler:** Non-blocking hardware Timer 1 sequencing consumes $< 3\,\mu\text{s}$ CPU total! |
+| **[E12](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/12_EVAL_STUB_DRIVERS_C.md)** | `stub_drivers.c` | 5 Scored | ADC stub returning `0` triggers false 0.0V battery failsafe lock; atomic fallback clobbers nested interrupt state. | State-preserving `csrrci mstatus, 8` sequence; explicit `#undef USE_ADC` in `target.h`. | Implemented `__atomic_fetch_add_4` for RV32IM, resolving libatomic missing symbols on non-atomic silicon. |
+| **[E13](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md)** | `ARIES.mk` | 5 Scored | Hardcoded host toolchain path `/home/ivan/...` breaks cross-platform and CI builds. | Dynamic toolchain resolution using `which riscv32-esp-elf-gcc` and `-print-file-name=libc.a`. | **Multilib RVC override:** Forcing `rv32i_zicsr_zifencei/ilp32` prevented fatal compressed instruction traps. |
+| **[E14](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md)** | `target.h` | 5 Scored | Reducing `EEPROM_SIZE` from 8192 to 4096 triggers boot panic because Betaflight PGs exceed 4.8 KB. | Static compile-time assertion guarding `EEPROM_SIZE >= 8192`. | Locked 1.0 kHz flight loop (`DEFAULT_PID_PROCESS_DENOM 8`) leaves $> 50\%$ CPU headroom on soft-float core. |
+| **[E15](file:///home/ivan/Desktop/betaflight/knowledgebase/codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)** | `src/main/` | 5 Scored | Injected `#ifdef THEJAS32` and `THEJAS_LOG` debug strings directly into 9 core files, violating platform isolation. | Encapsulate target diagnostics in weak platform hooks; gate logs behind `#if defined(THEJAS32_DEBUG_LOG)`. | **Instant CLI activation:** Pressing Enter (`\r`) or `#` eliminates the 100ms guard-time barrier for serial monitors. |
+
+---
+
+## 5. First-Boot & Configurator Verification Checklist
 
 When the minimal build is flashed into SRAM and executed:
 
