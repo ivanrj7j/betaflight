@@ -115,4 +115,12 @@ Before reporting any task complete or submitting code changes:
 - [ ] **Memory Bounds Check:** Verify that the total binary artifact is **$\le 248\text{ KB}$** and execution origin is `0x00202000`.
 - [ ] **Target Branch Check:** Confirm changes are on branch **`rebuild`** (not `master`).
 - [ ] **Knowledge Base Synchronization:** If any driver or architectural behavior was changed or discovered, document it in an evaluation/retrospective log and link it in [`knowledgebase/INDEX.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/INDEX.md).
-- [ ] **Physical Hardware Safety:** Ensure propellers are removed, an external 5V BEC supplies the flight receiver/peripherals, and a low-ESR capacitor ($470\text{--}1000\,\mu\text{F}$) is installed across the ESC battery leads to protect 3.3V LVCMOS pins.
+- [ ] **Physical Hardware Safety:** Ensure propellers are removed, an external 5V BEC supplies the flight receiver/peripherals, and a low-ESR capacitor ($470\text{--}1000\,\mu\text{s}$) is installed across the ESC battery leads to protect 3.3V LVCMOS pins.
+
+---
+
+## 7. Master Planning Suite & Navigation
+Before writing or proposing any code:
+* Consult the **[Master Macro Plan](file:///home/ivan/Desktop/betaflight/MACRO_PLAN.md)** to identify the current development phase and gating criteria.
+* Access the granular micro-plans in [`PLAN/`](file:///home/ivan/Desktop/betaflight/PLAN/) for component-specific registers, algorithms, expected inputs, and expected outputs.
+* Verify all hardware assumptions against [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md).
