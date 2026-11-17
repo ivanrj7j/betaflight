@@ -3,8 +3,9 @@ name: knowledge-search
 description: >-
   Search, locate, and retrieve verified hardware specifications, register maps, comparative logs
   (STM32 vs ESP32 vs THEJAS32), post-mortem retrospective analyses, and codebase evaluations across
-  the 50+ node Betaflight ARIES knowledge base. Use before proposing any architectural change,
-  writing driver code, or answering questions about hardware constraints.
+  the 50+ node Betaflight ARIES knowledge base. Automatically activate before proposing any architectural change,
+  planning or writing unit tests, writing driver code, or answering questions about hardware constraints,
+  and during development to cross-reference VEGA SDK, STM32, and ESP32 reference implementations.
 ---
 
 # Knowledge Search Skill: ARIES v3.0 Knowledge Base
@@ -30,6 +31,17 @@ This skill provides a fast, structured routing guide to search and navigate the 
 > [!IMPORTANT]
 > **STRICT USE OF RELATIVE PATHS:**  
 > When querying, citing, cross-referencing, or creating links to knowledge base documents and source files, always use POSIX relative file paths (e.g. `knowledgebase/INDEX.md` or `../../src/...`). Absolute paths (e.g. `/home/ivan/...` or `file:///home/...`) are strictly forbidden across all committed documentation and logs to guarantee portability across environments.
+
+### 1.3 Mandatory Pre-Development Reference Implementation Consultation (Development Only)
+> [!CAUTION]
+> **MANDATORY PREREQUISITE BEFORE WRITING ACTUAL IMPLEMENTATION CODE:**  
+> During development (not testing), after reading the relevant nodes from the knowledge base, the agent **MUST** refer to all three reference implementations for maximum clarity before writing any actual code:
+> 1. **C-DAC VEGA SDK Reference Drivers** ([`lib/vega-sdk/vega-sdk/bsp/`](../../../lib/vega-sdk/vega-sdk/bsp)): Cross-check raw hardware register definitions, base addresses, control bitmasks, and driver sequencing directly from C-DAC's official BSP.
+> 2. **STM32 Implementation** ([`src/platform/STM32/`](../../../src/platform/STM32) & [`logs/hardware_inspection/01..13`](../../../logs/hardware_inspection)): Inspect the standard, mature Betaflight flight controller implementation to understand the required API contracts, timing boundaries, and DMA/interrupt designs.
+> 3. **ESP32 Implementation** ([`src/platform/ESP32/`](../../../src/platform/ESP32) & [`logs/hardware_inspection/17..25`](../../../logs/hardware_inspection)): Inspect how Betaflight HAL abstractions were adapted to non-STM32 RISC-V targets (polled bus operations, UART ring buffers, ISR dispatch).
+> 
+> **ONLY AFTER CONSULTING THESE THREE REFERENCE IMPLEMENTATIONS CAN THE AGENT WRITE ANY ACTUAL CODE.**  
+> Writing implementation code without consulting these files is strictly prohibited.
 
 ---
 
@@ -70,7 +82,9 @@ Use this table to quickly find the authoritative documents for specific subsyste
 When investigating an issue or planning a change:
 
 1. **Identify Subsystem:** Match your task to the routing table above.
-2. **Read Component Node:** Review the component blueprint to understand the architectural design.
+2. **Read Component Node:** Review the component blueprint in `knowledgebase/components/` to understand the architectural design.
 3. **Read Codebase Evaluation Node:** Review what went wrong and what worked well in the corresponding `01..15_EVAL_*.md` file.
-4. **Compare with C-DAC Reference Drivers:** Cross-check register structures against C-DAC reference files in [`lib/vega-sdk/vega-sdk/bsp/`](../../../lib/vega-sdk/vega-sdk/bsp).
-5. **Proceed to Implementation:** Only after reviewing these verified records should you propose edits.
+4. **Consult C-DAC VEGA SDK:** Cross-check register structures against C-DAC reference files in [`lib/vega-sdk/vega-sdk/bsp/`](../../../lib/vega-sdk/vega-sdk/bsp).
+5. **Consult STM32 Implementation:** Cross-check Betaflight standard behavior against [`src/platform/STM32/`](../../../src/platform/STM32) and [`logs/hardware_inspection/`](../../../logs/hardware_inspection) (Logs 01–13).
+6. **Consult ESP32 Implementation:** Cross-check RISC-V porting patterns against [`src/platform/ESP32/`](../../../src/platform/ESP32) and [`logs/hardware_inspection/`](../../../logs/hardware_inspection) (Logs 17–25).
+7. **Proceed to Implementation (Development Gate):** **Only after consulting these three reference implementations can the agent write any actual code.**

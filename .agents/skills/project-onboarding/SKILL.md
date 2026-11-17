@@ -2,8 +2,8 @@
 name: project-onboarding
 description: >-
   Bootstrap and orient an agent working on the Betaflight port for C-DAC ARIES v3.0 (THEJAS32 / VEGA ET1031).
-  Use when starting a new session, onboarding to the project, checking toolchain setup, verifying active git branch
-  ('rebuild' vs 'master'), or reviewing the 8 inviolable silicon ground truths.
+  Automatically activate at the start of every session, on new task kickoff, when checking toolchain setup,
+  verifying active git branch ('rebuild' vs 'master'), or reviewing the 8 inviolable silicon ground truths.
 ---
 
 # Project Onboarding Skill: ARIES v3.0 (THEJAS32 / VEGA ET1031)

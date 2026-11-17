@@ -29,12 +29,20 @@ The repository maintains two fundamentally different codebase tracks:
 
 ---
 
-## 3. Mandatory Agent Skills (To Load on Project Entry)
+## 3. Mandatory Agent Skills & Automatic Activation Matrix
 
-Every AI agent assigned to this repository must load and utilize the following three core skills (located in the project skill registry):
+Every AI agent assigned to this repository must automatically activate and execute each workspace skill whenever its trigger condition occurs, without waiting for the user to prompt:
+
+| Skill | Mandatory Trigger Condition | Required Action |
+| :--- | :--- | :--- |
+| **`project-onboarding`** | • Session start<br>• Starting a new development phase or task<br>• Checking toolchain setup or git branch | Read [`.agents/skills/project-onboarding/SKILL.md`](.agents/skills/project-onboarding/SKILL.md); verify active branch is `rebuild`; review 8 silicon ground truths. |
+| **`knowledge-search`** | • Planning or reviewing architecture<br>• Authoring unit tests (TDD Step 1)<br>• Proposing or editing build flags/Makefiles<br>• **Before writing code in development (TDD Step 3)** | Read [`.agents/skills/knowledge-search/SKILL.md`](.agents/skills/knowledge-search/SKILL.md); search `knowledgebase/`; cross-check VEGA SDK, STM32, and ESP32 reference implementations before writing code. |
+| **`knowledge-update`** | • Completing a development phase<br>• Concluding hardware inspection or bench test<br>• Auditing drivers or discovering bugs/fixes<br>• Creating retrospective or evaluation notes | Read [`.agents/skills/knowledge-update/SKILL.md`](.agents/skills/knowledge-update/SKILL.md); document using 4-part 0–10 scoring template; synchronize `INDEX.md` and `PORTING_KNOWLEDGE_GRAPH.md`. |
+
+### Skill Protocols
 
 1. **`project-onboarding`**:
-   - Initializes the agent's context with hardware topology, peripheral base addresses, toolchain paths, and the 10 Golden Rules of THEJAS32 porting.
+   - Initializes the agent's context with hardware topology, peripheral base addresses, toolchain paths, and the 8 inviolable silicon ground truths.
 2. **`knowledge-search`**:
    - **MANDATORY FOR CODE ACCURACY:** Must be invoked **EVERY SINGLE TIME** before proposing, reviewing, planning, or writing any code, driver, register configuration, or build setting.
    - Queries the 50+ node knowledge base to find verified register maps, comparative logs (STM32 vs ESP32 vs THEJAS32), historical failure post-mortems, and evaluation scores before writing any code. Guessing or hallucinating hardware registers without searching is strictly prohibited.
@@ -70,6 +78,18 @@ Every AI agent assigned to this repository must load and utilize the following t
 * **Historical Retrospective Post-Mortems (01–14):** [`knowledgebase/retrospective_logs/`](knowledgebase/retrospective_logs) — Comprehensive evaluations of the failure cascades from the previous attempt.
 * **Hardware Inspection Logs (01–25):** [`logs/hardware_inspection/`](logs/hardware_inspection) — Deep architectural dissections of STM32 and ESP32 reference implementations.
 * **Component Implementation Nodes:** [`knowledgebase/components/`](knowledgebase/components) — Modules 01 through 11 defining the modular porting architecture.
+
+### 4.1 Mandatory Triple-Reference Implementation Consultation (Development Only)
+
+> [!CAUTION]
+> **PRE-DEVELOPMENT GATING RULE (DEVELOPMENT ONLY, NOT TESTING):**  
+> During development (not testing), after reading the relevant nodes from the knowledge base, the agent **MUST** refer to all three reference implementations for clarity before writing any actual code:
+> 1. **C-DAC VEGA SDK ([`lib/vega-sdk/`](lib/vega-sdk))**: Cross-check hardware register definitions, memory base offsets, bitmasks, and initialization sequences directly from C-DAC's official hardware drivers (`lib/vega-sdk/vega-sdk/bsp/`).
+> 2. **STM32 Implementation ([`src/platform/STM32/`](src/platform/STM32) & [`logs/hardware_inspection/`](logs/hardware_inspection))**: Consult the standard, flight-tested Betaflight hardware abstraction architecture (Logs 01–13) to ensure protocol compatibility, buffer structures, and timing boundaries are respected.
+> 3. **ESP32 Implementation ([`src/platform/ESP32/`](src/platform/ESP32) & [`logs/hardware_inspection/`](logs/hardware_inspection))**: Consult how Betaflight was successfully adapted to an alternative RISC-V platform (Logs 17–25), particularly interrupt models, polled bus operations, and timer scheduling.
+>
+> **ONLY AFTER CONSULTING THESE THREE REFERENCE IMPLEMENTATIONS CAN THE AGENT WRITE ANY ACTUAL CODE.**  
+> Writing or committing code without consulting these files is strictly prohibited.
 
 ---
 
@@ -114,6 +134,7 @@ Before reporting any task complete or submitting code changes:
 - [ ] **Opcode Audit:** Run `riscv32-esp-elf-objdump -d <binary>.elf | grep -E "^\s*[0-9a-f]+:\s+[0-9a-f]{4}\s+"` and verify that the compressed instruction count is **strictly 0**.
 - [ ] **Memory Bounds Check:** Verify that the total binary artifact is **$\le 248\text{ KB}$** and execution origin is `0x00202000`.
 - [ ] **Target Branch Check:** Confirm changes are on branch **`rebuild`** (not `master`).
+- [ ] **Triple Reference Consultation:** Verified that prior to writing code, logic was cross-referenced against VEGA SDK (`lib/vega-sdk/`), STM32 implementation (`src/platform/STM32/`), and ESP32 implementation (`src/platform/ESP32/`).
 - [ ] **Relative Path Integrity:** Confirm that all markdown links, test logs, documentation references, and evaluation notes strictly use POSIX relative paths (0 absolute `/home/...` or `file:///...` links).
 - [ ] **Knowledge Base Synchronization:** If any driver or architectural behavior was changed or discovered, document it in an evaluation/retrospective log and link it in [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md).
 - [ ] **Physical Hardware Safety:** Ensure propellers are removed, an external 5V BEC supplies the flight receiver/peripherals, and a low-ESR capacitor ($470\text{--}1000\,\mu\text{s}$) is installed across the ESC battery leads to protect 3.3V LVCMOS pins.

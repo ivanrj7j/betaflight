@@ -2,8 +2,8 @@
 name: knowledge-update
 description: >-
   Update, document, and synchronize findings, code critiques, hardware test outcomes, and technical
-  decisions into the Betaflight ARIES knowledge base. Use whenever new drivers are audited, bench
-  tests are conducted, code critiques are written, or knowledge graph/index updates are required.
+  decisions into the Betaflight ARIES knowledge base. Automatically activate whenever completing a development phase,
+  auditing drivers, running bench/hardware tests, discovering new hardware bugs, or updating knowledge graphs/indexes.
 ---
 
 # Knowledge Update Skill: Knowledge Base Synchronization

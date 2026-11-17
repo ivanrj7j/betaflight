@@ -63,6 +63,19 @@ flowchart TD
     D4 --> NEXT["Advance to Next Phase"]
 ```
 
+### 1.1 Automatic Skill Activation Mapping
+
+Agents working through the TDD protocol must automatically activate and execute the designated workspace skill at each step without waiting for user prompting:
+
+| TDD Workflow Step | Skill Automatically Activated | Mandatory Action Required |
+| :--- | :--- | :--- |
+| **Session Kickoff / Phase Start** | **`project-onboarding`** | Verify git branch `rebuild`, review 8 silicon ground truths, check toolchain. |
+| **Step 1: Test Design** | **`knowledge-search`** | Query component blueprints (`knowledgebase/components/`) and evaluation nodes to author AAA unit tests. |
+| **Step 2: User Approval Gate** | *(Interactive)* | Present test scenarios, explain coverage, and await explicit user approval. |
+| **Step 3: Implementation** | **`knowledge-search`** | **Triple-Reference Gate:** Consult VEGA SDK (`lib/vega-sdk/`), STM32 (`src/platform/STM32/`), and ESP32 (`src/platform/ESP32/`) before writing code. |
+| **Step 4: Host Verification** | *(Local Tooling)* | Run `make test`, compile firmware, verify opcode audit (`c. == 0`), check 248 KB SRAM budget. |
+| **Step 5: Post-Phase Logging** | **`knowledge-update`** | Persist log to `logs/dev/phase_XX_*.log`, update 0–10 scores, sync `INDEX.md` and `PORTING_KNOWLEDGE_GRAPH.md`. |
+
 ---
 
 ## 2. The 5-Step Agent TDD Protocol
@@ -91,12 +104,18 @@ flowchart TD
 4. **Wait for User Response**: Do not execute tools to modify source code until the user explicitly responds with approval.
 
 ### Step 3: Implement Code with Extensive Diagnostic Logging
-1. Once approved, write minimal compliant code in `src/platform/ARIES/` or `src/main/`.
-2. **Extensive Diagnostic Logging Mandate**:
+1. **Mandatory Triple-Reference Consultation Gate (Development Only)**:
+   - **During development (not testing)**, after reading the relevant nodes from the knowledge base, the agent **MUST** refer to all three reference implementations for maximum clarity before writing any actual code:
+     1. **C-DAC VEGA SDK** ([`lib/vega-sdk/vega-sdk/bsp/`](lib/vega-sdk/vega-sdk/bsp)): Cross-check raw hardware register definitions, base addresses, control bitmasks, and driver sequencing directly from C-DAC's official BSP.
+     2. **STM32 Implementation** ([`src/platform/STM32/`](src/platform/STM32) & [`logs/hardware_inspection/01..13`](logs/hardware_inspection)): Inspect the standard, mature Betaflight flight controller implementation to understand the required API contracts, timing boundaries, and DMA/interrupt designs.
+     3. **ESP32 Implementation** ([`src/platform/ESP32/`](src/platform/ESP32) & [`logs/hardware_inspection/17..25`](logs/hardware_inspection)): Inspect how Betaflight HAL abstractions were adapted to non-STM32 RISC-V targets.
+   - **ONLY AFTER CONSULTING THESE THREE REFERENCE IMPLEMENTATIONS CAN THE AGENT WRITE ANY ACTUAL CODE.**
+2. Once approved and references consulted, write minimal compliant code in `src/platform/ARIES/` or `src/main/`.
+3. **Extensive Diagnostic Logging Mandate**:
    - Because the user will run the compiled code on the physical hardware after each phase, the code **must include comprehensive diagnostic UART logging** across every major entry point, register configuration, state transition, and error path.
    - Use the non-blocking logging primitives defined in Section 3 (`LOG_INFO`, `LOG_HEX`, `LOG_DUMP`).
    - Prefix every log message with a subsystem tag: `[BOOT]`, `[TIME]`, `[UART]`, `[GPIO]`, `[EXTI]`, `[PWM]`, `[SPI]`, `[IMU]`, `[CRSF]`, `[SCHED]`, `[TRAP]`.
-3. Obey the **8 Inviolable Silicon Ground Truths** at all times.
+4. Obey the **8 Inviolable Silicon Ground Truths** at all times.
 
 ### Step 4: Execute Host Tests & Silicon Audits
 1. Run host GoogleTest / native unit test harness: `cd src/test && make test`.
@@ -412,12 +431,13 @@ When working on any of the 20 phases:
 - [ ] **2. Consulted Gap Register**: Verified zero unconfirmed assumptions in [`CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md).
 - [ ] **3. Wrote Unit Tests First**: Authored unit tests in `src/test/unit/platform/` following the AAA pattern as living documentation.
 - [ ] **4. Presented Tests to User & Awaited Approval**: Stated clearly what each test does and **waited for explicit user approval before writing code**.
-- [ ] **5. Implemented Code with Extensive Logging**: Embedded `LOG_INFO`, `LOG_HEX`, and `LOG_DUMP` across all critical paths.
-- [ ] **6. Ran Host Tests & Silicon Audits**: Verified tests pass 100%, `grep c.` equals 0, total footprint $\le 248\text{ KB}$, branch is `rebuild`.
-- [ ] **7. Provided Device Flashing Runbook**: Delivered exact compile commands, loading instructions, and expected serial logs for the user to run on the physical device.
-- [ ] **8. Persisted Phase Log**: Saved complete verification log to **`logs/dev/phase_XX_<name>.log`**.
-- [ ] **9. Updated Knowledge Base**: Synchronized [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md) with findings.
-- [ ] **10. Strictly Relative File Paths**: Verified that all file links, documentation cross-references, test logs, and phase reports use POSIX relative paths (0 instances of `/home/...` or `file:///...`).
+- [ ] **5. Consulted Reference Implementations**: Prior to writing code, cross-referenced VEGA SDK (`lib/vega-sdk/`), STM32 implementation (`src/platform/STM32/`), and ESP32 implementation (`src/platform/ESP32/`).
+- [ ] **6. Implemented Code with Extensive Logging**: Embedded `LOG_INFO`, `LOG_HEX`, and `LOG_DUMP` across all critical paths.
+- [ ] **7. Ran Host Tests & Silicon Audits**: Verified tests pass 100%, `grep c.` equals 0, total footprint $\le 248\text{ KB}$, branch is `rebuild`.
+- [ ] **8. Provided Device Flashing Runbook**: Delivered exact compile commands, loading instructions, and expected serial logs for the user to run on the physical device.
+- [ ] **9. Persisted Phase Log**: Saved complete verification log to **`logs/dev/phase_XX_<name>.log`**.
+- [ ] **10. Updated Knowledge Base**: Synchronized [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md) with findings.
+- [ ] **11. Strictly Relative File Paths**: Verified that all file links, documentation cross-references, test logs, and phase reports use POSIX relative paths (0 instances of `/home/...` or `file:///...`).
 
 ---
 

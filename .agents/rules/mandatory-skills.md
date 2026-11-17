@@ -2,9 +2,19 @@
 
 Every agent operating in this repository must automatically adhere to the following operational laws:
 
-## 1. Always-Loaded Skills
+## 1. Automatic Skill Activation Matrix
+
+Every agent operating in this repository must automatically activate each skill whenever its trigger condition occurs, without waiting for explicit user prompts:
+
+| Skill | Mandatory Trigger Condition | Required Action |
+| :--- | :--- | :--- |
+| **`project-onboarding`** | • Session start<br>• Starting a new development phase or task<br>• Checking toolchain setup or git branch | Read [`.agents/skills/project-onboarding/SKILL.md`](../skills/project-onboarding/SKILL.md); verify active branch is `rebuild`; review 8 silicon ground truths. |
+| **`knowledge-search`** | • Planning or reviewing architecture<br>• Authoring unit tests (TDD Step 1)<br>• Proposing or editing build flags/Makefiles<br>• **Before writing code in development (TDD Step 3)** | Read [`.agents/skills/knowledge-search/SKILL.md`](../skills/knowledge-search/SKILL.md); search `knowledgebase/`; cross-check VEGA SDK, STM32, and ESP32 reference implementations before writing code. |
+| **`knowledge-update`** | • Completing a development phase<br>• Concluding hardware inspection or bench test<br>• Auditing drivers or discovering bugs/fixes<br>• Creating retrospective or evaluation notes | Read [`.agents/skills/knowledge-update/SKILL.md`](../skills/knowledge-update/SKILL.md); document using 4-part 0–10 scoring template; synchronize `INDEX.md` and `PORTING_KNOWLEDGE_GRAPH.md`. |
+
+### Specific Skill Mandates
 1. **`project-onboarding`**: Required at the start of any session. Ensures the agent is on the `rebuild` branch and aware of the 248 KB SRAM boot and RV32IM constraints.
-2. **`knowledge-search`**: **MANDATORY BEFORE ANY CODE MODIFICATION.** Every driver, register address, clock divisor, and pin mapping must be cross-checked against the 50+ node knowledge base (`knowledgebase/INDEX.md`, `knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`, and `knowledgebase/codebase_evaluations/`). No guesswork is permitted. **ANTI-ASSUMPTION RULE:** Consult [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md); never guess hardware settings marked as [PENDING TEAM CONFIRMATION].
+2. **`knowledge-search`**: **MANDATORY BEFORE ANY CODE MODIFICATION.** Every driver, register address, clock divisor, and pin mapping must be cross-checked against the 50+ node knowledge base (`knowledgebase/INDEX.md`, `knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`, and `knowledgebase/codebase_evaluations/`). No guesswork is permitted. During development, refer to VEGA SDK, STM32 implementation, and ESP32 implementation before writing actual code. **ANTI-ASSUMPTION RULE:** Consult [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md); never guess hardware settings marked as [PENDING TEAM CONFIRMATION].
 3. **`knowledge-update`**: Required whenever evaluating code, auditing drivers, or running bench tests. Demands a 0–10 score for every decision and synchronization of `INDEX.md` and `PORTING_KNOWLEDGE_GRAPH.md`.
 
 ## 2. Silicon Constraints (THEJAS32 / VEGA ET1031)
