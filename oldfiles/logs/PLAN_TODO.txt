@@ -1,0 +1,419 @@
+================================================================================
+C-DAC ARIES v3.0 (THEJAS32 / VEGA ET1031 RISC-V) BETAFLIGHT ROADMAP & TODO
+================================================================================
+Document: PLAN_TODO.txt
+Target MCU: C-DAC THEJAS32 SoC (VEGA ET1031 32-bit RISC-V Core @ 100 MHz)
+Current Status: Phase 1 (Platform Skeleton) & Phase 2 (Stub Drivers) are COMPLETE.
+Firmware Compiles & Links with 0 errors into obj/main/betaflight_ARIESV3.elf & .hex.
+================================================================================
+
+TABLE OF CONTENTS:
+1. What Has Been Completed Successfully Till Now (Context & Baseline)
+   - Phase 1: Platform Skeleton Architecture
+   - Phase 2: Stub Drivers & 100% Clean Linkage
+   - Memory Utilization & Verified Binary Deliverables
+   - File Tree of Created Platform Code
+2. Executive Overview & Overall Feasibility Assessment
+3. Phase-by-Phase Roadmap (What To Do Next)
+   - Phase 3: Hardware UART Driver & Betaflight CLI / MSP
+   - Phase 4: Precision Hardware Timer & Microsecond Clock
+   - Phase 5: SPI Bus Driver & External IMU Integration
+   - Phase 6: Soft-Float Math Optimization & Loop Rate Tuning
+   - Phase 7: Motor Output Drivers (PWM / DShot)
+   - Phase 8: Configuration Storage (Flash Persistence / Emulated EEPROM)
+   - Phase 9: Serial Receiver Integration (CRSF / ExpressLRS / SBUS)
+   - Phase 10: Bench Testing, Failsafe & First Flight
+4. Difficulty & Complexity Matrix (Component by Component)
+5. Key Technical Challenges & How to Solve Them
+6. Development Milestones & Immediate Action Items
+
+================================================================================
+1. WHAT HAS BEEN COMPLETED SUCCESSFULLY TILL NOW (CONTEXT & BASELINE)
+================================================================================
+
+We have already completed the two most difficult architectural phases of this port:
+Phase 1 (Platform Skeleton) and Phase 2 (Stub Drivers & Full Build Integration).
+
+A. Phase 1: Platform Skeleton Architecture (COMPLETED)
+--------------------------------------------------------------------------------
+1. Toolchain Setup:
+   - Successfully integrated the pre-installed 32-bit RISC-V GCC toolchain:
+     `/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/riscv32-esp-elf-gcc` (GCC 13.2.0).
+   - Configured architecture flags: `-march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany`.
+   - Bypassed external SDKs (`PLATFORM_SDK := none`) so the ARIES build is completely self-contained.
+2. Target Definition & Registration:
+   - Created target `ARIESV3` registered under MCU `THEJAS32` and family `ARIES`.
+   - Verified that `make TARGET=ARIESV3 target-mcu` correctly prints:
+     `ARIES : THEJAS32`.
+3. Codebase Isolation Guarantee:
+   - 100% of our new code is strictly quarantined within `src/platform/ARIES/`.
+   - Zero files in the upstream Betaflight core codebase were modified, ensuring full upstream git compatibility.
+
+B. Phase 2: Stub Drivers & 100% Clean Linkage (COMPLETED)
+--------------------------------------------------------------------------------
+1. Compilation & Link Errors Solved:
+   - Iteratively diagnosed and resolved all 28 compilation and linking hurdles:
+     * Architecture: added `_zicsr` extension for CSR instructions (`csrr mcycle`).
+     * Intrinsics: emulated ARM CMSIS `__disable_irq()`, `__enable_irq()` via RISC-V `mstatus` CSR bit 3 (MIE), and `__NOP()`.
+     * Atomics: implemented an interrupt-safe fallback for `__atomic_fetch_add_4` since RV32IM lacks the hardware 'A' atomic extension.
+     * Memory Layout: enhanced `aries_v3.ld` with `.pg_registry` and `.pg_resetdata` sections for Betaflight's Parameter Groups, `_Min_Stack_Size`, and `__config_start/end`.
+     * Drivers: populated clean stub implementations for IO/GPIO, SPI, DMA, Timers, EXTI, UART, ADC, and Config persistence.
+     * Configuration: enabled `USE_UART1` with pin stubs and `SERIAL_TRAIT_PIN_CONFIG`.
+2. Verified Build Success:
+   - Running `make TARGET=ARIESV3 hex` terminates with EXIT CODE 0!
+   - Every single core flight controller module (PID loop, attitude estimation, task scheduler, CMS, CLI, MSP protocol, telemetry protocols) compiles and links cleanly.
+
+C. Memory Footprint & Verified Binary Deliverables
+--------------------------------------------------------------------------------
+Binary deliverables generated in `obj/`:
+- `obj/main/betaflight_ARIESV3.elf` (1.1 MB ELF with full symbols & debug info)
+- `obj/betaflight_2026.12.0-alpha_ARIESV3.hex` (2.0 MB Intel HEX ready for flashers)
+- `obj/main/betaflight_ARIESV3.bin` (708 KB raw machine code binary)
+- `obj/main/betaflight_ARIESV3.map` (1.7 MB complete memory map)
+
+Hardware Resource Utilization:
++-------------------+-------------------------+---------------+------------+-------------+
+| Memory Region     | Physical Address Range  | Total Size    | Used Size  | Utilization |
++-------------------+-------------------------+---------------+------------+-------------+
+| Flash (`FLASH`)   | 0x20000000 - 0x20200000 | 2,048 KB      | 708 KB     | 34.5%       |
+| SRAM (`RAM`)      | 0x10000000 - 0x10040000 | 256 KB        | 63.7 KB    | 24.9%       |
++-------------------+-------------------------+---------------+------------+-------------+
+* Note: The 63.7 KB RAM usage already includes a dedicated 16 KB execution stack.
+  Both Flash and RAM comfortably fit within the THEJAS32 hardware specifications.
+
+D. File Tree of Platform Files Created & Maintained
+--------------------------------------------------------------------------------
+```
+src/platform/ARIES/
+├── mk/
+│   └── ARIES.mk                       # Build rules, -march=rv32im_zicsr, include paths
+├── target/
+│   └── ARIESV3/
+│       ├── target.mk                  # Target identification (THEJAS32 / ARIES)
+│       └── target.h                   # Feature defines, pin mappings, UART1 enabled
+├── link/
+│   └── aries_v3.ld                    # Linker script with .text, .data, .bss, .pg_* sections
+├── include/
+│   └── platform/
+│       ├── platform.h                 # __disable_irq, __NOP, FunctionalState, UART traits
+│       └── timer_def.h                # Hardware timer type stubs
+├── io_def_generated.h                 # Dummy pin definitions
+├── dma_reqmap_mcu.h                   # DMA request map stub
+├── system.c                           # Clock math, micros()/millis(), cycle counter
+└── stub_drivers.c                     # Stubs for IO, SPI, DMA, Timers, EXTI, UART, Atomics
+
+Documentation & Guides:
+├── COMPILATION_GUIDE.md               # Beginner-friendly guide for building & flashing
+├── DETAILED_DUMMY_PLAN.md             # Complete step-by-step history of all 28 bug fixes
+├── PORT_GUIDE.md                      # High-level architecture and platform reference
+└── PLAN_TODO.txt                      # This document: full forward-looking roadmap
+```
+
+================================================================================
+2. EXECUTIVE OVERVIEW & OVERALL FEASIBILITY ASSESSMENT
+================================================================================
+How hard will this overall port be?
+Overall Feasibility Rating: MODERATE (7/10 Difficulty, Very Realistic)
+
+Why?
+- The hardest architectural barrier—getting Betaflight's massive build system,
+  scheduler, math libraries, parameter groups, and linker scripts to compile 
+  cleanly under the non-ARM RISC-V RV32IM toolchain—is ALREADY SOLVED in Phase 2.
+- The remaining work consists of standard embedded peripheral driver implementation:
+  reading/writing memory-mapped hardware registers on the THEJAS32 SoC.
+- Betaflight already contains sensor drivers for nearly every IMU on earth (MPU6050,
+  ICM-42688, BMI270, etc.). Once we provide a working SPI byte-transfer function,
+  the existing flight controller code detects and configures the sensor automatically!
+- Memory limits are NOT a problem:
+  * Flash: We use 708 KB out of 2,048 KB (only 34.5% used).
+  * RAM: We use 63.7 KB out of 256 KB (only 24.9% used).
+
+================================================================================
+2. PHASE-BY-PHASE ROADMAP (WHAT TO DO NEXT)
+================================================================================
+
+--------------------------------------------------------------------------------
+PHASE 3: HARDWARE UART DRIVER & BETAFLIGHT CLI / MSP (NEXT IMMEDIATE STEP)
+--------------------------------------------------------------------------------
+Objective:
+Connect THEJAS32 UART0 peripheral to the onboard Silicon Labs CP2102N USB-UART 
+bridge so that plugging the board into a PC allows interactive CLI commands
+and Betaflight Configurator connection.
+
+What To Do:
+1. Implement `src/platform/ARIES/serial_uart_aries.c`:
+   - Memory-mapped base address: UART0 = 0x11200000 (standard 16550/16750 layout).
+   - Configure baud rate generator (100 MHz clock / (16 * Baud)).
+   - Set 8 data bits, no parity, 1 stop bit (8N1).
+   - Enable 16-byte TX and RX FIFOs.
+2. Implement Ring Buffer & Interrupt Handler:
+   - Connect UART0 RX interrupt to push received characters into Betaflight's 
+     `serialPort->rxBuffer`.
+   - Implement `uartWrite()` to push bytes into the TX FIFO.
+3. Wire into Betaflight Serial VTable:
+   - Hook `serialUART()` in `stub_drivers.c` to return a configured `uartPort_t`.
+   - Hook `uartPinConfigure()` for UART0.
+4. Test & Validate:
+   - Connect via `picocom -b 115200 /dev/ttyUSB0`.
+   - Press `#` and verify `# version`, `# status`, and `# tasks` respond in CLI.
+   - Open Betaflight Configurator GUI and connect to `/dev/ttyUSB0`.
+
+Challenges & Pitfalls:
+- Baud rate clock divisor rounding error at 115200 baud on 100 MHz core.
+  Formula: Divisor = 100,000,000 / (16 * 115200) = 54.25 -> Integer divisor 54
+  Actual baud = 100,000,000 / (16 * 54) = 115,740 baud (0.47% error, well within 2% UART tolerance).
+- Level: EASY to MODERATE (Standard 16550 UART registers).
+
+--------------------------------------------------------------------------------
+PHASE 4: PRECISION HARDWARE TIMER & MICROSECOND CLOCK
+--------------------------------------------------------------------------------
+Objective:
+Provide an accurate, drift-free `micros()` and `millis()` timebase required by
+the flight loop scheduler.
+
+What To Do:
+1. Enhance `src/platform/ARIES/system.c`:
+   - Currently, `getCycleCounter()` reads `csrr mcycle` (32-bit counter).
+   - At 100 MHz, a 32-bit counter wraps around every 42.94 seconds!
+   - Fix: Read 64-bit cycle counter (`mcycle` + `mcycleh` on RISC-V) or implement
+     a rollover tracker to prevent scheduler glitch every 43 seconds.
+   - Code pattern for 64-bit atomic CSR read on RV32:
+     ```c
+     uint64_t getCycleCounter64(void) {
+         uint32_t h0, h1, l;
+         do {
+             __asm__ volatile("csrr %0, mcycleh" : "=r"(h0));
+             __asm__ volatile("csrr %0, mcycle"  : "=r"(l));
+             __asm__ volatile("csrr %0, mcycleh" : "=r"(h1));
+         } while (h0 != h1);
+         return ((uint64_t)h0 << 32) | l;
+     }
+     ```
+2. Hardware Timer Backup:
+   - Check THEJAS32 Timer 0 registers (`0x11100000`). If hardware timer generates
+     periodic ticks (e.g. 1 kHz SysTick), use it for system millisecond heartbeat.
+3. Test & Validate:
+   - Run a 10-second delay loop and verify against real-world stopwatch.
+   - Run CLI `status` and check that `Uptime` increments continuously past 60s.
+
+Challenges & Pitfalls:
+- 32-bit integer division in `micros()`: dividing uint32 by 100 takes 30-40 CPU cycles
+  without hardware divider. But VEGA ET1031 has the 'M' extension (hardware divide!),
+  so integer division `divu` is executed in hardware in ~32 cycles.
+- Level: VERY EASY.
+
+--------------------------------------------------------------------------------
+PHASE 5: SPI BUS DRIVER & EXTERNAL IMU INTEGRATION
+--------------------------------------------------------------------------------
+Objective:
+Read gyro and accelerometer data from the external IMU sensor (connected via SPI 
+header pins) at 1 kHz to feed the flight stabilization algorithms.
+
+What To Do:
+1. Implement `src/platform/ARIES/bus_spi_aries.c`:
+   - Memory-mapped base address: SPI0 = `0x11300000`.
+   - Implement `spiInitDevice()`:
+     * Clock polarity (CPOL = 0) and phase (CPHA = 0) - SPI Mode 0 or Mode 3.
+     * Clock prescaler: 100 MHz / 10 = 10 MHz (IMU sensors support up to 10-20 MHz).
+   - Implement synchronous byte transfer:
+     ```c
+     uint8_t spiTransferByte(spiDevice_t *dev, uint8_t data);
+     bool spiTransfer(spiDevice_t *dev, uint8_t *rx, const uint8_t *tx, size_t length);
+     ```
+   - Implement Chip Select (CS) toggle using GPIO.
+2. Wire Target Configuration in `target.h`:
+   - `#define USE_IMU_MPU6050` or `#define USE_IMU_ICM42688P` or `#define USE_IMU_BMI270`
+     (matches whichever physical breakout sensor is plugged into the headers).
+   - Specify SPI device and CS pin.
+3. Test & Validate:
+   - Read the sensor's `WHO_AM_I` register (e.g. 0x75 on MPU6000/6050 returns 0x68).
+   - In Betaflight CLI, run `status` and confirm:
+     `Arming disable flags: NO_GYRO` disappears and `Gyro/Acc: ICM42688P (1.00kHz)` is reported.
+   - Verify live gyro/accel traces in Betaflight Configurator "Sensors" tab!
+
+Challenges & Pitfalls:
+- SPI FIFO handling: Ensure TX FIFO is drained and RX FIFO has valid data before CS goes HIGH.
+- Level: MODERATE.
+
+--------------------------------------------------------------------------------
+PHASE 6: SOFT-FLOAT MATH OPTIMIZATION & LOOP RATE TUNING
+--------------------------------------------------------------------------------
+Objective:
+Optimize the PID and filtering calculation loop so that soft-float operations
+complete well within the 1000 us (1 kHz) scheduler deadline.
+
+What To Do:
+1. Benchmark Soft-Float PID Execution Time:
+   - Place cycle counter timestamps around `taskMainPidLoop()` in `fc/tasks.c`.
+   - Measure average execution time (typical ARM Cortex-M4 with FPU takes ~35 us;
+     RV32IM soft-float is expected to take ~150-250 us at 100 MHz).
+2. Apply Optimization Flags:
+   - Betaflight already uses `-ffast-math -fno-math-errno` and our custom `-DFAST_MATH`.
+   - Ensure GCC soft-float library `libgcc.a` uses the integer multiplier for `__mulsf3`.
+3. Loop Rate Selection:
+   - 1.0 kHz loop time (`TASK_GYROPID_DESIRED_PERIOD 1000`) is ideal for RV32IM soft-float.
+   - 250 us of CPU load every 1000 us = 25% CPU utilization (leaves 75% for scheduler,
+     CLI, receiver, and telemetry).
+4. Test & Validate:
+   - Check CLI `tasks`: verify `PID loop` task rate is exactly 1000 Hz, with 0 late/missed tasks.
+
+Challenges & Pitfalls:
+- High-order dynamic notch filters (`dyn_notch_filter.c`) use trigonometric math (sinf/cosf).
+  If CPU load exceeds 50%, reduce notch filter count or disable RPM filter.
+- Level: EASY to MODERATE (profiling and parameter tuning).
+
+--------------------------------------------------------------------------------
+PHASE 7: MOTOR OUTPUT DRIVERS (PWM / DSHOT)
+--------------------------------------------------------------------------------
+Objective:
+Generate control signals for 4 Electronic Speed Controllers (ESCs) driving the quad's motors.
+
+What To Do:
+Option A: Standard PWM (50 Hz - 400 Hz) / OneShot125 (Recommended First Step)
+- Use THEJAS32 hardware PWM timer channels.
+- Set period to 2.5 ms (400 Hz).
+- Pulse width: 1000 us (0% throttle) to 2000 us (100% throttle).
+- Implement `motorPwmDevInit()` and `pwmWriteMotor()`.
+
+Option B: DShot Digital ESC Protocol (DShot150 / DShot300)
+- DShot is a digital protocol (16-bit packet sent every loop).
+- On chips without DMA (like THEJAS32), DShot requires cycle-accurate GPIO bitbang.
+- At 100 MHz, 1 CPU clock = 10 nanoseconds.
+  * DShot150 bit time = 6.67 us (667 CPU cycles per bit).
+  * Very easy to bitbang with tight assembly loop!
+- Test & Validate:
+  - Connect oscilloscope or logic analyzer to motor pins 1–4.
+  - Test motor spinning via Betaflight Configurator "Motors" tab (props OFF!).
+
+Challenges & Pitfalls:
+- If bitbanging DShot without DMA, interrupts must be disabled during the 16-bit burst (~100 us).
+- Level: Standard PWM = EASY; Bitbang DShot = MODERATE-HARD.
+
+--------------------------------------------------------------------------------
+PHASE 8: CONFIGURATION STORAGE (FLASH PERSISTENCE / EEPROM)
+--------------------------------------------------------------------------------
+Objective:
+Persist user settings (PIDs, RC rates, modes, trims) across reboots so settings
+are saved permanently.
+
+What To Do:
+1. Flash Layout:
+   - Our linker script reserves the top 32 KB of the 2 MB Flash for config:
+     `__config_start = 0x20000000 + 2048K - 32K` (0x201F8000).
+2. Implement Flash Streamer in `src/platform/ARIES/flash_aries.c`:
+   - `configUnlock()`: Prepare SPI Flash for writes (`WREN` command 0x06).
+   - `configWriteWord()`: Program 32-bit word into SPI Flash page.
+   - `configClearFlags()`: Erase 4 KB or 32 KB flash sector (`SE` command 0x20).
+   - `configLock()`: Set write disable (`WRDI` command 0x04).
+3. Test & Validate:
+   - In CLI, run: `set roll_expo = 15; save`.
+   - Power cycle the board, re-open CLI, run `get roll_expo`, and confirm it remains `15`.
+
+Challenges & Pitfalls:
+- Flash must be erased (bits flipped to 1) before writing new data.
+- Level: MODERATE.
+
+--------------------------------------------------------------------------------
+PHASE 9: SERIAL RECEIVER INTEGRATION (CRSF / ELRS / SBUS)
+--------------------------------------------------------------------------------
+Objective:
+Connect a radio receiver (e.g. ExpressLRS or TBS Crossfire receiver) to UART1 to
+receive stick and switch commands from the pilot's transmitter.
+
+What To Do:
+1. Configure UART1 on THEJAS32:
+   - ExpressLRS / CRSF runs at 420,000 baud (or 115,200 baud).
+   - SBUS runs at 100,000 baud with inverted parity.
+2. Connect UART1 to Betaflight's `serial_uart` driver.
+3. In Betaflight Configurator "Receiver" tab, select `CRSF` on UART1.
+4. Test & Validate:
+   - Turn on transmitter; confirm channels 1–4 (Roll, Pitch, Yaw, Throttle) move smoothly.
+
+Challenges & Pitfalls:
+- High baud rate (420 kBaud) requires efficient interrupt RX ring buffering.
+- Level: EASY (once UART driver from Phase 3 is working).
+
+--------------------------------------------------------------------------------
+PHASE 10: BENCH TESTING, FAILSAFE & FIRST FLIGHT
+--------------------------------------------------------------------------------
+Objective:
+Final safety checks before taking the quadcopter to the field.
+
+What To Do:
+1. Sensor calibration (accelerometer calibration on flat surface).
+2. Arming check (verify arming switch arms/disarms motors cleanly).
+3. Failsafe test (turn off radio transmitter; confirm motors immediately disarm).
+4. Motor rotation direction check (clean direction test in Configurator).
+5. First tethered hover test.
+
+================================================================================
+3. DIFFICULTY & COMPLEXITY MATRIX (COMPONENT BY COMPONENT)
+================================================================================
+
++-------------------------+-------------+-------------+-------------------------------+
+| Component / Phase       | Difficulty  | Dev Time    | Primary Challenge             |
++-------------------------+-------------+-------------+-------------------------------+
+| Phase 1: Skeleton       | COMPLETED   | Done        | Target registration           |
+| Phase 2: Stub Compiling | COMPLETED   | Done        | GCC 13 RV32IM architecture    |
+| Phase 3: UART & CLI     | Low-Medium  | 1-2 days    | 16550 register mapping        |
+| Phase 4: Precision Time | Low         | 0.5 day     | 64-bit mcycle rollover        |
+| Phase 5: SPI Bus & IMU  | Medium      | 2-3 days    | SPI mode, CS timing           |
+| Phase 6: Math Tuning    | Low-Medium  | 1 day       | 1 kHz soft-float profiling    |
+| Phase 7: Motor Output   | Medium      | 2-3 days    | PWM timer registers or DShot  |
+| Phase 8: Flash Storage  | Medium      | 1-2 days    | Sector erase & write commands |
+| Phase 9: Radio Receiver | Low-Medium  | 1 day       | UART1 RX interrupt buffering  |
+| Phase 10: Flight Test   | Medium      | 1-2 days    | PID tuning for 100 MHz core   |
++-------------------------+-------------+-------------+-------------------------------+
+| OVERALL PROJECT         | MODERATE    | ~1.5 weeks  | No DMA; rely on polling/IRQs  |
++-------------------------+-------------+-------------+-------------------------------+
+
+================================================================================
+4. KEY TECHNICAL CHALLENGES & HOW TO SOLVE THEM
+================================================================================
+
+CHALLENGE 1: NO HARDWARE FPU (FLOATING POINT UNIT)
+- Why: VEGA ET1031 is RV32IM, not RV32IMF.
+- Impact: Math operations (`float a + b`, `sinf(x)`) call GCC software routines
+  (`__addsf3`, `__mulsf3`).
+- Solution:
+  * Limit loop rate to 1.0 kHz (`TASK_GYROPID_DESIRED_PERIOD 1000`).
+  * At 100 MHz, 1 ms = 100,000 clock cycles. A typical soft-float PID calculation
+    consumes ~20,000 cycles, which is only 20% CPU load!
+  * Keep `FAST_MATH` enabled (uses polynomial approximations for trig functions).
+
+CHALLENGE 2: NO DIRECT ON-CHIP USB CDC CONTROLLER
+- Why: Unlike STM32F405, THEJAS32 has no native USB peripheral.
+- Impact: No native DFU mode or direct Virtual COM Port (VCP).
+- Solution:
+  * The ARIES board already incorporates an onboard Silicon Labs CP2102N USB-UART bridge.
+  * The PC sees a standard USB COM port (`/dev/ttyUSB0`).
+  * Betaflight CLI and Configurator communicate over this serial port transparently.
+
+CHALLENGE 3: NO DMA CONTROLLER (OR LIMITED DMA)
+- Why: Standard Betaflight targets rely heavily on STM32 DMA for SPI and DShot.
+- Impact: Cannot use circular DMA buffers for SPI and serial.
+- Solution:
+  * Use interrupt-driven ring buffers for UART.
+  * Use fast polling for SPI IMU transfers (reading 14 bytes from gyro at 10 MHz
+    takes only 11.2 microseconds—doing this synchronously in the PID loop is fast).
+  * Use standard PWM timer hardware for ESC control (no CPU overhead).
+
+CHALLENGE 4: 32-BIT CYCLE COUNTER ROLLOVER (MCYCLE)
+- Why: `mcycle` is a 32-bit register incrementing at 100 MHz.
+- Impact: Wraps every 42.94 seconds.
+- Solution:
+  * Read the 64-bit pair (`mcycle` + `mcycleh`), which will not roll over for 5,849 years.
+
+================================================================================
+5. ACTION PLAN FOR NEXT SESSION (IMMEDIATE TODO)
+================================================================================
+[ ] Step 1: Open THEJAS32 SoC datasheet and verify UART0 register addresses:
+    - Base: 0x11200000
+    - Registers: RBR/THR (0x00), IER (0x04), IIR/FCR (0x08), LCR (0x0C), LSR (0x14)
+[ ] Step 2: Implement `src/platform/ARIES/serial_uart_aries.c` with:
+    - `uartInit()`
+    - `uartWrite()`
+    - `uartRead()`
+    - `serialUART()` vtable
+[ ] Step 3: Flash the updated binary and test `version` / `status` in serial terminal.
+================================================================================
