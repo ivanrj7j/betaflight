@@ -121,6 +121,7 @@ Before reporting any task complete or submitting code changes:
 
 ## 7. Master Planning Suite & Navigation
 Before writing or proposing any code:
+* Follow the **[Test-Driven Development (TDD) Guide](file:///home/ivan/Desktop/betaflight/DEVELOPMENT_GUIDE.md)**: write unit tests first as living documentation, present them for user approval, and wait for confirmation before implementing code.
 * Consult the **[Master Macro Plan](file:///home/ivan/Desktop/betaflight/MACRO_PLAN.md)** to identify the current development phase and gating criteria.
 * Access the granular micro-plans in [`PLAN/`](file:///home/ivan/Desktop/betaflight/PLAN/) for component-specific registers, algorithms, expected inputs, and expected outputs.
 * Verify all hardware assumptions against [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](file:///home/ivan/Desktop/betaflight/knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md).
