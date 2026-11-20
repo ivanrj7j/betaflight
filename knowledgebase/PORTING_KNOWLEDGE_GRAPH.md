@@ -149,9 +149,11 @@ graph TD
   * Evaluates bit 31 of `mcause`:
     * Synchronous Faults (`mcause & 0x80000000 == 0`) $\rightarrow$ dumps diagnostic telemetry (`[TRAP PANIC] mcause=0x... mepc=0x... sp=0x...`) over UART0 and halts.
     * Machine External Interrupts (`cause 11`) $\rightarrow$ queries interrupt controller status at `0x20010010` and executes registered ISR.
-* **Global Interrupt Enablement**:
+* **Global Interrupt Enablement & State-Preserving Atomics (Phase 04 Verified)**:
   * Unlike ARM Cortex-M, RISC-V resets with interrupts disabled (`mstatus.MIE = 0`, `mie.MEIE = 0`).
   * **Mandatory Action:** Must explicitly call `__enable_irq()` right before entering the cooperative scheduler loop in `run()`, setting bit 3 in `mstatus` and bit 11 in `mie`.
+  * **Critical Section Hook (`PLATFORM_CUSTOM_BASEPRI_NB`)**: Replaces ARM `MSR basepri` with custom `__get_BASEPRI()` (checks `mstatus.MIE`) and `__set_BASEPRI()` (restores only if previously enabled), providing 100% nesting safety inside ISRs.
+  * **RV32IM Libatomic Emulation (`stub_drivers.c`)**: `__atomic_fetch_add_4`, `fetch_sub`, `fetch_and`, `fetch_or`, `exchange`, `compare_exchange` use single-instruction `csrrci %0, mstatus, 8` and conditional `csrs mstatus, 8` to eliminate missing symbol errors and prevent ISR deadlock.
 * **Early Boot Telemetry & Panic Telemetry**:
   * Initialize UART0 at 115200 baud immediately in `systemInit()`.
   * Output sequenced boot milestones: `[INIT] 1. EEPROM... [INIT] 2. Config...`.
