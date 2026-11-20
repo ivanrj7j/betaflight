@@ -74,6 +74,12 @@ aries_uart_rx_unittest_SRC := \
 aries_uart_rx_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
+aries_uart_tx_drain_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
+aries_uart_tx_drain_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src
+
 aries_integration_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c \
 		$(USER_DIR)/common/crc.c \

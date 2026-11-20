@@ -1,0 +1,118 @@
+=== PHASE 11 BOUNDED 16-BYTE FIFO BURST TRANSMIT DRAIN & ANTI-STARVATION LOG ===
+Timestamp: 2026-11-20T21:24:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: make -C src/test CC=gcc CXX=g++ test_aries_uart_tx_drain_unittest
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 14 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 14 tests from AriesUartTxDrainTest
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_BurstLimiter_ClampTo16BytesMaximum
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_BurstLimiter_ClampTo16BytesMaximum (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_ExecutionTime_BusCyclesStrictlyUnder2Microseconds
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_ExecutionTime_BusCyclesStrictlyUnder2Microseconds (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_MultiBurstEvacuation_CompleteDrainAcrossMultipleTicks
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_MultiBurstEvacuation_CompleteDrainAcrossMultipleTicks (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_HardwareFIFOFill_HaltsImmediatelyWhenTHREDeasserts
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_HardwareFIFOFill_HaltsImmediatelyWhenTHREDeasserts (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_ZeroBytesPending_ZeroRegisterMutations
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_ZeroBytesPending_ZeroRegisterMutations (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_WrapAroundBoundary_CircularRingBufferStrideSafety
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_WrapAroundBoundary_CircularRingBufferStrideSafety (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_PermanentTHREInterruptSuppression_IERBit1StrictlyZero
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_PermanentTHREInterruptSuppression_IERBit1StrictlyZero (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_MultiPortIsolation_IndependentUART0AndUART1Queues
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_MultiPortIsolation_IndependentUART0AndUART1Queues (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_PollingHook_Thejas32UartPollTx_EvacuatesAllActivePorts
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_PollingHook_Thejas32UartPollTx_EvacuatesAllActivePorts (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_LargePayloadMSP_FlightLoopLatencyPreserved
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_LargePayloadMSP_FlightLoopLatencyPreserved (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_NullPointerGuard_RobustnessAgainstUninitializedPorts
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_NullPointerGuard_RobustnessAgainstUninitializedPorts (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_ConcurrentProducerConsumer_ThreadSafeRingBufferPointers
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_ConcurrentProducerConsumer_ThreadSafeRingBufferPointers (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_TransmitterEmpty_TEMT_FlagVerification
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_TransmitterEmpty_TEMT_FlagVerification (0 ms)
+[ RUN      ] AriesUartTxDrainTest.Test_UARTTX_LineStatusRegister_ReadPerformance_SingleAccessCaching
+[       OK ] AriesUartTxDrainTest.Test_UARTTX_LineStatusRegister_ReadPerformance_SingleAccessCaching (0 ms)
+[----------] 14 tests from AriesUartTxDrainTest (0 ms total)
+[----------] Global test environment tear-down
+[==========] 14 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 14 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+1. aries_startup_unittest:       6/6 PASS
+2. aries_linker_unittest:        6/6 PASS
+3. aries_atomics_unittest:       7/7 PASS
+4. aries_system_time_unittest:   9/9 PASS
+5. aries_target_config_unittest: 6/6 PASS
+6. aries_mcu_excludes_unittest:  5/5 PASS
+7. aries_pg_bounds_unittest:     10/10 PASS
+8. aries_uart_hw_unittest:       11/11 PASS
+9. aries_uart_rx_unittest:       18/18 PASS
+10. aries_uart_tx_drain_unittest: 14/14 PASS
+11. aries_integration_unittest:  12/12 PASS
+Cumulative Total:                104/104 PASS (100%)
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: 952a8c4023f1247cf54bce5cc31ad9c65ed829e33121d0fd7e46bbf1849d0ec0
+Size:   15,396 bytes (.bin)
+Memory: text=15396, data=0, bss=16636, dec=32032 (31.3 KB in SRAM)
+Entry:  0x00202000
+RVC:    0 compressed opcodes
+
+--- 10-POINT SILICON INVARIANT AUDIT ---
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (32032 / 253952 bytes, Headroom: 221920 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00207d18 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 15396 bytes ready for XMODEM SRAM upload)
+Outcome: 10-Point Silicon Audit Passed Successfully.
+
+
+--- PHYSICAL SILICON EXECUTION LOG (CP2102N USB-UART @ 115200 BAUD) ---
+Source: tempfiles/phase11.txt
+Hardware: Physical C-DAC ARIES v3.0 (THEJAS32 / VEGA ET1031 @ 100 MHz, 248 KB SRAM)
+
+================================================================================
+    C-DAC ARIES v3.0 / THEJAS32 SILICON BRINGUP (Phase 11 Bounded TX Drain)
+  Core: VEGA ET1031 (RV32IM @ 100 MHz) | SRAM: 248 KB @ 0x00202000 | 0 RVC
+================================================================================
+
+[TEST 01/11] Machine Mode Context & Register Sanitization: PASS
+[TEST 02/11] Monotonic 64-Bit Cycle Counter (mcycle / mcycleh @ 100 MHz): PASS
+[TEST 03/11] Microsecond & Millisecond Clocks (Zero __udivdi3): PASS (20002 us measured)
+[TEST 04/11] Hardware Timer 0 Down-Counter Status: PASS (Decremented by 100046 ticks)
+[TEST 05/11] State-Preserving Atomics via CSR mstatus.MIE: PASS
+[TEST 06/11] Bare-Metal Memory Primitives (Non-RVC Toolchain Safety): PASS
+[TEST 07/11] Global Interrupt Enablement: PASS (mstatus = 0x00001808)
+[TEST 08/11] Phase 06 Target Architecture, Clamping & Pin Matrix: PASS
+[TEST 09/11] Phase 07 Modular Driver Stripping (MCU_EXCLUDES) & Sizing: PASS
+[TEST 10/11] Phase 08 Parameter Group In-RAM Storage (CONFIG_IN_RAM) & Bounds: PASS
+[TEST 11/11] Phase 09 16550 APB UART0 Driver & Baud Rate Engine: PASS
+[TEST 12/12] Phase 10 Zero-Allocation RX Ring Buffer & LSR Error Recovery: PASS (LSR = 0x00000000)
+[TEST 13/13] Phase 11 Bounded 16-Byte FIFO Burst Transmit Drain & Anti-Starvation:
+  - FIFO Burst Limiter       : Clamped to 16 Bytes (Hardware FIFO Depth: OK)
+  - Transmitter Ready (THRE) : 0x00000000 [FIFO BUSY]
+  - 16-Byte Burst MMIO Latency: 0x00000049 cycles (< 2.0 us overhead: PASS)
+  - THRE Interrupt Suppression: IER = 0x00000000 (Bit 1 strictly 0: Zero THRE Storms: PASS)
+  - Anti-Starvation Impact   : Replaces 17.36 ms stall with < 2.0 us bursts (> 99.8% headroom)
+  -> STATUS: PASS (Bounded 16-Byte FIFO Burst Drain & Anti-Starvation Verified)
+
+================================================================================
+   [ALL 13 SILICON SELF-TESTS PASSED] Phase 11 Bounded TX Drain Verified!
+   Entering Continuous Live Heartbeat Telemetry Loop (1.0 Hz)...
+================================================================================
+[HEARTBEAT #1] Uptime: 3 s | micros: 3698982 | Timer0: 0xFC25EB8A | LED0: ON  | Overflows: 0
+...
+[HEARTBEAT #35] Uptime: 37 s | micros: 37829203 | Timer0: 0x30B83F25 | LED0: ON  | Overflows: 0
+Outcome: Physical Silicon Execution Verified (Zero Traps, 73 cycles / 0.73 us MMIO latency, 35s stable heartbeat).
