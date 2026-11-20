@@ -213,4 +213,5 @@ The implementation micro-plans cover every single hardware and software microcom
 | Phase | Log File | Core Verification / Focus | Silicon Status & Outcome |
 | :---: | :--- | :--- | :--- |
 | **01** | **[phase_01_toolchain_isolation.log](../logs/dev/phase_01_toolchain_isolation.log)** | Dynamic Toolchain Discovery & Multilib RVC Isolation (`ARIES.mk`) | **PASS**: 4/4 TDD tests pass (0.243s); pure uncompressed `rv32i_zicsr_zifencei/ilp32` archives isolated; strictly 0 compressed opcodes in `libgcc.a`. |
+| **02** | **[phase_02_machine_startup_gpr.md](../logs/dev/phase_02_machine_startup_gpr.md)** | Bare-Metal Reset, GPR Sanitization & Trap Vector (`startup.S`) | **PASS**: 6/6 TDD tests pass (0 ms); `_start` at `0x00202000`; `trap_entry` 64-byte aligned; pre-trap `sp` preserved in `frame[2]`; strictly 0 RVC opcodes. |
 

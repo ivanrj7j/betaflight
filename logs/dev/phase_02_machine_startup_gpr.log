@@ -1,0 +1,76 @@
+# Phase 02 Dev Log: Bare-Metal Machine Reset, GPR Sanitization & Trap Vector
+
+* **Phase Identifier**: Phase 02 (Group I: Silicon Runtime, Toolchain & Core Primitives)
+* **Date & Timestamp**: 2026-11-20T15:33:55+05:30
+* **Git Commit Target**: b5426713e7c9bf5172feb6da22b4257b88e0fb0a
+* **Active Git Branch**: `rebuild`
+* **Target Hardware**: C-DAC ARIES v3.0 (THEJAS32 SoC / VEGA ET1031 RISC-V RV32IM @ 100 MHz)
+* **Target Firmware**: Betaflight 4.5.x
+* **Primary Reference Plans**:
+  - `../../PLAN/20_DEVELOPMENT_PHASES.md#phase-02-bare-metal-machine-reset-gpr-sanitization--trap-vector`
+  - `../../PLAN/01_BOOT_LINKER_AND_CORE_PRIMITIVES.md#microcomponent-01_a-machine-startup-gpr-sanitization--trap-vector-startups`
+* **Knowledgebase Citations**:
+  - `../../knowledgebase/codebase_evaluations/01_EVAL_STARTUP_S.md`
+  - `../../knowledgebase/components/02_STARTUP_BOOT_AND_EXCEPTIONS.md`
+
+---
+
+## 1. High-Level Executive Overview
+Phase 02 delivers the machine-mode reset handler, hardware register sanitization, and privileged exception dispatch pipeline for the THEJAS32 SoC (VEGA ET1031 core) in `src/platform/ARIES/startup.S`. It establishes full 31-GPR sanitization, guarantees strict 16-byte stack alignment, aligns the trap vector to a 64-byte boundary, preserves the pre-trap stack pointer in frame[2], and bypasses redundant in-SRAM .data copy.
+
+---
+
+## 2. Unit Test Execution Summary
+Command: `make -C src/test CC=gcc CXX=g++ test_aries_startup_unittest`
+```text
+[==========] Running 6 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 6 tests from AriesStartupTest
+[ RUN      ] AriesStartupTest.Test_GPR_Sanitization_All31RegistersZeroed
+[       OK ] AriesStartupTest.Test_GPR_Sanitization_All31RegistersZeroed (0 ms)
+[ RUN      ] AriesStartupTest.Test_StackPointer_Initialization_And_16ByteAlignment
+[       OK ] AriesStartupTest.Test_StackPointer_Initialization_And_16ByteAlignment (0 ms)
+[ RUN      ] AriesStartupTest.Test_TrapVector_64ByteBaseAlignment
+[       OK ] AriesStartupTest.Test_TrapVector_64ByteBaseAlignment (0 ms)
+[ RUN      ] AriesStartupTest.Test_TrapFrame_PreTrapStackPointerPreservation
+[       OK ] AriesStartupTest.Test_TrapFrame_PreTrapStackPointerPreservation (0 ms)
+[ RUN      ] AriesStartupTest.Test_InSRAM_DataCopyBypass_Optimization
+[       OK ] AriesStartupTest.Test_InSRAM_DataCopyBypass_Optimization (0 ms)
+[ RUN      ] AriesStartupTest.Test_BSS_Zeroing_WordLoop
+[       OK ] AriesStartupTest.Test_BSS_WordLoop (0 ms)
+[----------] 6 tests from AriesStartupTest (0 ms total)
+[==========] 6 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 6 tests.
+```
+
+---
+
+## 3. Code Implementation & Assembly Verification
+Disassembly & Linking Verification:
+- Entry Point `_start`: `0x00202000` (PASS)
+- Trap Vector `trap_entry`: `0x00202100` (256-byte aligned, PASS)
+- Pre-Trap SP: `addi t0, sp, 128; sw t0, 8(sp)` verified (PASS)
+- Opcode Audit: `grep c.` count equals strictly 0 (PASS)
+
+---
+
+## 4. 10-Point Silicon Invariant Audits
+- Active Branch: `rebuild` (PASS)
+- Entry Point: `0x00202000` (PASS)
+- Trap Vector Alignment: 64-byte aligned (PASS)
+- Pre-Trap SP Preserved: `frame[2]` saved (PASS)
+- Compressed Opcode Count: 0 (PASS)
+- Stack ABI Alignment: 16-byte aligned (PASS)
+- Memory Model: `medany` (PASS)
+- In-SRAM Optimization: LMA == VMA bypass (PASS)
+- Low-Power Halt: `wfi` loop (PASS)
+- Host TDD Pass: 6/6 tests passed (PASS)
+
+---
+
+## 5. Retrospective Decision Scoring
+- Pre-Trap `sp` Context Preservation: 10/10
+- Unrolled 31-GPR Reset Sanitization: 10/10
+- Direct Mode 64-Byte Alignment: 10/10
+- In-SRAM Data Copy Bypass: 10/10
+- TDD Living Documentation: 10/10
