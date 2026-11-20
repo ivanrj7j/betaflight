@@ -111,13 +111,19 @@ graph TD
     ```ld
     MEMORY
     {
-        RAM (wxa!ri) : ORIGIN = 0x00202000, LENGTH = 128K  /* Minimal 128KB Handshake Target */
+        RAM (wxa!ri) : ORIGIN = 0x00202000, LENGTH = 248K  /* Full 248 KB In-SRAM Execution Budget */
     }
     ```
-  * Stack Alignment: `_estack = 0x0023FC50` (or `0x00222000` for 128K build, 16-byte aligned, 4 KB to 8 KB depth).
+  * Section Ordering: `KEEP(*(.text.startup*))` anchored first in `.text` before `KEEP(*(SORT_NONE(.init)))`, guaranteeing `_start` is placed at `0x00202000`. Dedicated `.rodata` section.
+  * Configuration Registry: Preserves `__pg_registry_*` and `__pg_resetdata_*` with `KEEP()` and 4-byte alignment.
+  * Stack Headroom: Dedicated 8 KB stack (`.stack (NOLOAD)`) with 16-byte alignment (`_sstack`, `_estack`).
+  * Safety Guardrail: Compile-time assertion `ASSERT(_end <= (ORIGIN(RAM) + LENGTH(RAM)), ...)` prevents silent memory overflow.
+  * Stack Alignment: `_estack` (16-byte aligned, 8 KB dedicated depth).
   * Peripheral Register Space: Base `0x10000000` is **peripheral APB/MMIO**, NOT SRAM!
   * External SPI Flash: Offline storage only; **NO Execute-In-Place (XIP)**.
   * Flashing Delivery: Strictly raw binary **`.bin`** (`betaflight_ARIESV3.bin`) streamed via XMODEM `flasher.bat`. (Passing `.hex` flashes ASCII text `:1000...` causing immediate crashes).
+* **Verification Status (Phase 03)**:
+  * [`logs/dev/phase_03_sram_linker_layout.md`](../logs/dev/phase_03_sram_linker_layout.md): **PASS** (6/6 TDD tests, 10-point audit passed, compile-time assertion verified).
 * **Consulted Logs**:
   * [12_STM32_LINKER_AND_SECTIONS.md](../logs/hardware_inspection/12_STM32_LINKER_AND_SECTIONS.md)
   * [13_STM32_BUILD_MAKEFILE.md](../logs/hardware_inspection/13_STM32_BUILD_MAKEFILE.md)

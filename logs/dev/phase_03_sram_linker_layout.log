@@ -1,0 +1,85 @@
+=== Phase 03 Linker Script & Memory Layout Verification Log ===
+Date: 2026-11-20T15:42:00+05:30
+Branch: rebuild
+Commit Target: b5426713e7c9bf5172feb6da22b4257b88e0fb0a
+Toolchain: riscv32-esp-elf-gcc (esp-13.2.0_20250707)
+
+--- 1. Unit Test Build & Execution Output ---
+$ make -C src/test CC=gcc CXX=g++ test_aries_linker_unittest
+make: Entering directory '/home/ivan/Desktop/betaflight/src/test'
+Makefile:1087: warning: gcc/g++ support is experimental. For normal testing, clang is recommended
+CC version: gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+CXX version: g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+compiling ../main/build/atomic.c 
+compiling unit/aries_linker_unittest.cc 
+linking ../../obj/test/aries_linker_unittest/aries_linker_unittest 
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 6 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 6 tests from AriesLinkerTest
+[ RUN      ] AriesLinkerTest.Test_MemoryBounds_OriginAndLength
+[       OK ] AriesLinkerTest.Test_MemoryBounds_OriginAndLength (0 ms)
+[ RUN      ] AriesLinkerTest.Test_SRAMBudgetEnforcement_CompileTimeAssertion
+[       OK ] AriesLinkerTest.Test_SRAMBudgetEnforcement_CompileTimeAssertion (0 ms)
+[ RUN      ] AriesLinkerTest.Test_StackAllocation_Minimum8KBHeadroom
+[       OK ] AriesLinkerTest.Test_StackAllocation_Minimum8KBHeadroom (0 ms)
+[ RUN      ] AriesLinkerTest.Test_SectionLinkOrder_StartupPrecedenceOverInit
+[       OK ] AriesLinkerTest.Test_SectionLinkOrder_StartupPrecedenceOverInit (0 ms)
+[ RUN      ] AriesLinkerTest.Test_ParameterGroupRegistry_AnchorsAndAlignment
+[       OK ] AriesLinkerTest.Test_ParameterGroupRegistry_AnchorsAndAlignment (0 ms)
+[ RUN      ] AriesLinkerTest.Test_SectionEndpoints_4ByteAlignment
+[       OK ] AriesLinkerTest.Test_SectionEndpoints_4ByteAlignment (0 ms)
+[----------] 6 tests from AriesLinkerTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 6 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 6 tests.
+running test_aries_linker_unittest: PASS
+make: Leaving directory '/home/ivan/Desktop/betaflight/src/test'
+
+--- 2. Cross-Compilation & Linker Symbol Table ---
+$ riscv32-esp-elf-readelf -s /tmp/test_boot.elf | grep -E '_start|trap_entry|_stext|_etext|_srodata|_erodata|_sdata|_edata|_sbss|_ebss|_sstack|_estack|_end|__global_pointer'
+    19: 00202a54     0 NOTYPE  GLOBAL DEFAULT  ABS __global_pointer$
+    21: 00202254     0 NOTYPE  GLOBAL DEFAULT    1 _etext
+    22: 00202254     0 NOTYPE  GLOBAL DEFAULT    6 _sbss
+    23: 00202254     0 NOTYPE  GLOBAL DEFAULT    2 _srodata
+    25: 00202254     0 NOTYPE  GLOBAL DEFAULT    5 _sdata
+    26: 00202254     0 NOTYPE  GLOBAL DEFAULT    6 _ebss
+    27: 00202000   248 FUNC    GLOBAL DEFAULT    1 _start
+    29: 00202100   292 FUNC    GLOBAL DEFAULT    1 trap_entry
+    30: 00202260     0 NOTYPE  GLOBAL DEFAULT    7 _sstack
+    31: 00204260     0 NOTYPE  GLOBAL DEFAULT    7 _estack
+    32: 00202254     0 NOTYPE  GLOBAL DEFAULT    5 _edata
+    33: 00204260     0 NOTYPE  GLOBAL DEFAULT    7 _end
+    34: 00202000     0 NOTYPE  GLOBAL DEFAULT    1 _stext
+    35: 00202254     0 NOTYPE  GLOBAL DEFAULT    2 _erodata
+
+--- 3. Opcode Compression Check ---
+$ riscv32-esp-elf-objdump -d /tmp/test_boot.elf | grep -E '\bc\.' | wc -l
+0
+
+--- 4. Compile-Time Budget Overflow Assertion Trigger Test ---
+$ riscv32-esp-elf-gcc -march=rv32im_zicsr -mabi=ilp32 -nostdlib -Wl,--gc-sections -T src/platform/ARIES/link/aries_v3.ld /tmp/startup.o /tmp/oversized.o -o /tmp/oversized.elf
+/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/../lib/gcc/riscv32-esp-elf/13.2.0/../../../../riscv32-esp-elf/bin/ld: /tmp/oversized.elf section `.data' will not fit in region `RAM'
+/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/../lib/gcc/riscv32-esp-elf/13.2.0/../../../../riscv32-esp-elf/bin/ld: FATAL: Total firmware image + stack exceeds 248 KB physical SRAM!
+/home/ivan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin/../lib/gcc/riscv32-esp-elf/13.2.0/../../../../riscv32-esp-elf/bin/ld: region `RAM' overflowed by 10896 bytes
+collect2: error: ld returned 1 exit status
+
+--- 5. 10-Point Silicon Invariant Audit ---
+$ src/test/unit/aries/build_verify.sh /tmp/test_boot.elf
+======================================================================
+ Starting 10-Point Silicon Invariant Audit: /tmp/test_boot.elf
+======================================================================
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (/tmp/test_boot.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (8800 / 253952 bytes, Headroom: 245152 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00202254 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: INFO (.bin file will be generated by make hex/bin target)
+======================================================================
+ 10-Point Silicon Audit Passed Successfully.
+======================================================================

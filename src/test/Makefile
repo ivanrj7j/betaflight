@@ -33,6 +33,9 @@ VPATH := $(VPATH):$(USER_DIR):$(TEST_DIR)
 aries_startup_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
 
+aries_linker_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \
