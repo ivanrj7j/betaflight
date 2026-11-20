@@ -1,0 +1,97 @@
+=== PHASE 10 ZERO-ALLOCATION RX RING BUFFER & LSR ERROR RECOVERY LOG ===
+Timestamp: 2026-11-20T20:55:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: make -C src/test CC=gcc CXX=g++ test_aries_uart_rx_unittest
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 18 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 18 tests from AriesUartRxTest
+[ RUN      ] AriesUartRxTest.Test_UARTRX_StaticBuffer_256ByteSizeAndModuloWraparound
+[       OK ] AriesUartRxTest.Test_UARTRX_StaticBuffer_256ByteSizeAndModuloWraparound (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_MultiByteFIFOBurst_DrainsUpTo16BytesInSingleISRPass
+[       OK ] AriesUartRxTest.Test_UARTRX_MultiByteFIFOBurst_DrainsUpTo16BytesInSingleISRPass (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_BufferCapacityGuard_HeadTailCollisionDropsIncomingBytes
+[       OK ] AriesUartRxTest.Test_UARTRX_BufferCapacityGuard_HeadTailCollisionDropsIncomingBytes (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_LSRErrorFlags_OverrunErrorAutoClearedOnLSRRead
+[       OK ] AriesUartRxTest.Test_UARTRX_LSRErrorFlags_OverrunErrorAutoClearedOnLSRRead (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_LSRErrorFlags_ParityErrorAutoClearedOnLSRRead
+[       OK ] AriesUartRxTest.Test_UARTRX_LSRErrorFlags_ParityErrorAutoClearedOnLSRRead (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_LSRErrorFlags_FramingErrorAutoClearedOnLSRRead
+[       OK ] AriesUartRxTest.Test_UARTRX_LSRErrorFlags_FramingErrorAutoClearedOnLSRRead (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_ConsumerDrain_FifoReadAdvancesTailCorrectly
+[       OK ] AriesUartRxTest.Test_UARTRX_ConsumerDrain_FifoReadAdvancesTailCorrectly (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_PolledFallbackEngine_HookedAndDrainResidualBytes
+[       OK ] AriesUartRxTest.Test_UARTRX_PolledFallbackEngine_HookedAndDrainResidualBytes (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_ZeroDynamicAllocation_BufferLivesInBssThreadSafe
+[       OK ] AriesUartRxTest.Test_UARTRX_ZeroDynamicAllocation_BufferLivesInBssThreadSafe (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_MultiPortIsolation_ZeroCrossTalkBetweenUART0AndUART1
+[       OK ] AriesUartRxTest.Test_UARTRX_MultiPortIsolation_ZeroCrossTalkBetweenUART0AndUART1 (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_CharacterTimeoutInterrupt_TrailingBytesFlushed
+[       OK ] AriesUartRxTest.Test_UARTRX_CharacterTimeoutInterrupt_TrailingBytesFlushed (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_LineBreakCondition_BreakInterruptUnlatched
+[       OK ] AriesUartRxTest.Test_UARTRX_LineBreakCondition_BreakInterruptUnlatched (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_SpuriousInterrupt_NoDataReady_ZeroBufferMutation
+[       OK ] AriesUartRxTest.Test_UARTRX_SpuriousInterrupt_NoDataReady_ZeroBufferMutation (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_BoundaryStress_ExactTransitionsAtCapacityLimit
+[       OK ] AriesUartRxTest.Test_UARTRX_BoundaryStress_ExactTransitionsAtCapacityLimit (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_FramingErrorCorruptedByte_SubsequentValidFrameIngestedCleanly
+[       OK ] AriesUartRxTest.Test_UARTRX_FramingErrorCorruptedByte_SubsequentValidFrameIngestedCleanly (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_HighThroughput_ContinuousStreamWithInterleavedConsumerTask
+[       OK ] AriesUartRxTest.Test_UARTRX_HighThroughput_ContinuousStreamWithInterleavedConsumerTask (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_AtomicBytesWaiting_RaceFreeCalculationDuringConcurrentHeadAdvance
+[       OK ] AriesUartRxTest.Test_UARTRX_AtomicBytesWaiting_RaceFreeCalculationDuringConcurrentHeadAdvance (0 ms)
+[ RUN      ] AriesUartRxTest.Test_UARTRX_OverrunRecovery_ContinuousStreamReturnsToCleanReception
+[       OK ] AriesUartRxTest.Test_UARTRX_OverrunRecovery_ContinuousStreamReturnsToCleanReception (0 ms)
+[----------] 18 tests from AriesUartRxTest (1 ms total)
+[----------] Global test environment tear-down
+[==========] 18 tests from 1 test suite ran. (2 ms total)
+[  PASSED  ] 18 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+1. aries_startup_unittest:       6/6 PASS
+2. aries_linker_unittest:        6/6 PASS
+3. aries_atomics_unittest:       7/7 PASS
+4. aries_system_time_unittest:   9/9 PASS
+5. aries_target_config_unittest: 6/6 PASS
+6. aries_mcu_excludes_unittest:  5/5 PASS
+7. aries_pg_bounds_unittest:     10/10 PASS
+8. aries_uart_hw_unittest:       11/11 PASS
+9. aries_uart_rx_unittest:       18/18 PASS
+10. aries_integration_unittest:  12/12 PASS
+Cumulative Total:                90/90 PASS (100%)
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: a4678e09b59a230e0b660a60d1c795114437c92d102bcf0bfd1ff8bf602220a3
+Size:   14,452 bytes (.bin)
+Memory: text=14452, data=0, bss=16636, dec=31088 (30.4 KB in SRAM)
+Entry:  0x00202000
+RVC:    0 compressed opcodes
+
+--- 10-POINT SILICON INVARIANT AUDIT ---
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (31088 / 253952 bytes, Headroom: 222864 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00207968 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 14452 bytes ready for XMODEM SRAM upload)
+Outcome: 10-Point Silicon Audit Passed Successfully.
+
+--- PHYSICAL HARDWARE BENCH TEST (tempfiles/phase10.txt) ---
+Hardware: C-DAC ARIES v3.0 (THEJAS32 @ 100 MHz, internal SRAM)
+Port: /dev/ttyUSB0 @ 115200 baud
+Banner: C-DAC ARIES v3.0 / THEJAS32 SILICON BRINGUP
+Self-Test Results: Tests 01-12 ALL PASS (100%)
+Live LSR Readback: 0x00000000 (Clean: No Overrun, No Framing, No Parity Error)
+Multi-Byte FIFO Draining: ACTIVE (while(LSR & 0x01) drains up to 16 bytes per pass)
+Polled Fallback Engine: ACTIVE (thejas32_uart_poll_rx() hooked at 100 Hz in tasks.c)
+Heartbeat: 15 cycles captured (up to 17s uptime, Timer0 decrementing, LED0 1.0 Hz blinking)
+Outcome: VERIFIED PASS ON PHYSICAL SILICON (Phase 10 RX Ring Buffer & LSR Error Recovery Verified)

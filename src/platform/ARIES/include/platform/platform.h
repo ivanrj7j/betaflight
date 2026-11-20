@@ -209,6 +209,9 @@ extern uint32_t SystemCoreClock;
 // Periodic / polled transmit queue drain hook for background tasks and scheduler
 void thejas32_uart_poll_tx(void);
 
+// Periodic / polled receive FIFO drain hook for background tasks and scheduler (Phase 10)
+void thejas32_uart_poll_rx(void);
+
 // Early Hardware UART0 Diagnostic Telemetry (115200 baud, polled)
 void thejas32_early_uart_init(void);
 void thejas32_early_uart_putc(char c);

@@ -229,6 +229,18 @@ void thejas32_uart_poll_tx(void)
     }
 }
 
+// Periodic / polled receive FIFO drain hook for background tasks and scheduler (Phase 10)
+// Empties any residual bytes sitting in the 16550 hardware FIFO into software ring buffers
+void thejas32_uart_poll_rx(void)
+{
+    for (int dev = 0; dev < UARTDEV_COUNT; dev++) {
+        uartPort_t *s = &uartDevice[dev].port;
+        if (s->USARTx && s->port.rxBuffer && (THEJAS32_UART(dev).UART_LSR & 0x01)) {
+            uartIrqHandler(s);
+        }
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Interrupt Handling (RX-Only Ring Buffer Ingestion & ORE Recovery)
 // -----------------------------------------------------------------------------
