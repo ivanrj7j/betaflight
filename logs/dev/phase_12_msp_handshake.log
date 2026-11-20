@@ -1,0 +1,130 @@
+=== PHASE 12 ZERO-ALLOCATION MSP PROTOCOL PARSER & 7-STEP HANDSHAKE LOG ===
+Timestamp: 2026-11-20T21:48:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz, 248 KB SRAM)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: make -C src/test CC=gcc CXX=g++ test_aries_msp_handshake_unittest
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 16 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 16 tests from AriesMspHandshakeTest
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Framing_V1_SerializationAndXORChecksum
+[       OK ] AriesMspHandshakeTest.Test_MSP_Framing_V1_SerializationAndXORChecksum (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Framing_V2_SerializationAndCRC8
+[       OK ] AriesMspHandshakeTest.Test_MSP_Framing_V2_SerializationAndCRC8 (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Handshake_Step1_ApiVersion
+[       OK ] AriesMspHandshakeTest.Test_MSP_Handshake_Step1_ApiVersion (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Handshake_Step2_FcVariant
+[       OK ] AriesMspHandshakeTest.Test_MSP_Handshake_Step2_FcVariant (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Handshake_Step3_FcVersion
+[       OK ] AriesMspHandshakeTest.Test_MSP_Handshake_Step3_FcVersion (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Handshake_Step4_BoardInfo
+[       OK ] AriesMspHandshakeTest.Test_MSP_Handshake_Step4_BoardInfo (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Handshake_Step5_BuildInfo
+[       OK ] AriesMspHandshakeTest.Test_MSP_Handshake_Step5_BuildInfo (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Handshake_Step6_UniqueSiliconIdentifier
+[       OK ] AriesMspHandshakeTest.Test_MSP_Handshake_Step6_UniqueSiliconIdentifier (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Handshake_Step7_FcStatus_LoopClampingEnforcement
+[       OK ] AriesMspHandshakeTest.Test_MSP_Handshake_Step7_FcStatus_LoopClampingEnforcement (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_NoiseRejection_StrayBytesBeforePreamble
+[       OK ] AriesMspHandshakeTest.Test_MSP_NoiseRejection_StrayBytesBeforePreamble (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_ChecksumError_CorruptedXOR_FrameSilentlyDiscarded
+[       OK ] AriesMspHandshakeTest.Test_MSP_ChecksumError_CorruptedXOR_FrameSilentlyDiscarded (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_V2ChecksumError_CorruptedCRC8_FrameSilentlyDiscarded
+[       OK ] AriesMspHandshakeTest.Test_MSP_V2ChecksumError_CorruptedCRC8_FrameSilentlyDiscarded (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_ZeroAllocation_MemorySafety
+[       OK ] AriesMspHandshakeTest.Test_MSP_ZeroAllocation_MemorySafety (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_Handshake_EndToEndSequentialPipeline
+[       OK ] AriesMspHandshakeTest.Test_MSP_Handshake_EndToEndSequentialPipeline (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_BoundedBurstDrainIntegration_FlightLoopHeadroomPreserved
+[       OK ] AriesMspHandshakeTest.Test_MSP_BoundedBurstDrainIntegration_FlightLoopHeadroomPreserved (0 ms)
+[ RUN      ] AriesMspHandshakeTest.Test_MSP_OversizedPayload_BufferOverflowGuard
+[       OK ] AriesMspHandshakeTest.Test_MSP_OversizedPayload_BufferOverflowGuard (0 ms)
+[----------] 16 tests from AriesMspHandshakeTest (0 ms total)
+[----------] Global test environment tear-down
+[==========] 16 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 16 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+1. aries_startup_unittest:       6/6 PASS
+2. aries_linker_unittest:        6/6 PASS
+3. aries_atomics_unittest:       7/7 PASS
+4. aries_system_time_unittest:   9/9 PASS
+5. aries_target_config_unittest: 6/6 PASS
+6. aries_mcu_excludes_unittest:  5/5 PASS
+7. aries_pg_bounds_unittest:     10/10 PASS
+8. aries_uart_hw_unittest:       11/11 PASS
+9. aries_uart_rx_unittest:       18/18 PASS
+10. aries_uart_tx_drain_unittest: 14/14 PASS
+11. aries_msp_handshake_unittest: 16/16 PASS
+12. aries_integration_unittest:  12/12 PASS
+Cumulative Total:                120/120 PASS (100% pass rate)
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: dffe330895752f14358aa721d5725de8f7f05b050697048901aff0ba0bc80938
+Size:   16,740 bytes (.bin)
+Memory: text=16740, data=0, bss=16636, dec=33376 (32.6 KB in SRAM)
+Entry:  0x00202000
+RVC:    0 compressed opcodes
+
+--- 10-POINT SILICON INVARIANT AUDIT ---
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (33376 / 253952 bytes, Headroom: 220576 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00208258 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 16740 bytes ready for XMODEM SRAM upload)
+Outcome: 10-Point Silicon Audit Passed Successfully.
+
+
+--- PHYSICAL SILICON EXECUTION LOG (CP2102N USB-UART @ 115200 BAUD) ---
+Source: tempfiles/phase12.txt
+Hardware: Physical C-DAC ARIES v3.0 (THEJAS32 / VEGA ET1031 @ 100 MHz, 248 KB SRAM)
+
+================================================================================
+    C-DAC ARIES v3.0 / THEJAS32 SILICON BRINGUP (Phase 12 Zero-Allocation MSP)
+  Core: VEGA ET1031 (RV32IM @ 100 MHz) | SRAM: 248 KB @ 0x00202000 | 0 RVC
+================================================================================
+
+[TEST 01/11] Machine Mode Context & Register Sanitization: PASS
+[TEST 02/11] Monotonic 64-Bit Cycle Counter (mcycle / mcycleh @ 100 MHz): PASS
+[TEST 03/11] Microsecond & Millisecond Clocks (Zero __udivdi3): PASS (20002 us measured)
+[TEST 04/11] Hardware Timer 0 Down-Counter Status: PASS (Decremented by 100114 ticks)
+[TEST 05/11] State-Preserving Atomics via CSR mstatus.MIE: PASS
+[TEST 06/11] Bare-Metal Memory Primitives (Non-RVC Toolchain Safety): PASS
+[TEST 07/11] Global Interrupt Enablement: PASS (mstatus = 0x00001808)
+[TEST 08/11] Phase 06 Target Architecture, Clamping & Pin Matrix: PASS
+[TEST 09/11] Phase 07 Modular Driver Stripping (MCU_EXCLUDES) & Sizing: PASS
+[TEST 10/11] Phase 08 Parameter Group In-RAM Storage (CONFIG_IN_RAM) & Bounds: PASS
+[TEST 11/11] Phase 09 16550 APB UART0 Driver & Baud Rate Engine: PASS
+[TEST 12/12] Phase 10 Zero-Allocation RX Ring Buffer & LSR Error Recovery: PASS (LSR = 0x00000000)
+[TEST 13/14] Phase 11 Bounded 16-Byte FIFO Burst Transmit Drain & Anti-Starvation: PASS
+[TEST 14/14] Phase 12 Zero-Allocation MSP Parser & 7-Step Handshake Engine:
+  - Protocol Framing         : MSPv1 ($M< / $M>) and MSPv2 ($X< / $X>) Supported
+  - Memory Architecture      : Zero Dynamic Allocation (Heapless static buffers in .bss)
+  - Step 1: MSP_API_VERSION   : ID 1 -> Protocol 1, API 1.45 [VERIFIED]
+  - Step 2: MSP_FC_VARIANT    : ID 2 -> 'BTFL' (Betaflight Identifier) [VERIFIED]
+  - Step 3: MSP_FC_VERSION    : ID 3 -> Release 4.5.0 [VERIFIED]
+  - Step 4: MSP_BOARD_INFO    : ID 4 -> Board 'ARV3', Target 'ARIESV3' [VERIFIED]
+  - Step 5: MSP_BUILD_INFO    : ID 5 -> Build date, time, git commit hash [VERIFIED]
+  - Step 6: MSP_UID           : ID 160 -> 12-byte Unique SoC Silicon ID [VERIFIED]
+  - Step 7: MSP_STATUS        : ID 101 -> cycleTime=1000 us (1.0 kHz Loop Clamped)
+  - CRC8-DVB Engine Check    : 0x0x00000045 [DVB-S2 Polynomial 0xD5: OK]
+  - Telemetry Pipeline Flow  : UART0 -> RX Ring Buffer -> MSP Parser -> Bounded TX Drain [ACTIVE]
+  -> STATUS: PASS (Zero-Allocation MSP Protocol Parser & 7-Step Handshake Verified)
+
+================================================================================
+   [ALL 14 SILICON SELF-TESTS PASSED] Phase 12 MSP Handshake Verified!
+   Entering Continuous Live Heartbeat Telemetry Loop (1.0 Hz)...
+================================================================================
+[HEARTBEAT #1] Uptime: 3 s | micros: 3792467 | Timer0: 0xFB974605 | LED0: ON  | Overflows: 0
+...
+[HEARTBEAT #29] Uptime: 31 s | micros: 31899745 | Timer0: 0x540FE159 | LED0: ON  | Overflows: 0
+Outcome: Physical Silicon Execution Verified (Zero Traps, 14/14 self-tests PASS, 7-step handshake validated, 31s stable heartbeat).

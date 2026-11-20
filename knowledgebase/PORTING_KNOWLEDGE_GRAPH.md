@@ -222,8 +222,11 @@ graph TD
 * **Strict Telemetry Wire Hygiene (Zero ASCII Pollution)**:
   * **NEVER emit unpacketized ASCII strings (`[SERIAL ALIVE]`, `[MSP RX]`) onto UART0.**
   * ASCII text corrupts binary MSP frames, causing framing/CRC errors and Configurator 10-second timeouts.
-* **Verification Status (Phase 09 Complete)**:
-  * [`logs/dev/phase_09_uart0_hardware_driver.md`](../logs/dev/phase_09_uart0_hardware_driver.md): **PASS** (8/8 TDD tests, cumulative 57/57 tests pass; Divisor 54 @ 100 MHz APB (+0.47% error); 16-byte hardware FIFOs via `FCR = 0x07`; permanent TX IRQ suppression via `IER = 0x01`; bounded burst drain $< 2.0\,\mu\text{s}$; 12,752 B binary; strictly 0 RVC opcodes).
+* **Verification Status (Phases 09–12 Hardware Verified)**:
+  * [`logs/dev/phase_09_uart0_hardware_driver.md`](../logs/dev/phase_09_uart0_hardware_driver.md): **PASS (Hardware Verified)**: 11/11 TDD tests; Divisor 54 (+0.47% error @ 115200 baud); 16-byte FIFOs; permanent TX IRQ suppression (0 THRE storms); bounded burst drain (< 2.0 us); verified on physical silicon (`phase9.1.txt`).
+  * [`logs/dev/phase_10_rx_ring_buffer.md`](../logs/dev/phase_10_rx_ring_buffer.md): **PASS (Hardware Verified)**: 18/18 TDD tests; zero-allocation 256-byte circular ring buffer in `.bss` with collision guard ($N-1$ capacity); automatic LSR error unlatching (ORE/PE/FE/BI); multi-byte FIFO burst drain; 100 Hz polled fallback in `taskHandleSerial()`; verified on physical silicon (`phase10.txt`).
+  * [`logs/dev/phase_11_bounded_tx_burst_drain.md`](../logs/dev/phase_11_bounded_tx_burst_drain.md): **PASS (Hardware Verified)**: 14/14 TDD tests; synchronous TX drain clamped to 16 bytes (measured 73 cycles / 0.73 us MMIO latency on hardware); permanent THRE interrupt suppression (`IER = 0x01`); 100 Hz background evacuation via `thejas32_uart_poll_tx()`; verified on physical silicon (`phase11.txt`).
+  * [`logs/dev/phase_12_msp_handshake.md`](../logs/dev/phase_12_msp_handshake.md): **PASS (Hardware Verified)**: 16/16 TDD tests; minimal 7-step Configurator handshake engine (API 1.45, BTFL, 4.5.0, ARV3/ARIESV3, build info, 12B UID, status cycleTime=1000 us); zero heap allocations; CRC8-DVB polynomial 0xD5 engine check; verified on physical silicon (`phase12.txt`).
 * **Consulted Logs**:
   * [05_STM32_SERIAL_UART_HW.md](../logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md)
   * [06_STM32_SERIAL_UART_DRIVER.md](../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md)

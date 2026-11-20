@@ -80,6 +80,19 @@ aries_uart_tx_drain_unittest_SRC := \
 aries_uart_tx_drain_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
+aries_msp_handshake_unittest_SRC := \
+		$(USER_DIR)/msp/msp_serial.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/build/atomic.c
+
+aries_msp_handshake_unittest_DEFINES := \
+		USE_CLI= \
+		USE_MSP_DISPLAYPORT=
+
+aries_msp_handshake_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src
+
 aries_integration_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c \
 		$(USER_DIR)/common/crc.c \
