@@ -88,3 +88,10 @@ When joining a session or starting a new task, follow this exact procedure:
 6. **Strict Relative File Path Policy:**
    - Ensure all documentation, phase logs (`logs/dev/`), code comments, and cross-references strictly use POSIX relative file paths (`../...` or repo-relative).
    - Hardcoded host filesystem paths (such as `/home/ivan/...` or `file:///home/...`) are strictly forbidden across all commits.
+7. **VM Environment & Manual Host Flashing:**
+   - The development environment runs inside a Virtual Machine (VM) without direct USB device or hardware debug passthrough.
+   - The agent **MUST NEVER** attempt direct device flashing or OpenOCD commands.
+   - After compiling each time, copy the generated `.bin` to `tempfiles/` (e.g. `cp obj/main/betaflight_bootstrap.bin tempfiles/`) so the user can easily flash it manually from the host machine.
+8. **Every-Phase Build Briefing & Verification Feedback Loop:**
+   - At every phase, provide compiled binary details (path, exact size, origin address, 0 RVC count), specify what to look for in the build/serial output, and wait for the user to flash and provide serial logs.
+   - Heavily instrument diagnostic firmware with detailed ASCII UART logs and status LED0 toggling.

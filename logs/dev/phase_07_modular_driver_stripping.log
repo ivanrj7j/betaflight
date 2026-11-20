@@ -1,0 +1,56 @@
+================================================================================
+PHASE 07 LOG: Modular Driver Stripping (MCU_EXCLUDES) & Binary Sizing
+Date: 2026-11-20T17:20:00+05:30
+Branch: rebuild
+Commit: b5426713e7c9bf5172feb6da22b4257b88e0fb0a
+================================================================================
+
+[BUILD & UNIT TEST RUN]
+Command: make -C src/test CC=gcc CXX=g++ test_aries_mcu_excludes_unittest
+make: Entering directory 'src/test'
+Makefile:1105: warning: gcc/g++ support is experimental. For normal testing, clang is recommended
+compiling unit/aries_mcu_excludes_unittest.cc
+linking ../../obj/test/aries_mcu_excludes_unittest/aries_mcu_excludes_unittest
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 5 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 5 tests from AriesMcuExcludesTest
+[ RUN      ] AriesMcuExcludesTest.Test_MCUExcludes_DisplayAndOSDPruned
+[       OK ] AriesMcuExcludesTest.Test_MCUExcludes_DisplayAndOSDPruned (0 ms)
+[ RUN      ] AriesMcuExcludesTest.Test_MCUExcludes_StorageAndFilesystemPruned
+[       OK ] AriesMcuExcludesTest.Test_MCUExcludes_StorageAndFilesystemPruned (0 ms)
+[ RUN      ] AriesMcuExcludesTest.Test_MCUExcludes_NavigationAndSensorsPruned
+[       OK ] AriesMcuExcludesTest.Test_MCUExcludes_NavigationAndSensorsPruned (0 ms)
+[ RUN      ] AriesMcuExcludesTest.Test_MCUExcludes_CumulativeSavings_Exceeds500KB
+[       OK ] AriesMcuExcludesTest.Test_MCUExcludes_CumulativeSavings_Exceeds500KB (0 ms)
+[ RUN      ] AriesMcuExcludesTest.Test_MCUExcludes_EssentialDriversPreserved
+[       OK ] AriesMcuExcludesTest.Test_MCUExcludes_EssentialDriversPreserved (0 ms)
+[----------] 5 tests from AriesMcuExcludesTest (0 ms total)
+[----------] Global test environment tear-down
+[==========] 5 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 5 tests.
+running test_aries_mcu_excludes_unittest: PASS
+make: Leaving directory 'src/test'
+
+[SILICON AUDIT VERIFICATION]
+Command: RISCV_TOOLCHAIN_PATH=... src/test/unit/aries/build_verify.sh obj/main/betaflight_bootstrap.elf
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (19168 / 253952 bytes, Headroom: 234784 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00204adc <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 10728 bytes ready for XMODEM SRAM upload)
+Result: 10-Point Silicon Audit Passed Successfully.
+
+[CUMULATIVE TEST STATUS]
+aries_startup_unittest       : 6/6 PASSED
+aries_linker_unittest        : 6/6 PASSED
+aries_atomics_unittest       : 7/7 PASSED
+aries_system_time_unittest   : 9/9 PASSED
+aries_target_config_unittest : 6/6 PASSED
+aries_mcu_excludes_unittest  : 5/5 PASSED
+TOTAL CUMULATIVE             : 39/39 PASSED (100%)
+
+STATUS: PHASE 07 COMPLETE

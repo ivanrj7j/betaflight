@@ -20,7 +20,8 @@
 | **Config Persistence in RAM (`CONFIG_IN_RAM` & `EEPROM_SIZE 8192`)** | 10/10 | Solves the non-XIP flash limitation on THEJAS32 silicon by allocating 8 KiB of SRAM for Parameter Groups, eliminating `mcause = 5/7` memory access traps. |
 | **Non-Conflicting 12-Pin Allocation Layout** | 10/10 | Maps all 12 necessary peripherals (4 motors, SPI IMU, EXTI DRDY, CRSF RX/TX, USB-UART, LED) to Header J1 & J2 with zero pin collisions. |
 | **Subsystem Pruning (`#undef` of Heavy Drivers)** | 10/10 | Strips OSD, CMS, VTX, SDCard, Baro, Mag, GPS, and ADC, shrinking firmware footprint from $> 800\text{ KB}$ down to $\approx 235\text{ KB}$ to fit SRAM budget. |
-| **Compile-Time `EEPROM_SIZE` Verification Oversight** | 5/10 | Omitted a compile-time static assertion checking that `EEPROM_SIZE >= 8192`. In Betaflight 4.x, Parameter Groups occupy ~5.1 KB; setting 4 KB triggers a runtime boot panic. |
+| **Compile-Time Static Assertion Guards (Phase 06 Remediation)** | 10/10 | Authored `config.h` installing `#error` static assertions guarding `EEPROM_SIZE >= 8192`, `DEFAULT_PID_PROCESS_DENOM >= 8`, and `CONFIG_IN_RAM`, converting runtime panics into build failures. |
+| **Historical Missing Bounds Guard Oversight** | 5/10 | Historical oversight where `config.h` lacked static compile-time assertions, allowing experiments with 4096-byte buffers that halted the MCU at runtime. |
 
 ---
 
@@ -36,8 +37,8 @@
    - The configuration header lacked a compile-time check like `#if (EEPROM_SIZE < 8192) #error "EEPROM_SIZE too small for active Parameter Groups!" #endif` to protect against unintentional developer regressions.
 
 ### What Could Have Been Done Better
-1. **Explicit Compile-Time Memory Bounds Guard**:
-   - Adding a static assertion on `EEPROM_SIZE` ensures that any future additions to Parameter Groups that exceed SRAM allocation immediately fail at build time rather than locking the microcontroller at runtime.
+1. **Explicit Compile-Time Memory Bounds Guard (Resolved in Phase 06)**:
+   - Added `src/platform/ARIES/target/ARIESV3/config.h` featuring `#if (EEPROM_SIZE < 8192) #error ... #endif` and `#if (DEFAULT_PID_PROCESS_DENOM < 8) #error ... #endif`. This guarantees that any configuration change that exceeds SRAM allocation immediately fails at build time rather than locking the microcontroller at runtime.
 2. **Explicit Fallback Battery Voltage Configuration**:
    - Since `#undef USE_ADC` is defined, adding an explicit default configuration for battery telemetry (or marking battery state as `BATTERY_NOT_PRESENT`) avoids nuisance warnings on external telemetry radios (e.g. EdgeTX CRSF alarms).
 

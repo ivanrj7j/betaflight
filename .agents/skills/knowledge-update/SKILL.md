@@ -97,7 +97,22 @@ When evaluating a driver, subsystem, or test outcome, create a new file in `know
 
 ---
 
-## 4. Knowledge Base Synchronization Workflow
+## 4. Phase Binary Distribution & Hardware Verification Protocol
+
+1. **Automatic Copy to `tempfiles/`:**
+   - Immediately upon compiling and linking the binary at each phase, the agent **MUST** copy the resulting `.bin` file into `tempfiles/` (`cp obj/main/betaflight_bootstrap.bin tempfiles/`).
+2. **Mandatory Build Briefing:**
+   - Inform the user of the exact binary location, byte size, SRAM origin (`0x00202000`), and confirmation that RVC opcodes are strictly 0.
+   - Detail exactly what the user should expect to see in the serial console output and what physical hardware indicators (LED0 blink rate) should do.
+3. **Heavy Diagnostic Telemetry:**
+   - Ensure all diagnostic firmware (`bootstrap_diag.c` / test harnesses) includes detailed ASCII UART printouts at every critical subsystem milestone.
+4. **User Verification Wait-Gate:**
+   - Since the agent runs in a VM without USB passthrough, the agent **MUST NOT** attempt automated flashing.
+   - The agent **MUST** wait for the user to flash the hardware from their host and provide the resulting serial/console logs before concluding the phase or advancing.
+
+---
+
+## 5. Knowledge Base Synchronization Workflow
 
 After creating an evaluation document or phase dev log:
 

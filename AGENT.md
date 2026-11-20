@@ -139,6 +139,9 @@ Before reporting any task complete or submitting code changes:
 - [ ] **Relative Path Integrity:** Confirm that all markdown links, test logs, documentation references, and evaluation notes strictly use POSIX relative paths (0 absolute `/home/...` or `file:///...` links).
 - [ ] **Dedicated Phase Dev Log Persisted:** Author separate log file in `logs/dev/phase_XX_<name>.md` covering High-Level Overview, Unit Test Design Rationales, Code Implementation Rationales, Expected Outputs, 10-Point Silicon Audits, and 0–10 Scoring.
 - [ ] **Knowledge Base Synchronization:** Synchronize phase outcomes in [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md) and [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](knowledgebase/PORTING_KNOWLEDGE_GRAPH.md).
+- [ ] **Output Binary Copied:** Copied output binary (`.bin`) to `tempfiles/` immediately after building.
+- [ ] **Build Briefing Provided:** Informed user of exact binary metrics, what to look for in build & serial output, and waited for flashing feedback.
+- [ ] **VM Constraint Respected:** No automated flashing attempted; user flashes from host.
 - [ ] **Physical Hardware Safety:** Ensure propellers are removed, an external 5V BEC supplies the flight receiver/peripherals, and a low-ESR capacitor ($470\text{--}1000\,\mu\text{s}$) is installed across the ESC battery leads to protect 3.3V LVCMOS pins.
 
 ---
@@ -149,3 +152,43 @@ Before writing or proposing any code:
 * Consult the **[Master Macro Plan](MACRO_PLAN.md)** to identify the current development phase and gating criteria.
 * Access the granular micro-plans in [`PLAN/`](PLAN) for component-specific registers, algorithms, expected inputs, and expected outputs.
 * Verify all hardware assumptions against [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md).
+
+---
+
+## 8. User-Defined Operational Directives & Bench Execution Protocols
+
+These 9 operational rules were explicitly mandated by the user and must be strictly adhered to across all phases and turns:
+
+1. **VM Environment Constraint (No Direct Flashing by Agent):**
+   - The development environment runs inside a Virtual Machine (VM) without direct USB device or hardware debug passthrough.
+   - The agent **MUST NEVER** attempt direct device flashing, OpenOCD commands, or direct hardware access.
+   - The user flashes the binary manually from the host machine and sends console outputs / serial logs back to the agent.
+2. **Every-Phase Build Briefing & Verification Feedback Loop:**
+   - At the conclusion of building every development phase, the agent **MUST** present a structured build briefing:
+     * Full path of compiled binary (`.elf` and `.bin`)
+     * Exact byte size
+     * SRAM execution origin (`0x00202000`) and headroom ($\le 248\text{ KB}$)
+     * Disassembly audit: strictly 0 RVC compressed instructions (`grep c. == 0`)
+     * Exactly what to look for in the build/binary
+     * What to look for in the UART serial console output and hardware behavior (e.g., LED0 heartbeat rate)
+   - The agent **MUST** wait for the user to flash and provide serial logs before concluding the phase or proceeding.
+3. **Heavy Diagnostic Telemetry ("Debug in Detail"):**
+   - The diagnostic firmware (`bootstrap_diag.c` / test harness) must be heavily instrumented with detailed, comprehensive ASCII UART printouts at every critical subsystem milestone.
+   - Include hardware visual heartbeat indicators (LED0 on `PA22`) blinking continuously to confirm silicon health even if UART is delayed.
+4. **Copy Output Binary to `tempfiles/` After Every Build:**
+   - Immediately after generating the `.bin` output in `obj/main/betaflight_bootstrap.bin` (or phase binary), copy the file to `tempfiles/` (e.g. `cp obj/main/betaflight_bootstrap.bin tempfiles/`) so the user can easily access it for host flashing.
+5. **Deep & Comprehensive Unit Test Coverage (TDD Step 1):**
+   - Author thorough, exhaustive unit tests with realistic boundary conditions, edge cases, and hardware failure simulations.
+   - Never write superficial or trivial 2-3 line tests.
+   - Follow the 4-step TDD protocol: write unit tests first as documentation, present to user, await explicit approval, implement, and verify.
+6. **Strict Sequential Execution (No Phase Skipping):**
+   - Never skip any phase in the 20-phase master plan (`PLAN/20_DEVELOPMENT_PHASES.md`).
+   - Every phase must be executed sequentially, thoroughly verified with unit tests and physical silicon testing.
+7. **Anti-Assumption Directive (Guesswork Only as Absolute Last Resort):**
+   - Guessing register addresses, hardware parameters, or assuming peripheral behavior without verified citations is strictly forbidden.
+   - Always locate and verify information from the knowledge base, VEGA SDK, STM32, ESP32, or `master` branch.
+   - If a parameter or pinout is marked as `[PENDING TEAM CONFIRMATION]`, ask the user or wait for verified confirmation.
+8. **Historical `master` Branch Rule:**
+   - Inspect `master` *if and only if needed* for historical context or failed test cases; NEVER write or commit code to `master`.
+9. **Laser Focus on Assigned Task:**
+   - Stick strictly to the user's requested scope without discursive wandering, unnecessary background scans, or unrequested refactorings.

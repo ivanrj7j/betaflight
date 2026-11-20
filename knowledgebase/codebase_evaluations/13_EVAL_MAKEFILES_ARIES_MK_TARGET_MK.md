@@ -20,7 +20,9 @@
 | **GCC 13+ ISA Migration (`-march=rv32im_zicsr`)** | 10/10 | Correctly handles the architectural separation of CSR instructions into the `_zicsr` extension mandated in GCC 13+. |
 | **No-Builtin Memory Flags (`-fno-builtin-memcpy/memset`)** | 9/10 | Prevents the compiler from substituting inline loops with calls to toolchain `libc` memset/memcpy routines that contain 16-bit compressed instructions. |
 | **Aggressive Driver Pruning (`MCU_EXCLUDES`)** | 10/10 | Pruning OSD, CMS, VTX, SDCard, and unused baro/mag drivers shrank the final binary from $> 800\text{ KB}$ down to $\approx 235\text{ KB}$, enabling the firmware to fit inside the 248 KB SRAM execution budget. |
-| **Hardcoded Toolchain Path (`/home/ivan/...`)** | 4/10 | Fragile across environments; fails to compile if executed under another username, inside a Docker container, or on CI runners unless paths are manually updated. |
+| **Dynamic Toolchain Discovery (Phase 01 Remediation)** | 10/10 | Completely eliminated hardcoded `/home/ivan/...` paths by querying `PATH` via `which` and resolving uncompressed multilibs via `$(CC) -print-file-name=libc.a`. |
+| **Directory-Level `MCU_EXCLUDES` & `LD_SCRIPT` (Phase 07)** | 10/10 | Bound `LD_SCRIPT` directly to `aries_v3.ld` and pruned $> 250\text{ KB}$ of bloat (display, osd, cms, vtx, baro, mag, gps, sdcard, flashfs) to enforce the $\le 248\text{ KB}$ SRAM budget. |
+| **Historical Hardcoded Toolchain Path Oversight** | 4/10 | Historical flaw on early branch; fragile across environments and broke headless CI/CD until Phase 01 dynamic discovery was implemented. |
 
 ---
 

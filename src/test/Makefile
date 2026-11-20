@@ -48,6 +48,12 @@ aries_target_config_unittest_SRC := \
 aries_target_config_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
+aries_mcu_excludes_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
+aries_mcu_excludes_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \
