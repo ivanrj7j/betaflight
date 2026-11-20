@@ -206,6 +206,9 @@ extern uint32_t SystemCoreClock;
 #define UART_RX_BUFFER_ATTRIBUTE
 #define SERIAL_TRAIT_PIN_CONFIG         1
 
+// Periodic / polled transmit queue drain hook for background tasks and scheduler
+void thejas32_uart_poll_tx(void);
+
 // Early Hardware UART0 Diagnostic Telemetry (115200 baud, polled)
 void thejas32_early_uart_init(void);
 void thejas32_early_uart_putc(char c);

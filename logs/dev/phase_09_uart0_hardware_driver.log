@@ -1,0 +1,68 @@
+=== PHASE 09 16550 APB UART0 HARDWARE DRIVER & BAUD RATE CLOCK GENERATOR LOG ===
+Timestamp: 2026-11-20T19:30:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: cd src/test && ./../../obj/test/aries_uart_hw_unittest/aries_uart_hw_unittest
+[==========] Running 11 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 11 tests from AriesUartHwTest
+[ RUN      ] AriesUartHwTest.Test_UART0_BaudRateDivisorMath_115200Baud_ErrorUnder1Percent
+[       OK ] AriesUartHwTest.Test_UART0_BaudRateDivisorMath_115200Baud_ErrorUnder1Percent (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART1_BaudRateDivisorMath_420000Baud_CRSFReceiver
+[       OK ] AriesUartHwTest.Test_UART1_BaudRateDivisorMath_420000Baud_CRSFReceiver (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART0_DLAB_LatchSequenceAndFraming8N1
+[       OK ] AriesUartHwTest.Test_UART0_DLAB_LatchSequenceAndFraming8N1 (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART0_FIFOControlRegister_16ByteDepthEnabled
+[       OK ] AriesUartHwTest.Test_UART0_FIFOControlRegister_16ByteDepthEnabled (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART0_InterruptEnable_RXOnly_TXSuppressed
+[       OK ] AriesUartHwTest.Test_UART0_InterruptEnable_RXOnly_TXSuppressed (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART0_DedicatedPinTags_PA30TX_PA31RX
+[       OK ] AriesUartHwTest.Test_UART0_DedicatedPinTags_PA30TX_PA31RX (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART0_LineStatusRegister_FlagsValidation
+[       OK ] AriesUartHwTest.Test_UART0_LineStatusRegister_FlagsValidation (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART0_BoundedBurstTxDrain_Limit16Bytes
+[       OK ] AriesUartHwTest.Test_UART0_BoundedBurstTxDrain_Limit16Bytes (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART0_MultiBurstTxDrain_EvacuateComplete64BytePayload
+[       OK ] AriesUartHwTest.Test_UART0_MultiBurstTxDrain_EvacuateComplete64BytePayload (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART0_ParityOption_OddParityBitSet
+[       OK ] AriesUartHwTest.Test_UART0_ParityOption_OddParityBitSet (0 ms)
+[ RUN      ] AriesUartHwTest.Test_UART_MultiPortBackgroundFlush_BothQueuesEvacuated
+[       OK ] AriesUartHwTest.Test_UART_MultiPortBackgroundFlush_BothQueuesEvacuated (0 ms)
+[----------] 11 tests from AriesUartHwTest (0 ms total)
+[----------] Global test environment tear-down
+[==========] 11 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 11 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+1. aries_startup_unittest:       6/6 PASS
+2. aries_linker_unittest:        6/6 PASS
+3. aries_atomics_unittest:       7/7 PASS
+4. aries_system_time_unittest:   9/9 PASS
+5. aries_target_config_unittest: 6/6 PASS
+6. aries_mcu_excludes_unittest:  5/5 PASS
+7. aries_pg_bounds_unittest:     10/10 PASS
+8. aries_uart_hw_unittest:       11/11 PASS
+9. aries_integration_unittest:   12/12 PASS
+Cumulative Total:                72/72 PASS (100%)
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: cfa9eef4af1ef5a18e493a79e217169acc9f72dc19c61fe905d5d8ff617da436
+Size:   12,996 bytes (.bin)
+Memory: text=12996, data=0, bss=16636, dec=29632 (28.9 KB in SRAM)
+Entry:  0x00202000
+RVC:    0 compressed opcodes
+
+--- PHYSICAL HARDWARE BENCH TEST (tempfiles/phase9.1.txt) ---
+Hardware: C-DAC ARIES v3.0 (THEJAS32 @ 100 MHz, internal SRAM)
+Port: /dev/ttyUSB0 @ 115200 baud
+Banner: C-DAC ARIES v3.0 / THEJAS32 SILICON BRINGUP (Phase 09 16550 UART0 Driver)
+Test Results: Tests 01-11 ALL PASS
+Live LCR Readback: 0x03030303 (8N1 Framing Confirmed)
+Live LSR Readback: 0x00000000 (Line Status: Transmitter Ready)
+Live IER Readback: 0x00000000 (TX IRQ Suppressed: No THRE Storm)
+Heartbeat: 9 cycles captured (up to 11s uptime, Timer0 decrementing, LED0 1.0 Hz blinking)
+Outcome: VERIFIED PASS ON PHYSICAL SILICON (Phase 09 & Code Audit 01 Remediations Verified)

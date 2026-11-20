@@ -255,16 +255,7 @@ void thejas32_interrupt_disable(uint8_t irq_number)
     }
 }
 
-static inline uint32_t thejas32_ctz(uint32_t val)
-{
-    uint32_t n = 0;
-    if ((val & 0x0000FFFFU) == 0) { n += 16; val >>= 16; }
-    if ((val & 0x000000FFU) == 0) { n += 8;  val >>= 8;  }
-    if ((val & 0x0000000FU) == 0) { n += 4;  val >>= 4;  }
-    if ((val & 0x00000003U) == 0) { n += 2;  val >>= 2;  }
-    if ((val & 0x00000001U) == 0) { n += 1; }
-    return n;
-}
+extern int __ctzsi2(int val);
 
 /*
  * C trap handler invoked from startup.S trap_entry:
@@ -278,11 +269,11 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
         uint32_t cause_num = mcause & 0x7FFFFFFFUL;
         // Machine External Interrupt (cause 11)
         if (cause_num == 11) {
-            // Fast O(1) interrupt dispatching using binary search CTZ (Solves 05_EVAL_SYSTEM_C.md)
+            // Fast O(1) interrupt dispatching using robust binary search CTZ (__ctzsi2)
             uint32_t status = THEJAS32_INTR_CTRL.INTR_STATUS;
             while (status != 0U) {
-                uint32_t i = thejas32_ctz(status);
-                if (interrupt_table[i]) {
+                uint32_t i = (uint32_t)__ctzsi2((int)status);
+                if (i < 32 && interrupt_table[i]) {
                     interrupt_table[i]();
                 }
                 status &= ~(1UL << i);
@@ -365,6 +356,28 @@ void *memset(void *dest, int c, size_t n)
 {
     uint8_t *p = (uint8_t *)dest;
     uint8_t val = (uint8_t)c;
+
+    // Align to 4-byte word boundary
+    while (n && ((uintptr_t)p & 3)) {
+        *p++ = val;
+        n--;
+        __asm__ volatile ("" : "+r"(p) : : "memory");
+    }
+
+    // 32-bit word transfer loop
+    if (n >= 4) {
+        uint32_t val32 = ((uint32_t)val << 24) | ((uint32_t)val << 16) | ((uint32_t)val << 8) | (uint32_t)val;
+        uint32_t *p32 = (uint32_t *)p;
+        size_t words = n >> 2;
+        while (words--) {
+            *p32++ = val32;
+            __asm__ volatile ("" : "+r"(p32) : : "memory");
+        }
+        p = (uint8_t *)p32;
+        n &= 3;
+    }
+
+    // Remaining trailing bytes
     while (n--) {
         *p++ = val;
         __asm__ volatile ("" : "+r"(p) : : "memory");
@@ -377,6 +390,28 @@ void *memcpy(void *dest, const void *src, size_t n)
 {
     uint8_t *d = (uint8_t *)dest;
     const uint8_t *s = (const uint8_t *)src;
+
+    // If source and destination share the same 4-byte alignment
+    if (((uintptr_t)d & 3) == ((uintptr_t)s & 3)) {
+        while (n && ((uintptr_t)d & 3)) {
+            *d++ = *s++;
+            n--;
+            __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");
+        }
+        if (n >= 4) {
+            uint32_t *d32 = (uint32_t *)d;
+            const uint32_t *s32 = (const uint32_t *)s;
+            size_t words = n >> 2;
+            while (words--) {
+                *d32++ = *s32++;
+                __asm__ volatile ("" : "+r"(d32), "+r"(s32) : : "memory");
+            }
+            d = (uint8_t *)d32;
+            s = (const uint8_t *)s32;
+            n &= 3;
+        }
+    }
+
     while (n--) {
         *d++ = *s++;
         __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");
@@ -390,6 +425,25 @@ void *memmove(void *dest, const void *src, size_t n)
     uint8_t *d = (uint8_t *)dest;
     const uint8_t *s = (const uint8_t *)src;
     if (d < s) {
+        if (((uintptr_t)d & 3) == ((uintptr_t)s & 3)) {
+            while (n && ((uintptr_t)d & 3)) {
+                *d++ = *s++;
+                n--;
+                __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");
+            }
+            if (n >= 4) {
+                uint32_t *d32 = (uint32_t *)d;
+                const uint32_t *s32 = (const uint32_t *)s;
+                size_t words = n >> 2;
+                while (words--) {
+                    *d32++ = *s32++;
+                    __asm__ volatile ("" : "+r"(d32), "+r"(s32) : : "memory");
+                }
+                d = (uint8_t *)d32;
+                s = (const uint8_t *)s32;
+                n &= 3;
+            }
+        }
         while (n--) {
             *d++ = *s++;
             __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");
@@ -397,6 +451,25 @@ void *memmove(void *dest, const void *src, size_t n)
     } else if (d > s) {
         d += n;
         s += n;
+        if (((uintptr_t)d & 3) == ((uintptr_t)s & 3)) {
+            while (n && ((uintptr_t)d & 3)) {
+                *--d = *--s;
+                n--;
+                __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");
+            }
+            if (n >= 4) {
+                uint32_t *d32 = (uint32_t *)d;
+                const uint32_t *s32 = (const uint32_t *)s;
+                size_t words = n >> 2;
+                while (words--) {
+                    *--d32 = *--s32;
+                    __asm__ volatile ("" : "+r"(d32), "+r"(s32) : : "memory");
+                }
+                d = (uint8_t *)d32;
+                s = (const uint8_t *)s32;
+                n &= 3;
+            }
+        }
         while (n--) {
             *--d = *--s;
             __asm__ volatile ("" : "+r"(d), "+r"(s) : : "memory");

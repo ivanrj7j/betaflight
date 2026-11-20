@@ -62,6 +62,20 @@ aries_pg_bounds_unittest_SRC := \
 aries_pg_bounds_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
+aries_uart_hw_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
+aries_uart_hw_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src
+
+aries_integration_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/streambuf.c
+
+aries_integration_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \
@@ -1065,6 +1079,11 @@ ifeq ($(and $(shell which $(CC) 2>/dev/null), $(shell which $(CXX) 2>/dev/null))
 $(info Falling back to 'clang')
 CC  := clang
 CXX := clang++
+endif
+ifeq ($(and $(shell which $(CC) 2>/dev/null), $(shell which $(CXX) 2>/dev/null)),)
+$(info Falling back to 'gcc')
+CC  := gcc
+CXX := g++
 endif
 
 OPTIMIZE = -O0

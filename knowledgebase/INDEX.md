@@ -220,5 +220,26 @@ The implementation micro-plans cover every single hardware and software microcom
 | **06** | **[phase_06_target_header.md](../logs/dev/phase_06_target_header.md)** | Target Header Configuration, 1.0 kHz Loop Clamping & Pin Matrix (`target.h`, `config.h`) | **PASS**: 6/6 TDD tests pass (1 ms); `DEFAULT_PID_PROCESS_DENOM 8` guarantees > 65% idle headroom; 12-pin allocation matrix zero collisions; `CONFIG_IN_RAM` (8 KB) static assertions active. |
 | **07** | **[phase_07_modular_driver_stripping.md](../logs/dev/phase_07_modular_driver_stripping.md)** | Modular Driver Stripping (`MCU_EXCLUDES`) & Binary Footprint Pruning (`target.mk`) | **PASS**: 5/5 TDD tests pass (0 ms); 10/10 Silicon Audit pass; 10,728 B binary (< 248 KB SRAM limit); > 250 KB bloat pruned; strictly 0 RVC opcodes. |
 | **08** | **[phase_08_param_group_storage.md](../logs/dev/phase_08_param_group_storage.md)** | Parameter Group In-RAM Storage & Compile-Time Bounds Guard (`target.h`, `config.h`) | **PASS**: 10/10 TDD tests pass (3 ms); cumulative 49/49 tests pass; `CONFIG_IN_RAM` (8 KB) active; flash dereference trap (`0x20000000`) prevented; exact Betaflight CRC-16-CCITT validated; 11,656 B binary; strictly 0 RVC opcodes. |
+| **09** | **[phase_09_uart0_hardware_driver.md](../logs/dev/phase_09_uart0_hardware_driver.md)** | 16550 APB UART0 Hardware Driver & Baud Rate Clock Generator (`serial_uart_aries.c`) | **PASS (Hardware Verified)**: 11/11 TDD tests pass (0 ms); cumulative 72/72 tests pass across 9 suites; Divisor 54 (+0.47% error @ 115200 baud); DLAB latching & 8N1 framing; 16-byte FIFOs; permanent TX IRQ suppression (0 THRE storms); bounded burst drain (< 2.0 us); 100 Hz background flush in `tasks.c`; immutable `uartVTable` in `.rodata`; 12,996 B binary; strictly 0 RVC opcodes; verified on physical silicon (`phase9.1.txt`). |
+
+---
+
+## 9. Code Audit
+
+Independent quality, safety, and integration audits conducted on the active codebase.
+
+| Audit Node | Target / Scope | Methodology | Key Findings & Recommendations |
+| :--- | :--- | :--- | :--- |
+| **[01_ACTIVE_REBUILD_BRANCH_AUDIT.md](code_audit/01_ACTIVE_REBUILD_BRANCH_AUDIT.md)** | Active `rebuild` Branch (Phases 01–09: `serial_uart_aries.c`, `system.c`, `target.h`, `stub_drivers.c`, `startup.S`, `integration`, `tasks.c`) | Senior Developer Quality Audit (Correctness, Safety, Load, Tests, Speed, Lean) | **All 11 Findings Resolved (100% Remediation)**:<br>• **Group I (Bugs/Load)**: Background transmit hook `thejas32_uart_poll_tx()` wired into `taskHandleSerial()` in `tasks.c` at 100 Hz.<br>• **Group II (Safety/Hardware)**: Mutable `ariesUartVTable` in `.bss` replaced with direct reference to `uartVTable` in `.rodata`; 921,600 baud clock divisor error ($-3.12\%$) documented; multi-port flush unit test added.<br>• **Group III (Lean/Build)**: Host test Makefile GCC/Clang automatic fallback added.<br>• **Previous 6 Closed**: Pin tags (`PA30`/`PA31`), 32-bit aligned memory helpers, unified `__ctzsi2`, multi-burst TX test, odd parity, deleted `timer_def.h`.<br>• **Test Suite**: 72 / 72 tests passed across 9 suites (100%). |
+
+---
+
+## 10. Integration Testing Reports
+
+Formal system-level cross-module integration test verification reports exercising end-to-end subsystem interactions, concurrent execution dynamics, and hardware contracts.
+
+| Report ID | Title / Scope | Key Modules Integrated | Result & Highlights |
+| :---: | :--- | :--- | :--- |
+| **[01](integration_testing/01_PHASES_01_TO_09_INTEGRATION_REPORT.md)** | **[Cross-Module Integration Verification (Phases 01–09)](integration_testing/01_PHASES_01_TO_09_INTEGRATION_REPORT.md)** | Phases 01–09 (Startup, Linker, Atomics, Timebase, Target Config, Stripping, In-RAM PG, 16550 UART0) | **12 / 12 PASS (100%)**: Validated SRAM boot & PG isolation, atomic monotonic clocks, multi-burst TX drain, RX collision guard, soft-float 1.0 kHz loop headroom ($>65\%$), and multi-rate baud prescalers. |
 
 

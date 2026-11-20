@@ -125,8 +125,8 @@
  *   - PA16: UART1 TX (CRSF / ELRS Receiver)
  *   - PA17: UART1 RX (CRSF / ELRS Receiver)
  *   - PA22: LED0 (Status Blue LED)
- *   - PA30: UART0 RX (CP2102N USB Bridge)
- *   - PA31: UART0 TX (CP2102N USB Bridge)
+ *   - PA30: UART0 TX (CP2102N USB Bridge)
+ *   - PA31: UART0 RX (CP2102N USB Bridge)
  * -----------------------------------------------------------------------------
  */
 
@@ -136,8 +136,8 @@
 
 // Onboard USB-UART Bridge (CP2102N)
 #define USE_UART0
-#define UART0_RX_PIN            PA30
-#define UART0_TX_PIN            PA31
+#define UART0_TX_PIN            PA30
+#define UART0_RX_PIN            PA31
 #define MSP_UART                SERIAL_PORT_UART0
 
 // RC Receiver Interface (CRSF / ExpressLRS @ 420k Baud)

@@ -8,6 +8,8 @@ It directly rectifies the historical planning and practical implementation mista
 * [HISTORICAL_RETROSPECTIVE_GRAPH.md](HISTORICAL_RETROSPECTIVE_GRAPH.md)
 * [Retrospective Logs 01–14 Catalog](retrospective_logs)
 * [Codebase Evaluations 01–15 Catalog](codebase_evaluations)
+* [Code Audit Catalog](code_audit)
+* [Integration Testing Reports Catalog](integration_testing)
 * [Critical Knowledge Gaps & Assumptions Register](CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
 * [Exhaustive Micro-Planning Document Suite (`PLAN/`)](../PLAN/00_MASTER_PLAN_OVERVIEW.md)
 
@@ -220,6 +222,8 @@ graph TD
 * **Strict Telemetry Wire Hygiene (Zero ASCII Pollution)**:
   * **NEVER emit unpacketized ASCII strings (`[SERIAL ALIVE]`, `[MSP RX]`) onto UART0.**
   * ASCII text corrupts binary MSP frames, causing framing/CRC errors and Configurator 10-second timeouts.
+* **Verification Status (Phase 09 Complete)**:
+  * [`logs/dev/phase_09_uart0_hardware_driver.md`](../logs/dev/phase_09_uart0_hardware_driver.md): **PASS** (8/8 TDD tests, cumulative 57/57 tests pass; Divisor 54 @ 100 MHz APB (+0.47% error); 16-byte hardware FIFOs via `FCR = 0x07`; permanent TX IRQ suppression via `IER = 0x01`; bounded burst drain $< 2.0\,\mu\text{s}$; 12,752 B binary; strictly 0 RVC opcodes).
 * **Consulted Logs**:
   * [05_STM32_SERIAL_UART_HW.md](../logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md)
   * [06_STM32_SERIAL_UART_DRIVER.md](../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md)
@@ -462,6 +466,7 @@ The following matrix synthesizes the line-by-line technical audits conducted on 
 | **[E13](codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md)** | `ARIES.mk`, `target.mk` | 5 Scored | Hardcoded host toolchain path `/home/ivan/...` breaks cross-platform builds; unpruned 850 KB image overflows SRAM. | Dynamic toolchain resolution; directory-level `MCU_EXCLUDES` pruning > 250 KB bloat; `LD_SCRIPT` binding. | **Multilib RVC override & MCU pruning:** Pure RV32IM multilibs + pruned tree enforces $\le 248\text{ KB}$ SRAM budget. |
 | **[E14](codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md)** | `target.h`, `config.h` | 5 Scored | Reducing `EEPROM_SIZE` from 8192 to 4096 triggers boot panic because Betaflight PGs exceed 4.8 KB. | Static compile-time assertion guarding `EEPROM_SIZE >= 8192` and `DEFAULT_PID_PROCESS_DENOM >= 8`. | Locked 1.0 kHz flight loop (`DEFAULT_PID_PROCESS_DENOM 8`) leaves $> 65\%$ CPU headroom; 12-pin matrix zero collisions. |
 | **[E15](codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)** | `src/main/` | 5 Scored | Injected `#ifdef THEJAS32` and `THEJAS_LOG` debug strings directly into 9 core files, violating platform isolation. | Encapsulate target diagnostics in weak platform hooks; gate logs behind `#if defined(THEJAS32_DEBUG_LOG)`. | **Instant CLI activation:** Pressing Enter (`\r`) or `#` eliminates the 100ms guard-time barrier for serial monitors. |
+| **[A01](code_audit/01_ACTIVE_REBUILD_BRANCH_AUDIT.md)** | `src/platform/ARIES/` | 8 Scored | Background transmit hook `thejas32_uart_poll_tx` uncalled; mutable VTable in `.bss`; 921.6k baud clock divisor error (3.12%). | Call `thejas32_uart_poll_tx` from serial task; move VTable to `const` in `.rodata`; clamp logging baud rates. | **Quality Audit Complete**: All 11 findings resolved (pins, 32-bit memory copy, CTZ, parity, VTable in `.rodata`, poll hook, baud docs, Makefile fallback); 72/72 tests passing. |
 
 ---
 

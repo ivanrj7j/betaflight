@@ -129,8 +129,8 @@ TEST_F(AriesTargetConfigTest, Test_TargetConfig_PinMatrix_ZeroCollisions) {
         { "UART1_TX",     "Onboard",   16, "PA16" },
         { "UART1_RX",     "Onboard",   17, "PA17" },
         { "LED0",         "Onboard",   22, "PA22" },
-        { "UART0_RX",     "Onboard",   30, "PA30" },
-        { "UART0_TX",     "Onboard",   31, "PA31" }
+        { "UART0_TX",     "Onboard",   30, "PA30" },
+        { "UART0_RX",     "Onboard",   31, "PA31" }
     };
 
     // Assert exactly 14 assigned pin functions
