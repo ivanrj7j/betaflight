@@ -1,0 +1,69 @@
+=== PHASE 08 PARAMETER GROUP IN-RAM STORAGE & BOUNDS VERIFICATION LOG ===
+Timestamp: 2026-11-20T17:48:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: cd src/test && ./../../obj/test/aries_pg_bounds_unittest/aries_pg_bounds_unittest
+[==========] Running 10 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 10 tests from AriesPgBoundsTest
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_ConfigInRam_DefinedAndFlashProhibited
+[       OK ] AriesPgBoundsTest.Test_PGBounds_ConfigInRam_DefinedAndFlashProhibited (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_EEPROMSize_Strictly8192Bytes
+[       OK ] AriesPgBoundsTest.Test_PGBounds_EEPROMSize_Strictly8192Bytes (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_ActiveParameterGroups_SRAMHeadroomExceeds25Percent
+[       OK ] AriesPgBoundsTest.Test_PGBounds_ActiveParameterGroups_SRAMHeadroomExceeds25Percent (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_FlashAddressDereference_PreventedByRamBuffer
+[       OK ] AriesPgBoundsTest.Test_PGBounds_FlashAddressDereference_PreventedByRamBuffer (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_SimulatedEEPROMSerialization_CRC32Integrity
+[       OK ] AriesPgBoundsTest.Test_PGBounds_SimulatedEEPROMSerialization_CRC32Integrity (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_StaticAssertionThreshold_CompileTimeGuard
+[       OK ] AriesPgBoundsTest.Test_PGBounds_StaticAssertionThreshold_CompileTimeGuard (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_BetaflightHeaderValidation_MagicBEAndVersion
+[       OK ] AriesPgBoundsTest.Test_PGBounds_BetaflightHeaderValidation_MagicBEAndVersion (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_BetaflightCRC16CCITT_CheckValue0x1D0F
+[       OK ] AriesPgBoundsTest.Test_PGBounds_BetaflightCRC16CCITT_CheckValue0x1D0F (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_RecordSizeTearing_4KBFailureReplay_8KBResolution
+[       OK ] AriesPgBoundsTest.Test_PGBounds_RecordSizeTearing_4KBFailureReplay_8KBResolution (0 ms)
+[ RUN      ] AriesPgBoundsTest.Test_PGBounds_MultiProfileStrideIsolation_PIDAndRateProfiles
+[       OK ] AriesPgBoundsTest.Test_PGBounds_MultiProfileStrideIsolation_PIDAndRateProfiles (0 ms)
+[----------] 10 tests from AriesPgBoundsTest (2 ms total)
+[----------] Global test environment tear-down
+[==========] 10 tests from 1 test suite ran. (3 ms total)
+[  PASSED  ] 10 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+aries_startup_unittest:       6/6 PASS
+aries_linker_unittest:        6/6 PASS
+aries_atomics_unittest:       7/7 PASS
+aries_system_time_unittest:   9/9 PASS
+aries_target_config_unittest: 6/6 PASS
+aries_mcu_excludes_unittest:  5/5 PASS
+aries_pg_bounds_unittest:    10/10 PASS
+Cumulative Unit Tests:       49/49 PASS (100%)
+
+--- FIRMWARE COMPILATION & SILICON AUDITS ---
+riscv32-esp-elf-size -B obj/main/betaflight_bootstrap.elf:
+   text	   data	    bss	    dec	    hex	filename
+  11656	      0	  16632	  28288	   6e80	obj/main/betaflight_bootstrap.elf
+
+Binary Size: 11,656 bytes (0x2D88)
+Binary Limit: 253,952 bytes (248 KB)
+SRAM Headroom: 225,664 bytes free (88.8% free)
+
+Opcode Audit (grep c. on disassembly):
+0 RVC instructions detected (Strictly RV32IM compliance)
+
+Entry Point Audit (readelf -h):
+Entry point address: 0x202000
+
+SHA-256 Checksum:
+e4a278c7765e808e0272b5a6cfbaab433874d02bd9f40b4b199cc7c66b6a80c7  obj/main/betaflight_bootstrap.bin
+e4a278c7765e808e0272b5a6cfbaab433874d02bd9f40b4b199cc7c66b6a80c7  tempfiles/betaflight_bootstrap.bin
+Status: PASS
+
+--- PHYSICAL SILICON SERIAL TELEMETRY CAPTURE (/dev/ttyUSB0 @ 115200 BAUD) ---
+Source: tempfiles/phase8.txt
+Target: Physical C-DAC ARIES v3.0 Board (THEJAS32 RV32IM @ 100 MHz)
+Hardware Verification Status: PASS (All 10/10 tests pass, Heartbeats #1-#16 captured, LED0 blinking at 1.0 Hz)

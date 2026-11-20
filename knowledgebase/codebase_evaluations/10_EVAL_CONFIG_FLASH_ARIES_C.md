@@ -52,3 +52,10 @@
    - The CS assertions, WIP (Write In Progress) polling bitmask (`0x01`), and 256-byte page boundary wrapping in `config_flash_aries.c` were cleanly implemented.
 2. **Seamless Fallback to RAM Storage**:
    - When the user and team transitioned to `CONFIG_IN_RAM`, Betaflight's built-in EEPROM emulation layer immediately operated flawlessly without crashing the board.
+
+---
+
+## 4. Physical Silicon & TDD Verification Traceability
+- **Phase Dev Log**: [`../../logs/dev/phase_08_param_group_storage.md`](../../logs/dev/phase_08_param_group_storage.md)
+- **Living Documentation Unit Test**: [`../../src/test/unit/aries_pg_bounds_unittest.cc`](../../src/test/unit/aries_pg_bounds_unittest.cc) (10/10 tests pass)
+- **Hardware Self-Test**: Validated dynamically on physical hardware in `bootstrap_diag.c` [TEST 10/10], confirming SRAM buffer bounds and CRC integrity.

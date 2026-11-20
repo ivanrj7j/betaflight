@@ -54,6 +54,14 @@ aries_mcu_excludes_unittest_SRC := \
 aries_mcu_excludes_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
+aries_pg_bounds_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/streambuf.c
+
+aries_pg_bounds_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \
