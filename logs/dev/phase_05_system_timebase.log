@@ -1,0 +1,72 @@
+=== Phase 05 Monotonic System Timebase & Timer 0 Verification Log ===
+Date: 2026-11-20T16:08:00+05:30
+Branch: rebuild
+Commit Target: b5426713e7c9bf5172feb6da22b4257b88e0fb0a
+Toolchain: riscv32-esp-elf-gcc (esp-13.2.0_20250707)
+
+--- 1. Unit Test Build & Execution Output ---
+$ make -C src/test CC=gcc CXX=g++ test_aries_system_time_unittest
+make: Entering directory '/home/ivan/Desktop/betaflight/src/test'
+Makefile:1093: warning: gcc/g++ support is experimental. For normal testing, clang is recommended
+CC version: gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+CXX version: g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+compiling ../main/build/atomic.c 
+compiling unit/aries_system_time_unittest.cc 
+linking ../../obj/test/aries_system_time_unittest/aries_system_time_unittest 
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 9 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 9 tests from AriesSystemTimeTest
+[ RUN      ] AriesSystemTimeTest.Test_Timebase_Atomic64BitCycleRead_RolloverSafety
+[       OK ] AriesSystemTimeTest.Test_Timebase_Atomic64BitCycleRead_RolloverSafety (0 ms)
+[ RUN      ] AriesSystemTimeTest.Test_Timebase_FastModularReciprocal_MicrosAccuracy
+[       OK ] AriesSystemTimeTest.Test_Timebase_FastModularReciprocal_MicrosAccuracy (0 ms)
+[ RUN      ] AriesSystemTimeTest.Test_Timebase_FastModularReciprocal_MillisAccuracy
+[       OK ] AriesSystemTimeTest.Test_Timebase_FastModularReciprocal_MillisAccuracy (0 ms)
+[ RUN      ] AriesSystemTimeTest.Test_Timebase_StrictMonotonicity_NoBackwardJumps
+[       OK ] AriesSystemTimeTest.Test_Timebase_StrictMonotonicity_NoBackwardJumps (25 ms)
+[ RUN      ] AriesSystemTimeTest.Test_Timebase_DelayMicroseconds_BoundedExecution
+[       OK ] AriesSystemTimeTest.Test_Timebase_DelayMicroseconds_BoundedExecution (0 ms)
+[ RUN      ] AriesSystemTimeTest.Test_Timebase_Timer0_EOI_Acknowledgement
+[       OK ] AriesSystemTimeTest.Test_Timebase_Timer0_EOI_Acknowledgement (0 ms)
+[ RUN      ] AriesSystemTimeTest.Test_Timebase_ExternalInterrupt_CTZ_FastPath
+[       OK ] AriesSystemTimeTest.Test_Timebase_ExternalInterrupt_CTZ_FastPath (0 ms)
+[ RUN      ] AriesSystemTimeTest.Test_Timebase_SoftReset_VectorJumpValidation
+[       OK ] AriesSystemTimeTest.Test_Timebase_SoftReset_VectorJumpValidation (0 ms)
+[ RUN      ] AriesSystemTimeTest.Test_MemoryPrimitives_NonRVC_Memcpy_Memset_Memmove
+[       OK ] AriesSystemTimeTest.Test_MemoryPrimitives_NonRVC_Memcpy_Memset_Memmove (0 ms)
+[----------] 9 tests from AriesSystemTimeTest (25 ms total)
+
+[----------] Global test environment tear-down
+[==========] 9 tests from 1 test suite ran. (26 ms total)
+[  PASSED  ] 9 tests.
+running test_aries_system_time_unittest: PASS
+make: Leaving directory '/home/ivan/Desktop/betaflight/src/test'
+
+--- 2. Bootstrap Binary Artifact Sizing ---
+$ ls -la /tmp/betaflight_bootstrap.*
+-rwxrwxr-x 1 ivan ivan 3064 Nov 20 16:07 /tmp/betaflight_bootstrap.bin
+-rwxrwxr-x 1 ivan ivan 9792 Nov 20 16:07 /tmp/betaflight_bootstrap.elf
+
+--- 3. Opcode Compression Check ---
+$ riscv32-esp-elf-objdump -d /tmp/betaflight_bootstrap.elf | grep -E '\bc\.' | wc -l
+0
+
+--- 4. 10-Point Silicon Invariant Audit ---
+$ src/test/unit/aries/build_verify.sh /tmp/betaflight_bootstrap.elf
+======================================================================
+ Starting 10-Point Silicon Invariant Audit: /tmp/betaflight_bootstrap.elf
+======================================================================
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (/tmp/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (11392 / 253952 bytes, Headroom: 242560 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00202c7c <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (/tmp/betaflight_bootstrap.bin generated, 3064 bytes ready for XMODEM SRAM upload)
+======================================================================
+ 10-Point Silicon Audit Passed Successfully.
+======================================================================

@@ -39,6 +39,9 @@ aries_linker_unittest_SRC := \
 aries_atomics_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
 
+aries_system_time_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \

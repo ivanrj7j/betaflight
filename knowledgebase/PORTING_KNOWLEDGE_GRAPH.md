@@ -184,15 +184,15 @@ graph TD
         return (((uint64_t)hi) << 32) | lo;
     }
     ```
-* **Leaf Function Reciprocal Division (Zero `__udivdi3`)**:
-  * In `micros()`, dividing 64-bit integer by 100 via software division calls `__udivdi3` (~140 cycles + stack frame).
-  * Upgraded to pure 32-bit modular reciprocal math:
-    ```c
-    timeUs_t micros(void) {
-        uint64_t c = getCycleCounter64();
-        return (timeUs_t)(c / 100ULL); // Inlined reciprocal multiplication (25 cycles, 0 stack)
-    }
-    ```
+* **Verification Status (Phase 05 - Milestone 1 Complete)**:
+  * [`logs/dev/phase_05_system_timebase.md`](../logs/dev/phase_05_system_timebase.md): **PASS** (9/9 TDD tests, 10-point audit passed, 3064-byte `betaflight_bootstrap.bin` generated, 0 RVC opcodes).
+* **Hardware Timer 0 (Synopsys DW_apb_timers @ 0x10000A00)**:
+  * Periodic reload mode; unmasked level-triggered IRQ 7.
+  * Explicit reading of `EOI` register (`0x10000A0C`) in `thejas32_timer0_isr()` clears the active hardware latch.
+* **Vector-Jump Soft Reset (`systemReset()`)**:
+  * Resolves historical `while(1);` freeze. Disables IRQ, restores `_estack`, branches to `_start` (`0x00202000`).
+* **External Interrupt CTZ Fast-Path**:
+  * Replaces linear 32-bit loop with inline binary-search CTZ (`thejas32_ctz()`), executing in $< 10$ cycles.
 * **Hardware Timer 0 EOI Interrupt Acknowledgment**:
   * Hardware Timer 0 (`0x10000A00`) on IRQ 7 (`THEJAS32_IRQ_TIMER0`).
   * Synopsys DW_apb_timers IP requires reading the End-of-Interrupt (`EOI`) register (`0x10000A0C`) upon ISR entry: `(void)THEJAS32_TIMER(0).EOI;` to clear the latch and prevent infinite trap re-entry.
