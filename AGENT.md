@@ -47,7 +47,8 @@ Every AI agent assigned to this repository must automatically activate and execu
    - **MANDATORY FOR CODE ACCURACY:** Must be invoked **EVERY SINGLE TIME** before proposing, reviewing, planning, or writing any code, driver, register configuration, or build setting.
    - Queries the 50+ node knowledge base to find verified register maps, comparative logs (STM32 vs ESP32 vs THEJAS32), historical failure post-mortems, and evaluation scores before writing any code. Guessing or hallucinating hardware registers without searching is strictly prohibited.
 3. **`knowledge-update`**:
-   - Enforces documentation discipline: logs findings, evaluates technical decisions (0–10 score), creates retrospective nodes, and updates both [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md) and [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](knowledgebase/PORTING_KNOWLEDGE_GRAPH.md).
+   - Enforces documentation discipline: authors dedicated phase logs in `logs/dev/phase_XX_<name>.md` covering High-Level Overview, Unit Test Rationales (AAA, conditions, flight consequences), Code Implementation Rationales, Expected Outputs, 10-Point Audit, and 0–10 Scoring.
+   - Updates both [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md) and [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](knowledgebase/PORTING_KNOWLEDGE_GRAPH.md).
 
 ---
 
@@ -136,7 +137,8 @@ Before reporting any task complete or submitting code changes:
 - [ ] **Target Branch Check:** Confirm changes are on branch **`rebuild`** (not `master`).
 - [ ] **Triple Reference Consultation:** Verified that prior to writing code, logic was cross-referenced against VEGA SDK (`lib/vega-sdk/`), STM32 implementation (`src/platform/STM32/`), and ESP32 implementation (`src/platform/ESP32/`).
 - [ ] **Relative Path Integrity:** Confirm that all markdown links, test logs, documentation references, and evaluation notes strictly use POSIX relative paths (0 absolute `/home/...` or `file:///...` links).
-- [ ] **Knowledge Base Synchronization:** If any driver or architectural behavior was changed or discovered, document it in an evaluation/retrospective log and link it in [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md).
+- [ ] **Dedicated Phase Dev Log Persisted:** Author separate log file in `logs/dev/phase_XX_<name>.md` covering High-Level Overview, Unit Test Design Rationales, Code Implementation Rationales, Expected Outputs, 10-Point Silicon Audits, and 0–10 Scoring.
+- [ ] **Knowledge Base Synchronization:** Synchronize phase outcomes in [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md) and [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](knowledgebase/PORTING_KNOWLEDGE_GRAPH.md).
 - [ ] **Physical Hardware Safety:** Ensure propellers are removed, an external 5V BEC supplies the flight receiver/peripherals, and a low-ESR capacitor ($470\text{--}1000\,\mu\text{s}$) is installed across the ESC battery leads to protect 3.3V LVCMOS pins.
 
 ---

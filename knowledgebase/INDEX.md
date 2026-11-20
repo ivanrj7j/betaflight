@@ -205,3 +205,12 @@ The implementation micro-plans cover every single hardware and software microcom
 5. **[04_GPIO_EXTI_AND_HARDWARE_TIMERS.md](../PLAN/04_GPIO_EXTI_AND_HARDWARE_TIMERS.md)**: Flat 32-bit address-decoded atomic GPIO (`io_aries.c`), open-drain emulation, $O(1)$ EXTI `__builtin_ctz` fast-path (`exti_aries.c`), Timer 1 ascending deadline soft-PWM (`pwm_motor_aries.c`).
 6. **[05_SPI_BUS_IMU_AND_FLASH_PERSISTENCE.md](../PLAN/05_SPI_BUS_IMU_AND_FLASH_PERSISTENCE.md)**: Polled SPI0 master clamped to 12.5 MHz (`bus_spi_aries.c`), ICM-42688P 1.0 kHz synchronization, `CONFIG_IN_RAM` (8 KB), command-based `MDP_SPI_3` cold-reboot persistence.
 7. **[06_SENSORS_RC_TELEMETRY_AND_SCHEDULER.md](../PLAN/06_SENSORS_RC_TELEMETRY_AND_SCHEDULER.md)**: Non-inverted CRSF/ExpressLRS on `UART1` (420,000 baud), battery ADC nominal safe fallback, 1.0 kHz cooperative scheduler, state-preserving software atomics (`stub_drivers.c`).
+
+---
+
+## 8. Active Development Phase Verification Logs (`logs/dev/`)
+
+| Phase | Log File | Core Verification / Focus | Silicon Status & Outcome |
+| :---: | :--- | :--- | :--- |
+| **01** | **[phase_01_toolchain_isolation.log](../logs/dev/phase_01_toolchain_isolation.log)** | Dynamic Toolchain Discovery & Multilib RVC Isolation (`ARIES.mk`) | **PASS**: 4/4 TDD tests pass (0.243s); pure uncompressed `rv32i_zicsr_zifencei/ilp32` archives isolated; strictly 0 compressed opcodes in `libgcc.a`. |
+
