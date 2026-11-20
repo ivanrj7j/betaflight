@@ -42,6 +42,12 @@ aries_atomics_unittest_SRC := \
 aries_system_time_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
 
+aries_target_config_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
+aries_target_config_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \

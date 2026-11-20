@@ -5,6 +5,7 @@
  * Citations:
  *   - knowledgebase/components/09_BUILD_LINKER_AND_MEMORY.md
  *   - knowledgebase/codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md
+ *   - PLAN/02_BUILD_SYSTEM_AND_MEMORY_OPTIMIZATION.md (Microcomponent 02_C)
  */
 
 #pragma once
@@ -102,20 +103,50 @@
 #undef CONFIG_IN_FLASH
 #undef ENABLE_CONFIG_FLASH_INIT
 
-// Actuator & Serial Pin Mappings
+/*
+ * -----------------------------------------------------------------------------
+ * Zero-Conflict 12-Pin Allocation Matrix (Headers J1 & J2)
+ * Reference: knowledgebase/codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md
+ * -----------------------------------------------------------------------------
+ * Header J1:
+ *   - PA0: Gyro EXTI DRDY (ICM-42688P Data Ready Interrupt)
+ *   - PA4: Motor 4 PWM Output
+ *   - PA5: SPI0 SCK  (12.5 MHz Clamped)
+ *   - PA6: SPI0 SDI  (MISO)
+ *   - PA7: SPI0 SDO  (MOSI)
+ *   - PA8: SPI0 CS   (ICM-42688P Chip Select)
+ *
+ * Header J2:
+ *   - PA1: Motor 1 PWM Output
+ *   - PA2: Motor 2 PWM Output
+ *   - PA3: Motor 3 PWM Output
+ *
+ * Onboard Dedicated:
+ *   - PA16: UART1 TX (CRSF / ELRS Receiver)
+ *   - PA17: UART1 RX (CRSF / ELRS Receiver)
+ *   - PA22: LED0 (Status Blue LED)
+ *   - PA30: UART0 RX (CP2102N USB Bridge)
+ *   - PA31: UART0 TX (CP2102N USB Bridge)
+ * -----------------------------------------------------------------------------
+ */
+
+// Status Indicator & Beeper
 #define LED0_PIN                PA22
 #define BEEPER_PIN              NONE
 
+// Onboard USB-UART Bridge (CP2102N)
 #define USE_UART0
 #define UART0_RX_PIN            PA30
 #define UART0_TX_PIN            PA31
 #define MSP_UART                SERIAL_PORT_UART0
 
+// RC Receiver Interface (CRSF / ExpressLRS @ 420k Baud)
 #define USE_UART1
 #define UART1_RX_PIN            PA17
 #define UART1_TX_PIN            PA16
 #define SERIALRX_UART           SERIAL_PORT_USART1
 
+// Motor PWM Actuator Outputs (Timer 1 Non-Blocking Deadline Scheduler)
 #define USE_PWM_OUTPUT
 #define USE_MOTOR
 #define DEFAULT_MOTOR_PROTOCOL  MOTOR_PROTOCOL_PWM
@@ -125,6 +156,19 @@
 #define MOTOR3_PIN              PA3
 #define MOTOR4_PIN              PA4
 
+// SPI0 & IMU Sensor Bus Mappings (Header J1)
+#define SPI1_SCK_PIN            PA5
+#define SPI1_SDI_PIN            PA6     // MISO
+#define SPI1_SDO_PIN            PA7     // MOSI
+#define GYRO_1_CS_PIN           PA8
+#define GYRO_1_EXTI_PIN         PA0
+#define GYRO_1_ALIGN            CW0_DEG
+#define ACC_1_ALIGN             CW0_DEG
+
+// Serial RX Protocol Selection
 #define USE_SERIALRX
 #define USE_SERIALRX_CRSF
 #define SERIALRX_PROVIDER       SERIALRX_CRSF
+
+// Enforce target configuration static assertion guards
+#include "config.h"
