@@ -119,6 +119,18 @@ SECTIONS
     } > RAM
 
     /*
+     * Persistent Non-Initialized Data (.noinit) Section:
+     * Survives warm soft resets; explicitly NOT cleared by startup.S bss zeroing loop.
+     */
+    .noinit (NOLOAD) : {
+        . = ALIGN(4);
+        _snoinit = .;
+        *(.noinit .noinit.*)
+        . = ALIGN(4);
+        _enoinit = .;
+    } > RAM
+
+    /*
      * Dedicated Execution Stack Section:
      * 8 KB (0x2000 bytes) reserved headroom for deep nested interrupts (Timer 0, Timer 1, UART RX)
      * and soft-float trigonometric calculations. 16-byte aligned per RV32 ABI.

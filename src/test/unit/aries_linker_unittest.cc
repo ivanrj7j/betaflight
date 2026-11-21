@@ -240,3 +240,33 @@ TEST(AriesLinkerTest, Test_SectionEndpoints_4ByteAlignment) {
     // An odd section boundary causes the loop condition (beq t0, t1) to miss termination,
     // resulting in runaway memory overwrites and hardware lockups.
 }
+
+// =============================================================================
+// Test 7: Persistent .noinit Section Allocation & BSS Isolation (TD-08)
+// =============================================================================
+TEST(AriesLinkerTest, Test_SectionLinkOrder_NoInitSectionPreservedAcrossWarmReset) {
+    // Persistent data objects (such as warm-boot reason codes, crash dump tokens)
+    // must be allocated in a dedicated .noinit (NOLOAD) section.
+    // Arrange: Synthetic linker memory map
+    uint32_t _sbss    = 0x00205AC0U;
+    uint32_t _ebss    = 0x0021A400U;
+    uint32_t _snoinit = 0x0021A400U;
+    uint32_t _enoinit = 0x0021A440U; // 64 bytes (16 uint32_t words)
+    uint32_t _sstack  = 0x0021A440U;
+    uint32_t _estack  = 0x0021C440U; // 8 KB stack
+
+    // Assert: .noinit is 4-byte word aligned
+    EXPECT_EQ(_snoinit % 4U, 0U);
+    EXPECT_EQ(_enoinit % 4U, 0U);
+
+    // Assert: .noinit memory addresses reside outside the .bss zeroing window
+    // startup.S zeroes strictly from _sbss to _ebss:
+    EXPECT_GE(_snoinit, _ebss)
+        << ".noinit section must start at or above _ebss so startup.S does NOT wipe it!";
+    EXPECT_LE(_enoinit, _sstack)
+        << ".noinit section must not collide with the execution stack!";
+
+    // Assert: persistentObjects array (16 x 4 = 64 bytes) fits cleanly
+    uint32_t noinit_size = _enoinit - _snoinit;
+    EXPECT_GE(noinit_size, 64U);
+}

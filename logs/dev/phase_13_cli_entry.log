@@ -1,0 +1,85 @@
+=== PHASE 13 HIGH-USABILITY ENTER/'#' SERIAL CLI & PLATFORM HOOKS LOG ===
+Timestamp: 2026-11-20T22:16:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz, 248 KB SRAM)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: make -C src/test CC=gcc CXX=g++ test_aries_cli_entry_unittest
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 16 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 16 tests from AriesCliEntryTest
+[ RUN      ] AriesCliEntryTest.Test_CLI_Entry_CarriageReturn_ActivatesImmediatelyWithoutGuardDelay
+[       OK ] AriesCliEntryTest.Test_CLI_Entry_CarriageReturn_ActivatesImmediatelyWithoutGuardDelay (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_Entry_LineFeed_ActivatesImmediatelyWithoutGuardDelay
+[       OK ] AriesCliEntryTest.Test_CLI_Entry_LineFeed_ActivatesImmediatelyWithoutGuardDelay (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_Entry_Hash_ActivatesImmediatelyWithoutGuardDelay
+[       OK ] AriesCliEntryTest.Test_CLI_Entry_Hash_ActivatesImmediatelyWithoutGuardDelay (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_Entry_HashThenCR_ActivatesImmediately
+[       OK ] AriesCliEntryTest.Test_CLI_Entry_HashThenCR_ActivatesImmediately (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_Entry_BinaryMode_ControlB_EntersNonInteractiveCli
+[       OK ] AriesCliEntryTest.Test_CLI_Entry_BinaryMode_ControlB_EntersNonInteractiveCli (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_MspFramePriority_IncomingDollarCancelsPendingCli
+[       OK ] AriesCliEntryTest.Test_CLI_MspFramePriority_IncomingDollarCancelsPendingCli (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_StrayNonMsp_RebootCharacter_Requires100msGuardTime
+[       OK ] AriesCliEntryTest.Test_CLI_StrayNonMsp_RebootCharacter_Requires100msGuardTime (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_ArmedState_SkipsNonMspEvaluation
+[       OK ] AriesCliEntryTest.Test_CLI_ArmedState_SkipsNonMspEvaluation (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_PeripheralPort_DoesNotEvaluateNonMspData
+[       OK ] AriesCliEntryTest.Test_CLI_PeripheralPort_DoesNotEvaluateNonMspData (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_ExitCommand_ReturnsToPortIdleState
+[       OK ] AriesCliEntryTest.Test_CLI_ExitCommand_ReturnsToPortIdleState (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_PlatformIsolation_ZeroDebugStringLiteralsInProduction
+[       OK ] AriesCliEntryTest.Test_CLI_PlatformIsolation_ZeroDebugStringLiteralsInProduction (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_MultipleKeystrokes_DebouncedSingleEntry
+[       OK ] AriesCliEntryTest.Test_CLI_MultipleKeystrokes_DebouncedSingleEntry (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_BufferSafety_ZeroHeapAllocation
+[       OK ] AriesCliEntryTest.Test_CLI_BufferSafety_ZeroHeapAllocation (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_EndToEndTerminalFlow_InstantPromptReadiness
+[       OK ] AriesCliEntryTest.Test_CLI_EndToEndTerminalFlow_InstantPromptReadiness (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_InputSanitization_DiscardsNonPrintableAndLineNoise
+[       OK ] AriesCliEntryTest.Test_CLI_InputSanitization_DiscardsNonPrintableAndLineNoise (0 ms)
+[ RUN      ] AriesCliEntryTest.Test_CLI_CRLF_Suppression_NoDuplicatePrompts
+[       OK ] AriesCliEntryTest.Test_CLI_CRLF_Suppression_NoDuplicatePrompts (0 ms)
+[----------] 16 tests from AriesCliEntryTest (1 ms total)
+[----------] Global test environment tear-down
+[==========] 16 tests from 1 test suite ran. (1 ms total)
+[  PASSED  ] 16 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+1. aries_startup_unittest:       6/6 PASS
+2. aries_linker_unittest:        6/6 PASS
+3. aries_atomics_unittest:       7/7 PASS
+4. aries_system_time_unittest:   9/9 PASS
+5. aries_target_config_unittest: 6/6 PASS
+6. aries_mcu_excludes_unittest:  5/5 PASS
+7. aries_pg_bounds_unittest:     10/10 PASS
+8. aries_uart_hw_unittest:       11/11 PASS
+9. aries_uart_rx_unittest:       18/18 PASS
+10. aries_uart_tx_drain_unittest: 14/14 PASS
+11. aries_msp_handshake_unittest: 16/16 PASS
+12. aries_cli_entry_unittest:    16/16 PASS
+13. aries_integration_unittest:  12/12 PASS
+Cumulative Total:                136/136 PASS (100% pass rate)
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: 8d5071112c7bbe34d55d629e4f2cb7bc05bc4314178d18475ff6d991f6b5c8aa
+Size:   19,932 bytes (.bin)
+Memory: text=19932, data=0, bss=16628, dec=36560 (35.7 KB in SRAM)
+Entry:  0x00202000
+RVC:    0 compressed opcodes
+
+--- 10-POINT SILICON INVARIANT AUDIT ---
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (36560 / 253952 bytes, Headroom: 217392 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00208ed0 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 19932 bytes ready for XMODEM SRAM upload)
+Outcome: 10-Point Silicon Audit Passed Successfully.

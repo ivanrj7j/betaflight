@@ -93,6 +93,20 @@ aries_msp_handshake_unittest_DEFINES := \
 aries_msp_handshake_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
+aries_cli_entry_unittest_SRC := \
+		$(USER_DIR)/msp/msp_serial.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/build/atomic.c
+
+aries_cli_entry_unittest_DEFINES := \
+		USE_CLI= \
+		USE_IMMEDIATE_CLI= \
+		USE_MSP_DISPLAYPORT=
+
+aries_cli_entry_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src
+
 aries_integration_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c \
 		$(USER_DIR)/common/crc.c \
@@ -1098,18 +1112,9 @@ GTEST_DIR = ../../lib/test/gtest
 
 # Use clang/clang++ by default
 
-CC  := clang-18
-CXX := clang++-18
-ifeq ($(and $(shell which $(CC) 2>/dev/null), $(shell which $(CXX) 2>/dev/null)),)
-$(info Falling back to 'clang')
-CC  := clang
-CXX := clang++
-endif
-ifeq ($(and $(shell which $(CC) 2>/dev/null), $(shell which $(CXX) 2>/dev/null)),)
-$(info Falling back to 'gcc')
-CC  := gcc
-CXX := g++
-endif
+# Dynamic compiler detection: prefer clang/clang++ if installed, otherwise cleanly fallback to gcc/g++
+CC  ?= $(shell which clang-18 2>/dev/null || which clang 2>/dev/null || echo gcc)
+CXX ?= $(shell which clang++-18 2>/dev/null || which clang++ 2>/dev/null || echo g++)
 
 OPTIMIZE = -O0
 

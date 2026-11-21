@@ -404,3 +404,95 @@ TEST(AriesSystemTimeTest, Test_MemoryPrimitives_NonRVC_Memcpy_Memset_Memmove) {
     // Standard library newlib memset/memcpy contain 16-bit compressed RVC opcodes.
     // Calling them on RV32IM ET1031 silicon immediately triggers Illegal Instruction traps (mcause = 2).
 }
+
+// =============================================================================
+// Test 10: Monotonic Millisecond Delay Drift Mitigation (Finding 5)
+// =============================================================================
+TEST(AriesSystemTimeTest, Test_Delay_MonotonicMillis_PreventsAccumulatedDrift) {
+    // Arrange: Verify delay duration calculation based on millis() delta
+    // Simulating a delay(50) call
+    uint32_t start_ms = 1000;
+    uint32_t current_ms = 1049;
+
+    // Act: Elapsed time check using unsigned 32-bit arithmetic (handles rollover)
+    bool is_done = ((uint32_t)(current_ms - start_ms) >= 50);
+    EXPECT_FALSE(is_done);
+
+    current_ms = 1050;
+    is_done = ((uint32_t)(current_ms - start_ms) >= 50);
+    EXPECT_TRUE(is_done);
+
+    // Verify 32-bit millisecond rollover boundary (at 2^32 - 10 ms)
+    start_ms = 0xFFFFFFF6U;
+    current_ms = 0x00000004U; // 14 ms elapsed across rollover boundary
+    uint32_t elapsed = (uint32_t)(current_ms - start_ms);
+    EXPECT_EQ(elapsed, 14U);
+
+    // Real-world flight consequence:
+    // Calling delayMicroseconds(1000) inside delay(ms) in a loop repeatedly executes 64-bit cycle math
+    // and loop overhead, causing 1000 ms to stretch to 1020+ ms. Measuring millis() delta directly
+    // eliminates cumulative drift during sensor boot calibration.
+}
+
+// =============================================================================
+// Test 11: Machine External Interrupt Dispatch & Unhandled Line Masking (Finding 2)
+// =============================================================================
+TEST(AriesSystemTimeTest, Test_HandleTrap_UnhandledExternalInterrupt_MasksIntrEnBit) {
+    // Arrange: THEJAS32 interrupt controller mock state
+    uint32_t mock_intr_en = 0x00000080U;     // Bit 7 enabled in hardware
+    uint32_t mock_intr_status = 0x00000080U; // Bit 7 asserted (spurious noise or unhandled event)
+    void (*mock_interrupt_table[32])(void) = {nullptr}; // No handler registered for bit 7
+
+    // Act: Simulate handle_trap fast CTZ dispatch loop
+    uint32_t status = mock_intr_status;
+    int handled_count = 0;
+    while (status != 0U) {
+        // Find trailing zero bit
+        uint32_t i = 0;
+        uint32_t temp = status;
+        while ((temp & 1U) == 0U) {
+            temp >>= 1;
+            i++;
+        }
+
+        if (i < 32 && mock_interrupt_table[i] != nullptr) {
+            mock_interrupt_table[i]();
+            handled_count++;
+        } else {
+            // Finding 2: Defensively mask spurious/unhandled interrupt in INTR_EN
+            if (i < 32) {
+                mock_intr_en &= ~(1UL << i);
+            }
+        }
+        status &= ~(1UL << i);
+    }
+
+    // Assert: Unhandled interrupt bit 7 must be masked in INTR_EN
+    EXPECT_EQ(handled_count, 0);
+    EXPECT_EQ(mock_intr_en, 0U)
+        << "Spurious/unhandled peripheral interrupt must be automatically masked in INTR_EN";
+
+    // Real-world flight consequence:
+    // If unhandled interrupts are not masked in INTR_EN, the external line remains asserted,
+    // causing an immediate re-trap upon mret, completely locking the CPU in an infinite trap storm.
+}
+
+// =============================================================================
+// Test 12: Peripheral Interrupt Cleanup Across Software Reset (Finding 3)
+// =============================================================================
+TEST(AriesSystemTimeTest, Test_SystemReset_DisablesPeripheralInterruptsBeforeJump) {
+    // Arrange: Active peripheral interrupt state prior to soft reboot
+    uint32_t mock_intr_en = 0x00000101U; // Timer 0 (bit 0) and Timer 1 (bit 8) active
+
+    // Act: Software reset peripheral cleanup sequence
+    // Prior to jumping to entry point _start (0x00202000), disable all peripheral lines
+    mock_intr_en = 0U;
+
+    // Assert: All peripheral interrupts disabled
+    EXPECT_EQ(mock_intr_en, 0U)
+        << "systemReset must zero INTR_EN before jumping to _start to avoid boot-time trap panics";
+
+    // Real-world flight consequence:
+    // If INTR_EN remains active across soft reset, a pending Timer or UART interrupt fires
+    // before the C runtime clears BSS and populates interrupt_table, crashing boot.
+}

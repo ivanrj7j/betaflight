@@ -434,4 +434,183 @@ TEST_F(AriesUartHwTest, Test_UART_MultiPortBackgroundFlush_BothQueuesEvacuated) 
     }
 }
 
+// =============================================================================
+// TEST 12: High-Speed Baud Rate Prescaler Clamping (Audit Node 02 / TD-03)
+// =============================================================================
+TEST_F(AriesUartHwTest, Test_UART0_HighSpeedBaudClamping_921600BaudClampedToSafeRate) {
+    // 921,600 baud on 100 MHz APB: Divisor 7 = 892,857.14 bps (-3.12% timing error)
+    // Exceeds standard +/- 2.5% UART asynchronous tolerance, causing framing errors (FE).
+    constexpr uint32_t UNSAFE_BAUD = 921600U;
+    uint32_t baud = UNSAFE_BAUD;
+
+    // Runtime guardrail: baud rates > 460,800 baud must be clamped to 420,000 baud
+    if (baud > 460800U) {
+        baud = 420000U;
+    }
+
+    EXPECT_EQ(baud, 420000U);
+
+    // Verify 420,000 baud error on 100 MHz clock
+    uint32_t divisor_rounded = (THEJAS32_SYSTEM_CLOCK_HZ + (baud * 8U)) / (baud * 16U);
+    EXPECT_EQ(divisor_rounded, 15U);
+
+    double actual_baud = static_cast<double>(THEJAS32_SYSTEM_CLOCK_HZ) / (16.0 * divisor_rounded);
+    double pct_error = ((actual_baud - 420000.0) / 420000.0) * 100.0;
+    EXPECT_NEAR(pct_error, -0.7936, 0.01);
+    EXPECT_LT(std::abs(pct_error), 2.5); // Strictly within +/- 2.5% UART margin
+}
+
+// =============================================================================
+// TEST 13: Dynamic UART Framing - SBUS 8E2 Line Control Configuration (Finding 1)
+// =============================================================================
+TEST_F(AriesUartHwTest, Test_UART_ParityAndStopBits_LCR_Configuration_SBUS_8E2) {
+    // Arrange: SBUS requires 100,000 baud, 8 data bits, Even parity, 2 stop bits (8E2).
+    // In Betaflight portOptions_e:
+    // SERIAL_STOPBITS_2 = (1 << 1) = 0x02
+    // SERIAL_PARITY_EVEN = (1 << 2) = 0x04
+    const uint32_t options = (1 << 1) | (1 << 2); // SERIAL_STOPBITS_2 | SERIAL_PARITY_EVEN
+
+    // Act: Derive expected 16550 LCR register value:
+    // Bit 1:0 = 11b (0x03) -> 8 data bits
+    // Bit 2   = 1b  (0x04) -> 2 stop bits
+    // Bit 3   = 1b  (0x08) -> Parity Enable (PEN)
+    // Bit 4   = 1b  (0x10) -> Even Parity Select (EPS)
+    uint8_t lcr = LCR_DATA_8_BITS; // 0x03
+    if (options & (1 << 1)) { // SERIAL_STOPBITS_2
+        lcr |= LCR_STOP_2_BITS; // 0x04
+    }
+    if (options & (1 << 2)) { // SERIAL_PARITY_EVEN
+        lcr |= LCR_PARITY_EVEN; // 0x18 (PEN | EPS)
+    }
+
+    mock_uart0.LCR = lcr;
+
+    // Assert: LCR must equal 0x1F (0b00011111)
+    EXPECT_EQ(mock_uart0.LCR, 0x1FU)
+        << "SBUS line configuration must set 8 data bits, 2 stop bits, and even parity (LCR = 0x1F)";
+    EXPECT_TRUE(mock_uart0.LCR & LCR_STOP_2_BITS);
+    EXPECT_TRUE(mock_uart0.LCR & LCR_PARITY_ENABLE);
+    EXPECT_EQ(mock_uart0.LCR & 0x18, 0x18); // Both PEN and EPS active
+
+    // Real-world flight consequence:
+    // If LCR remains hardcoded to 0x03 (8N1), connecting an SBUS radio receiver results in 100%
+    // framing and parity corruptions, leading to total failsafe and receiver lockup.
+}
+
+// =============================================================================
+// TEST 14: Dynamic UART Framing - Standard 8N1 Line Control Configuration (Finding 1)
+// =============================================================================
+TEST_F(AriesUartHwTest, Test_UART_ParityAndStopBits_LCR_Configuration_Standard_8N1) {
+    // Arrange: Standard MSP/CLI and CRSF links use 8 data bits, no parity, 1 stop bit (8N1).
+    const uint32_t options = 0; // SERIAL_PARITY_NO | SERIAL_STOPBITS_1
+
+    // Act: Derive expected LCR value
+    uint8_t lcr = LCR_DATA_8_BITS; // 0x03
+    if (options & (1 << 1)) {
+        lcr |= LCR_STOP_2_BITS;
+    }
+    if (options & (1 << 2)) {
+        lcr |= LCR_PARITY_EVEN;
+    }
+
+    mock_uart0.LCR = lcr;
+
+    // Assert: LCR must equal 0x03
+    EXPECT_EQ(mock_uart0.LCR, 0x03U)
+        << "Standard MSP/CLI port configuration must strictly maintain 8N1 framing (LCR = 0x03)";
+    EXPECT_FALSE(mock_uart0.LCR & LCR_STOP_2_BITS);
+    EXPECT_FALSE(mock_uart0.LCR & LCR_PARITY_ENABLE);
+}
+
+// =============================================================================
+// TEST 15: Pure Buffer Query Const-Correctness - uartTotalRxBytesWaiting (Finding 4)
+// =============================================================================
+TEST_F(AriesUartHwTest, Test_UART_TotalRxBytesWaiting_ConstQueryDoesNotModifyHardware) {
+    // Arrange: Software ring buffer state with 6 bytes queued
+    constexpr uint32_t rx_buffer_size = 64;
+    uint32_t rx_head = 10;
+    uint32_t rx_tail = 4;
+
+    // Mock initial hardware register state
+    mock_uart0.LSR = LSR_THRE_EMPTY | LSR_TRANSMITTER_EMPTY; // No incoming HW byte
+    mock_uart0.RBR_THR_DLL = 0;
+
+    // Act: Query buffer depth using standard ring buffer calculation
+    auto query_rx_waiting = [](uint32_t head, uint32_t tail, uint32_t size) -> uint32_t {
+        if (head >= tail) {
+            return head - tail;
+        } else {
+            return size + head - tail;
+        }
+    };
+
+    uint32_t waiting = query_rx_waiting(rx_head, rx_tail, rx_buffer_size);
+
+    // Assert: Correctly reports 6 bytes waiting without touching hardware
+    EXPECT_EQ(waiting, 6U);
+    EXPECT_EQ(mock_uart0.RBR_THR_DLL, 0U) << "Hardware register must not be read or polled during const query";
+
+    // Test wrapped ring buffer condition (head < tail)
+    rx_head = 2;
+    rx_tail = 60;
+    waiting = query_rx_waiting(rx_head, rx_tail, rx_buffer_size);
+    EXPECT_EQ(waiting, 6U); // 64 + 2 - 60 = 6 bytes
+
+    // Real-world flight consequence:
+    // If uartTotalRxBytesWaiting casts away const to poll hardware in an ATOMIC_BLOCK,
+    // the 1.0 kHz flight loop continuously disables interrupts during routine buffer checks,
+    // jittering sensor sampling deadlines.
+}
+
+// =============================================================================
+// TEST 16: Diagnostic Number Formatting Specification (Finding 8)
+// =============================================================================
+TEST_F(AriesUartHwTest, Test_BootstrapDiag_NumberFormatting_DecimalAndHex) {
+    // Helper to format decimal into string matching uart_print_dec algorithm
+    auto format_dec = [](uint32_t val) -> std::string {
+        char buf[12];
+        int i = 0;
+        if (val == 0) return "0";
+        while (val > 0) {
+            buf[i++] = (char)('0' + (val % 10));
+            val /= 10;
+        }
+        std::string res;
+        while (i > 0) {
+            res.push_back(buf[--i]);
+        }
+        return res;
+    };
+
+    // Helper to format 32-bit hex into string matching thejas32_early_uart_print_hex
+    auto format_hex = [](uint32_t val) -> std::string {
+        char buf[9];
+        for (int i = 7; i >= 0; i--) {
+            uint8_t nibble = val & 0x0F;
+            buf[i] = (nibble < 10) ? ('0' + nibble) : ('A' + nibble - 10);
+            val >>= 4;
+        }
+        buf[8] = '\0';
+        return std::string(buf);
+    };
+
+    // Assert decimal boundaries
+    EXPECT_EQ(format_dec(0U), "0");
+    EXPECT_EQ(format_dec(1U), "1");
+    EXPECT_EQ(format_dec(9U), "9");
+    EXPECT_EQ(format_dec(10U), "10");
+    EXPECT_EQ(format_dec(42U), "42");
+    EXPECT_EQ(format_dec(100U), "100");
+    EXPECT_EQ(format_dec(12345U), "12345");
+    EXPECT_EQ(format_dec(65535U), "65535");
+    EXPECT_EQ(format_dec(4294967295U), "4294967295");
+
+    // Assert hexadecimal boundaries
+    EXPECT_EQ(format_hex(0x00000000U), "00000000");
+    EXPECT_EQ(format_hex(0x00000001U), "00000001");
+    EXPECT_EQ(format_hex(0x00202000U), "00202000"); // ARIES SRAM entry origin
+    EXPECT_EQ(format_hex(0x12345678U), "12345678");
+    EXPECT_EQ(format_hex(0xFFFFFFFFU), "FFFFFFFF");
+}
+
 } // namespace

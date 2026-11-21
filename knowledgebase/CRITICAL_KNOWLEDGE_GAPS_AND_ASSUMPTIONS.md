@@ -141,8 +141,35 @@ graph TD
 
 ---
 
-## 3. Mandatory Agent Operational Rules Summary
+## 3. Verified Silicon Errata & Architecture Guardrails (Code Audit Node 02)
 
-1. **Before writing code touching these 6 areas:** Check this document first.
+The following architectural guardrails and silicon quirks were confirmed through physical hardware testing, technical debt analysis ([`code_audit/02_WORKING_TREE_REVIEW_AND_TECHNICAL_DEBT.md`](code_audit/02_WORKING_TREE_REVIEW_AND_TECHNICAL_DEBT.md)), and consultation of official C-DAC VEGA SDK/BSP sources:
+
+### Erratum 1: Synopsys DW_apb_uart 16550 Hardware FIFO Errata (`FCR = 0x00` Mandatory)
+* **The Hardware Reality**: The DW_apb_uart 16550 IP on THEJAS32 (VEGA ET1031) silicon has hardware FIFO pointer and clock-crossing errata. Writing `UART_IIR_FCR = 0x07` or `0x01` causes incoming keystrokes to arrive scrambled/out-of-order, duplicates characters, and eventually freezes the hardware FIFO pointer.
+* **The Official Precedent**: Every official C-DAC driver ([`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c:104`](../lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c), [`lib/vega-bsp/cores/arduino/HardwareSerial.cpp:114`](../lib/vega-bsp/cores/arduino/HardwareSerial.cpp), [`lib/vega-bsp/cores/arduino/UARTClass.cpp:101`](../lib/vega-bsp/cores/arduino/UARTClass.cpp)) strictly disables hardware FIFOs by writing `UART_IIR_FCR = 0x00`.
+* **Guardrail Rule**: Always operate in 1-byte register mode (`UART_IIR_FCR = 0x00`). Never enable hardware FIFOs in runtime code.
+
+### Erratum 2: 921,600 Baud Timing Error Exceeds Asynchronous Tolerance (-3.12%)
+* **The Math**: On a 100 MHz APB clock, 921,600 baud yields integer divisor 7:
+  $$\text{Actual Baud} = \frac{100{,}000{,}000}{16 \times 7} \approx 892{,}857.14\text{ bps} \implies \text{Error} = -3.12\%$$
+* **The Consequence**: Exceeds the standard $\pm 2.5\%$ UART asynchronous margin, causing framing errors (`FE`) on high-speed blackbox or logging ports.
+* **Guardrail Rule**: Clamp or reject 921,600 baud in `thejas32_uart_set_baudrate_ex()`. Safe high-speed baud rates are 230,400 (Divisor 27, $+0.47\%$) and 420,000 (Divisor 15, $-0.79\%$).
+
+### Erratum 3: Concurrency Hazard in Generic Polled Ingestion Hooks
+* **The Mechanism**: In `src/main/drivers/serial_uart.c`, `#ifdef THEJAS32` calls `uartIrqHandler((uartPort_t *)uartPort)` inside `uartTotalRxBytesWaiting()` and `uartRead()`.
+* **The Concurrency Risk**: In thread mode, these calls execute without atomic masking. If the hardware external interrupt (`thejas32_uart0_isr`) fires concurrently, both thread and ISR mutate `rxBufferHead` and read `UART_DR` simultaneously, corrupting ring buffers.
+* **Guardrail Rule**: Any thread-mode invocation of `uartIrqHandler` must be enclosed in an `ATOMIC_BLOCK(NVIC_PRIO_SERIALUART)`.
+
+### Erratum 4: Linker Script Section Missing for Persistent Objects (`.noinit`)
+* **The Vulnerability**: `persistentObjects[16]` in `stub_drivers.c` is placed in `.bss`, which `startup.S` zeroes on every CPU reset.
+* **The Consequence**: Warm soft-reboot reason codes, crash flags, and bootloader jump tokens are erased during reset.
+* **Guardrail Rule**: When implementing Phase 18 persistent storage, add `.noinit (NOLOAD) : { *(.noinit .noinit.*) } > RAM` to `aries_v3.ld` and annotate persistent data structures accordingly.
+
+---
+
+## 4. Mandatory Agent Operational Rules Summary
+
+1. **Before writing code touching these areas:** Check this document first.
 2. **If an item is marked [PENDING TEAM CONFIRMATION]:** Ask the user for clarification rather than assuming default STM32/ESP32 behavior.
-3. **If a team member provides physical hardware details:** Immediately invoke `knowledge-update` to document the findings and clear the gap!
+3. **If a team member provides physical hardware details or audits:** Immediately invoke `knowledge-update` to document findings and track technical debt!

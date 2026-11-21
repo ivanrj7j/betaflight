@@ -54,7 +54,7 @@ Backed directly by [05_STM32_SERIAL_UART_HW.md](../../logs/hardware_inspection/0
 | **UART Hardware IP** | ST Proprietary USART | Espressif Custom UART Controller | **Industry-Standard 16550 IP** |
 | **Physical Interface** | Native USB VCP or ST-Link | Native USB-Serial JTAG or external bridge | **Silicon Labs CP2102N Bridge** (Hardwired Pins 107/108) |
 | **Native USB Middleware** | Requires ~30 KB of ST USB device stack! | Optional TinyUSB or hardware JTAG FIFO | **Zero KB**: Handled by dedicated CP2102N chip! |
-| **Hardware FIFOs** | 1 byte (F4) or 8/16 bytes (H7) | 128 bytes TX & RX FIFOs | **16-byte hardware FIFO** (FCR enabled) |
+| **Hardware FIFOs** | 1 byte (F4) or 8/16 bytes (H7) | 128 bytes TX & RX FIFOs | **1-byte register mode** (`UART_IIR_FCR = 0x00` mandatory; hardware FIFOs disabled due to DW_apb_uart silicon errata) |
 | **Hardware Inversion** | Supported only on F3/F7/H7; F4 requires external FET inverter | Universal signal inversion in GPIO matrix | Non-inverted 3.3V TTL (matches CP2102N natively) |
 
 ---
@@ -76,6 +76,14 @@ Backed directly by [05_STM32_SERIAL_UART_HW.md](../../logs/hardware_inspection/0
 * **The Bug**: If software enables the Transmit Data Register Empty interrupt (`TXEIE`) while the transmit ring buffer is empty, the hardware immediately and continuously fires the ISR (because `TXE` is true), spinning the CPU at 100% load and starving all flight tasks!
 * **Overcome By**: From [06_STM32_SERIAL_UART_DRIVER.md](../../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), STM32 only enables `TXEIE` when bytes exist in the buffer, and clears `TXEIE` the instant the buffer empties.
 * **ARIES v3.0 Resolution**: Adopt non-blocking polled or ring-buffered TX. Because the CP2102N USB bridge accepts byte bursts into its internal USB packetizer, writing directly to `THR` when `LSR & 0x20` is asserted takes $<0.1\,\mu\text{s}$, eliminating the need for TX interrupts during early bringup.
+
+### Failure Mode 3: Hardware FIFO Desynchronization & Scrambled Characters (THEJAS32)
+* **The Bug**: On the Synopsys DW_apb_uart 16550 IP, writing `FCR = 0x07` or `0x01` activates hardware FIFOs. Due to silicon clock-crossing and FIFO pointer errata, characters arrive scrambled/out-of-order, duplicate bytes, and eventually halt reception.
+* **Overcome By**: C-DAC's official VEGA SDK (`uart.c:104`) and BSP (`HardwareSerial.cpp:114`) permanently set `UART_IIR_FCR = 0x00`. ARIES v3.0 operates in 1-byte register mode with a zero-allocation software ring buffer in `.bss` (`rxBuffer[256]`), guaranteeing strict sequential byte ingestion.
+
+### Failure Mode 4: Non-Atomic Polled Ingestion Race with Hardware ISR
+* **The Bug**: Calling `uartIrqHandler` from thread mode (`uartTotalRxBytesWaiting()` / `uartRead()`) without atomic protection races with `thejas32_uart0_isr`. If an external interrupt fires mid-execution, both thread and ISR read `UART_DR` and update `rxHead`, corrupting data.
+* **Overcome By**: Wrap thread-mode polled calls in `ATOMIC_BLOCK(NVIC_PRIO_SERIALUART)`.
 
 ---
 

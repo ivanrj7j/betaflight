@@ -134,6 +134,9 @@
 #define LED0_PIN                PA22
 #define BEEPER_PIN              NONE
 
+// High-Usability Immediate CLI Activation (Phase 13)
+#define USE_IMMEDIATE_CLI
+
 // Onboard USB-UART Bridge (CP2102N)
 #define USE_UART0
 #define UART0_TX_PIN            PA30

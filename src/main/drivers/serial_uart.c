@@ -30,6 +30,8 @@
 #include <string.h>
 
 #include "platform.h"
+#include "build/atomic.h"
+#include "drivers/nvic.h"
 
 #ifdef USE_UART
 
@@ -439,6 +441,16 @@ static uint8_t uartRead(serialPort_t *instance)
 {
     uint8_t ch;
     uartPort_t *uartPort = (uartPort_t *)instance;
+
+#ifdef THEJAS32
+    if (uartPort && uartPort->USARTx && uartPort->port.rxBuffer && uartPort->port.rxBufferSize > 0) {
+        if (uartPort->port.rxBufferHead == uartPort->port.rxBufferTail) {
+            ATOMIC_BLOCK(NVIC_PRIO_MAX) {
+                uartIrqHandler((uartPort_t *)uartPort);
+            }
+        }
+    }
+#endif
 
 #ifdef USE_DMA
     if (uartPort->rxDMAResource) {

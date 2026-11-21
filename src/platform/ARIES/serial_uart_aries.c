@@ -110,6 +110,10 @@ void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
     }
 }
 
+#ifndef SERIAL_PARITY_ODD
+#define SERIAL_PARITY_ODD (2 << 2) // Optional extension for odd parity checking
+#endif
+
 // -----------------------------------------------------------------------------
 // Baud Rate & Line Control Configuration (16550 IP DLAB Latching)
 // -----------------------------------------------------------------------------
@@ -121,10 +125,17 @@ void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
 // - 921,600 baud: Divisor  7 -> 892,857.14 bps (-3.12% error, EXCEEDS +/- 2.5% UART tolerance!)
 // Warning: 921,600 baud will cause framing errors on 100 MHz APB clock without fractional baud hardware.
 // Use 230,400 baud or 420,000 baud for high-speed serial links.
-static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, bool resetFifo)
+static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, portOptions_e options, bool resetFifo)
 {
     if (baudRate == 0) {
         baudRate = 115200;
+    }
+
+    // Clamp high-speed baud rates exceeding asynchronous UART tolerance (+/- 2.5%).
+    // On 100 MHz APB clock, 921,600 baud yields integer divisor 7 (-3.12% error) which induces framing errors.
+    // Clamp to 420,000 baud (divisor 15, -0.79% error) or 230,400 baud (divisor 27, +0.47% error).
+    if (baudRate > 460800U) {
+        baudRate = 420000U;
     }
 
     // Formula from 16550 IP & VEGA SDK:
@@ -136,8 +147,20 @@ static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, bool re
         divisor = 1;
     }
 
-    // Step 1: Set DLAB (Divisor Latch Access Bit) = 1 (Bit 7 of UART_LCR)
-    THEJAS32_UART(ch).UART_LCR = 0x83; // DLAB=1, 8 data bits
+    // Configure stop bits & parity in LCR (Finding 1: Dynamic framing for SBUS 8E2 / standard 8N1)
+    uint8_t lcr = 0x03; // Default: 8 data bits, 1 stop bit, no parity
+    if (options & SERIAL_STOPBITS_2) {
+        lcr |= 0x04; // 2 stop bits (STB = 1)
+    }
+    if (options & SERIAL_PARITY_EVEN) {
+        lcr |= 0x18; // Even parity enable (PEN = 1, EPS = 1)
+    }
+    if (options & SERIAL_PARITY_ODD) {
+        lcr |= 0x08; // Odd parity enable (PEN = 1, EPS = 0)
+    }
+
+    // Step 1: Set DLAB (Divisor Latch Access Bit) = 1 (Bit 7 of UART_LCR) while maintaining framing
+    THEJAS32_UART(ch).UART_LCR = 0x80 | lcr;
     __asm__ volatile ("fence" : : : "memory");
 
     // Step 2: Write Divisor Latches (DLL in UART_DR, DLM in UART_IE)
@@ -145,42 +168,28 @@ static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, bool re
     THEJAS32_UART(ch).UART_IE = (divisor >> 8) & 0xFF; // DLM (MSB)
     __asm__ volatile ("fence" : : : "memory");
 
-    // Step 3: Clear DLAB and lock 8N1 framing (0x03)
-    THEJAS32_UART(ch).UART_LCR = 0x03; // 8 data bits, 1 stop bit, no parity
+    // Step 3: Clear DLAB and lock framing bits
+    THEJAS32_UART(ch).UART_LCR = lcr;
     __asm__ volatile ("fence" : : : "memory");
 
-    // Step 4: Configure 16-byte hardware FIFOs (FCR = 0x07 on cold reset, 0x01 on reconfigure)
-    THEJAS32_UART(ch).UART_IIR_FCR = resetFifo ? 0x07 : 0x01;
-    __asm__ volatile ("fence" : : : "memory");
+    // Step 4: Disable hardware FIFOs (FCR = 0x00) matching official C-DAC VEGA SDK (uart.c:104) and BSP (HardwareSerial.cpp:114)
+    // THEJAS32 DW_apb_uart 16550 IP hardware FIFOs have errata causing character desynchronization when enabled.
+    if (resetFifo) {
+        THEJAS32_UART(ch).UART_IIR_FCR = 0x00;
+        __asm__ volatile ("fence" : : : "memory");
+    }
 }
 
-static inline void thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate)
+static inline void thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate, portOptions_e options)
 {
-    thejas32_uart_set_baudrate_ex(ch, baudRate, true);
+    thejas32_uart_set_baudrate_ex(ch, baudRate, options, true);
 }
-
-#ifndef SERIAL_PARITY_ODD
-#define SERIAL_PARITY_ODD (2 << 2) // Optional extension for odd parity checking
-#endif
 
 void uartReconfigure(uartPort_t *uartPort)
 {
     uint8_t ch = uartGetIndex(uartPort->USARTx);
 
-    thejas32_uart_set_baudrate_ex(ch, uartPort->port.baudRate, false);
-
-    // Configure stop bits & parity in LCR
-    uint8_t lcr = 0x03; // Default: 8 data bits, 1 stop bit, no parity
-    if (uartPort->port.options & SERIAL_STOPBITS_2) {
-        lcr |= 0x04; // 2 stop bits
-    }
-    if (uartPort->port.options & SERIAL_PARITY_EVEN) {
-        lcr |= 0x18; // Even parity enable (PEN=1, EPS=1)
-    }
-    if (uartPort->port.options & SERIAL_PARITY_ODD) {
-        lcr |= 0x08; // Odd parity enable (PEN=1, EPS=0)
-    }
-    THEJAS32_UART(ch).UART_LCR = lcr;
+    thejas32_uart_set_baudrate_ex(ch, uartPort->port.baudRate, uartPort->port.options, false);
 
     // Ground Truth 8: Enable RX-only interrupt (bit 0 of UART_IE).
     // TX interrupt (bit 1) must remain strictly 0 to prevent level-triggered THRE storms!
@@ -252,10 +261,6 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
 
     uint8_t ch = uartGetIndex(s->USARTx);
 
-    // Reading IIR acknowledges active interrupt condition
-    volatile uint32_t iir = THEJAS32_UART(ch).UART_IIR_FCR;
-    (void)iir;
-
     // Reading Line Status Register (LSR) automatically clears Overrun Error (ORE),
     // Parity Error (PE), and Framing Error (FE) flags on 16550 IP.
     uint32_t lsr = THEJAS32_UART(ch).UART_LSR;
@@ -301,8 +306,6 @@ static void thejas32_uart1_isr(void)
 // -----------------------------------------------------------------------------
 uartPort_t *serialUART(uartDevice_t *uartdev, uint32_t baudRate, portMode_e mode, portOptions_e options)
 {
-    UNUSED(options);
-
     uartPort_t *s = &uartdev->port;
     const uartHardware_t *hardware = uartdev->hardware;
     if (!hardware) {
@@ -311,8 +314,13 @@ uartPort_t *serialUART(uartDevice_t *uartdev, uint32_t baudRate, portMode_e mode
 
     uint8_t ch = uartGetIndex(hardware->reg);
 
-    // Initialize baud rate and 16-byte hardware FIFOs
-    thejas32_uart_set_baudrate(ch, baudRate);
+    // Save port state
+    s->port.options = options;
+    s->port.mode = mode;
+    s->port.baudRate = baudRate;
+
+    // Initialize baud rate and line framing (parity / stop bits)
+    thejas32_uart_set_baudrate(ch, baudRate, options);
 
     // Register with THEJAS32 interrupt controller
     if (ch == 0) {

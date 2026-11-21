@@ -503,10 +503,21 @@ static mspPostProcessFnPtr mspSerialProcessReceivedCommand(mspPort_t *msp, mspPr
 
 static void mspProcessPendingRequest(mspPort_t * mspPort)
 {
-    // If no request is pending or 100ms guard time has not elapsed - do nothing
-    if ((mspPort->pendingRequest == MSP_PENDING_NONE) || (cmp32(millis(), mspPort->lastActivityMs) < 100)) {
+    if (mspPort->pendingRequest == MSP_PENDING_NONE) {
         return;
     }
+
+#if defined(USE_IMMEDIATE_CLI) || defined(THEJAS32) || defined(ARIES)
+    // High-Usability Immediate CLI Activation (Phase 13 / ARIES v3.0):
+    // Enter ('\r' / '\n') or '#' activates CLI immediately without requiring 100ms guard delay
+    if (mspPort->pendingRequest != MSP_PENDING_CLI && (cmp32(millis(), mspPort->lastActivityMs) < 100)) {
+        return;
+    }
+#else
+    if (cmp32(millis(), mspPort->lastActivityMs) < 100) {
+        return;
+    }
+#endif
 
     switch(mspPort->pendingRequest) {
     case MSP_PENDING_BOOTLOADER_ROM:
@@ -623,8 +634,13 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
                 if (c == serialConfig()->reboot_character) {
                     mspPort->pendingRequest = MSP_PENDING_BOOTLOADER_ROM;
 #ifdef USE_CLI
+#if defined(USE_IMMEDIATE_CLI) || defined(THEJAS32) || defined(ARIES)
+                } else if (c == '#' || c == '\r' || c == '\n') {
+                    mspPort->pendingRequest = MSP_PENDING_CLI;
+#else
                 } else if (c == '#') {
                     mspPort->pendingRequest = MSP_PENDING_CLI;
+#endif
                 } else if (c == 0x2) {
                     mspPort->portState = PORT_CLI_CMD;
                     cliEnter(mspPort->port, false);

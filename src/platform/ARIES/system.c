@@ -154,8 +154,10 @@ void delayMicroseconds(uint32_t us)
 
 void delay(uint32_t ms)
 {
-    while (ms--) {
-        delayMicroseconds(1000);
+    // Finding 5: Measure elapsed monotonic time via millis() to eliminate accumulated loop drift
+    timeMs_t start = millis();
+    while ((timeMs_t)(millis() - start) < ms) {
+        __NOP();
     }
 }
 
@@ -172,9 +174,12 @@ void thejas32_early_uart_init(void)
     THEJAS32_UART(0).UART_DR = 54;    // DLL: Divisor 54 for 115200 baud @ 100 MHz (+0.47% error)
     THEJAS32_UART(0).UART_IE = 0;     // DLM
     __asm__ volatile ("fence");
-    THEJAS32_UART(0).UART_LCR = 0x03; // DLAB = 0, 8 data bits, 1 stop bit, no parity (8N1)
+    // Clear DLAB: 8 data bits, 1 stop bit, no parity (8N1)
+    THEJAS32_UART(0).UART_LCR = 0x03;
     __asm__ volatile ("fence");
-    THEJAS32_UART(0).UART_IIR_FCR = 0x07; // Enable and clear 16-byte FIFO
+    THEJAS32_UART(0).UART_IE = 0x00;  // Explicitly disable interrupts in early/polled mode
+    __asm__ volatile ("fence");
+    THEJAS32_UART(0).UART_IIR_FCR = 0x00; // Disable hardware FIFOs matching official C-DAC VEGA SDK & BSP
     __asm__ volatile ("fence");
 }
 
@@ -186,16 +191,19 @@ void thejas32_early_uart_putc(char c)
         __NOP();
     }
     THEJAS32_UART(0).UART_DR = (uint8_t)c;
+    __asm__ volatile ("fence" : : : "memory");
 }
 
 void thejas32_early_uart_puts(const char *s)
 {
     if (!s) return;
+    char prev = '\0';
     while (*s) {
-        if (*s == '\n') {
+        if (*s == '\n' && prev != '\r') {
             thejas32_early_uart_putc('\r');
         }
-        thejas32_early_uart_putc(*s++);
+        thejas32_early_uart_putc(*s);
+        prev = *s++;
     }
 }
 
@@ -255,7 +263,21 @@ void thejas32_interrupt_disable(uint8_t irq_number)
     }
 }
 
-extern int __ctzsi2(int val);
+/*
+ * Software Count-Trailing-Zeros (__ctzsi2) Helper for RV32IM (no Bitmanip extension)
+ */
+int __ctzsi2(int val)
+{
+    if (val == 0) return 32;
+    int n = 0;
+    uint32_t x = (uint32_t)val;
+    if ((x & 0x0000FFFFU) == 0) { n += 16; x >>= 16; }
+    if ((x & 0x000000FFU) == 0) { n += 8;  x >>= 8;  }
+    if ((x & 0x0000000FU) == 0) { n += 4;  x >>= 4;  }
+    if ((x & 0x00000003U) == 0) { n += 2;  x >>= 2;  }
+    if ((x & 0x00000001U) == 0) { n += 1; }
+    return n;
+}
 
 /*
  * C trap handler invoked from startup.S trap_entry:
@@ -275,6 +297,12 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
                 uint32_t i = (uint32_t)__ctzsi2((int)status);
                 if (i < 32 && interrupt_table[i]) {
                     interrupt_table[i]();
+                } else {
+                    // Finding 2: Defensively mask spurious/unhandled interrupt in INTR_EN
+                    // to prevent an immediate infinite re-trap upon mret.
+                    if (i < 32) {
+                        THEJAS32_INTR_CTRL.INTR_EN &= ~(1UL << i);
+                    }
                 }
                 status &= ~(1UL << i);
             }
@@ -314,8 +342,16 @@ void systemInit(void)
 void systemReset(void)
 {
     __disable_irq();
+
+    // Finding 3: Disable all peripheral interrupt lines in THEJAS32 interrupt controller
+    // so no stale interrupt fires during startup before BSS and tables are initialized.
+    THEJAS32_INTR_CTRL.INTR_EN = 0U;
+    __asm__ volatile ("fence" : : : "memory");
+
     extern uint32_t _estack;
     extern void _start(void);
+    (void)_estack;
+    (void)_start;
     __asm__ volatile (
         "la sp, _estack\n"
         "la t0, _start\n"

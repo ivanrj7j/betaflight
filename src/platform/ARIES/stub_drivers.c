@@ -122,25 +122,10 @@ void __atomic_store_4(volatile void *ptr, unsigned int val, int memorder)
 }
 
 // ----------------------------------------------------------------------------
-// Compiler Helper Builtins for RV32IM without Bitmanip Extension
-// ----------------------------------------------------------------------------
-int __ctzsi2(int val)
-{
-    if (val == 0) return 32;
-    int n = 0;
-    uint32_t x = (uint32_t)val;
-    if ((x & 0x0000FFFFU) == 0) { n += 16; x >>= 16; }
-    if ((x & 0x000000FFU) == 0) { n += 8;  x >>= 8;  }
-    if ((x & 0x0000000FU) == 0) { n += 4;  x >>= 4;  }
-    if ((x & 0x00000003U) == 0) { n += 2;  x >>= 2;  }
-    if ((x & 0x00000001U) == 0) { n += 1; }
-    return n;
-}
-
 // ----------------------------------------------------------------------------
 // Persistent Object Stubs (Warm-reboot survival in internal SRAM)
 // ----------------------------------------------------------------------------
-static uint32_t persistentObjects[16];
+static uint32_t persistentObjects[16] __attribute__((section(".noinit")));
 
 void persistentObjectInit(void)
 {
@@ -169,6 +154,9 @@ void debugInit(void)
 {
 }
 
+// ----------------------------------------------------------------------------
+// Debug Pin Stubs (debug_pin.h compliance for oscilloscope / profiling hooks)
+// ----------------------------------------------------------------------------
 void dbgPinHi(int index)
 {
     UNUSED(index);
