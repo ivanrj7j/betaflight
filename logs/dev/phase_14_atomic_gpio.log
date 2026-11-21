@@ -1,0 +1,97 @@
+=== PHASE 14 FLAT DUAL-BANK ADDRESS-DECODED ATOMIC GPIO & OPEN-DRAIN LOG ===
+Timestamp: 2026-11-21T12:00:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz, 248 KB SRAM)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: make -C src/test CC=gcc CXX=g++ test_aries_io_unittest
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 15 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 15 tests from AriesIoTest
+[ RUN      ] AriesIoTest.Test_GPIO_DualBank_BaseAddresses_And_DirectionOffsets
+[       OK ] AriesIoTest.Test_GPIO_DualBank_BaseAddresses_And_DirectionOffsets (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_AddressDecodedStoreFormula_Bank0_Aperture
+[       OK ] AriesIoTest.Test_GPIO_AddressDecodedStoreFormula_Bank0_Aperture (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_AddressDecodedStoreFormula_Bank1_Aperture
+[       OK ] AriesIoTest.Test_GPIO_AddressDecodedStoreFormula_Bank1_Aperture (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_AddressDecodedStoreFormula_All32Pins_UniqueNoAliasing
+[       OK ] AriesIoTest.Test_GPIO_AddressDecodedStoreFormula_All32Pins_UniqueNoAliasing (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_IOInitGlobal_SRAMBudgetAndRecs
+[       OK ] AriesIoTest.Test_GPIO_IOInitGlobal_SRAMBudgetAndRecs (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_TagMapping_And_O1_Lookup
+[       OK ] AriesIoTest.Test_GPIO_TagMapping_And_O1_Lookup (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_AtomicPinSetAndClear_PushPull_MockMMIO
+[       OK ] AriesIoTest.Test_GPIO_AtomicPinSetAndClear_PushPull_MockMMIO (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_IOToggle_StateTransitions
+[       OK ] AriesIoTest.Test_GPIO_IOToggle_StateTransitions (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_IORead_LevelDetection
+[       OK ] AriesIoTest.Test_GPIO_IORead_LevelDetection (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_OpenDrain_DirectionToggling
+[       OK ] AriesIoTest.Test_GPIO_OpenDrain_DirectionToggling (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_DirectionConfig_PushPull_And_Input
+[       OK ] AriesIoTest.Test_GPIO_DirectionConfig_PushPull_And_Input (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_PortAndPinIdx_Extraction
+[       OK ] AriesIoTest.Test_GPIO_PortAndPinIdx_Extraction (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_NullAndOutOfRange_DefensiveGuards
+[       OK ] AriesIoTest.Test_GPIO_NullAndOutOfRange_DefensiveGuards (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_SingleInstructionAtomic_ZeroCriticalSection
+[       OK ] AriesIoTest.Test_GPIO_SingleInstructionAtomic_ZeroCriticalSection (0 ms)
+[ RUN      ] AriesIoTest.Test_GPIO_StatusLED0_PA22_AddressDecodedBinding
+[       OK ] AriesIoTest.Test_GPIO_StatusLED0_PA22_AddressDecodedBinding (0 ms)
+[----------] 15 tests from AriesIoTest (0 ms total)
+[----------] Global test environment tear-down
+[==========] 15 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 15 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+1. aries_startup_unittest:       6/6 PASS
+2. aries_linker_unittest:        7/7 PASS
+3. aries_atomics_unittest:       7/7 PASS
+4. aries_system_time_unittest:   12/12 PASS
+5. aries_target_config_unittest: 6/6 PASS
+6. aries_mcu_excludes_unittest:  5/5 PASS
+7. aries_pg_bounds_unittest:     10/10 PASS
+8. aries_uart_hw_unittest:       16/16 PASS
+9. aries_uart_rx_unittest:       18/18 PASS
+10. aries_uart_tx_drain_unittest: 14/14 PASS
+11. aries_msp_handshake_unittest: 16/16 PASS
+12. aries_cli_entry_unittest:    17/17 PASS
+13. aries_integration_unittest:  12/12 PASS
+14. aries_io_unittest:           15/15 PASS
+Cumulative Total:                161/161 PASS (100% pass rate)
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: 401edef723ba7ae4e9844dd1d0b262048c109b4c2f0c1a62d739333c6c09b0c0
+Size:   21,900 bytes (.bin)
+Memory: text=21900, data=0, bss=17044, dec=38944 (38.0 KB in SRAM, 215.0 KB headroom)
+Entry:  0x00202000
+RVC:    0 compressed opcodes
+
+--- 10-POINT SILICON INVARIANT AUDIT ---
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (38944 / 253952 bytes, Headroom: 215008 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00209814 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 21900 bytes ready for XMODEM SRAM upload)
+Outcome: 10-Point Silicon Audit Passed Successfully.
+
+--- PHYSICAL BENCH VERIFICATION (tempfiles/phase14.txt) ---
+Hardware: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz, 248 KB SRAM)
+Boot: Flash Initialized -> Clocks & Timer0 Initialized -> Reset Vector 0x00202000
+Self-Tests: 16/16 PASS (100% pass rate)
+Phase 14 Test 16/16: PASS
+  - Bank 0: 0x10080000, Bank 1: 0x10180000, DIR Offset +0x40000
+  - LED0 (PA22): &ioRecs[22] -> 0x10180100
+  - Address-decoded store atomic & fence verified
+  - Open-drain emulation (DIR toggle) verified
+Heartbeat: 42 heartbeats, 45 seconds continuous runtime, 0 overflows
+Status LED0: Toggling ON/OFF at 1.0 Hz via Phase 14 driver APIs
+Outcome: Hardware Verified 100% PASS.

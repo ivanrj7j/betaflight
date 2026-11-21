@@ -115,6 +115,13 @@ aries_integration_unittest_SRC := \
 aries_integration_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
+aries_io_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
+aries_io_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src \
+		$(ROOT)/src/platform/ARIES/include
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \
