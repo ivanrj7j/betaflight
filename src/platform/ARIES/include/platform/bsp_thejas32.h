@@ -118,3 +118,6 @@ typedef struct {
 } thejas32_spi_reg_t;
 
 #define THEJAS32_SPI(n) (*((thejas32_spi_reg_t *)(((n) < 2 ? THEJAS32_SPI_0_1_BASE : THEJAS32_SPI_2_3_BASE) + (((n) % 2) * 0x100))))
+
+// Standard Betaflight SPI peripheral instance definition for Header J1 SPI0
+#define SPI1 ((thejas32_spi_reg_t *)THEJAS32_SPI_0_1_BASE)

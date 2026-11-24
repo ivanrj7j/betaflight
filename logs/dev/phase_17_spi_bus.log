@@ -1,0 +1,122 @@
+=== PHASE 17 HEADER J1 SPI0 POLLED MASTER & 12.5 MHZ CLAMPING LOG ===
+Timestamp: 2026-11-24T16:00:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz, 248 KB SRAM)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: make -C src/test CC=gcc CXX=g++ test_aries_spi_hw_unittest
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 24 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 24 tests from AriesSpiHwTest
+[ RUN      ] AriesSpiHwTest.Test_01_SPI_Initialization_BaseAddress_And_PinMatrix
+[       OK ] AriesSpiHwTest.Test_01_SPI_Initialization_BaseAddress_And_PinMatrix (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_02_SPI_Default_Status_Sanitization_On_Boot
+[       OK ] AriesSpiHwTest.Test_02_SPI_Default_Status_Sanitization_On_Boot (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_03_SPI_No_Interrupt_No_DMA_Complexity
+[       OK ] AriesSpiHwTest.Test_03_SPI_No_Interrupt_No_DMA_Complexity (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_04_SPI_ChipSelect_SoftwarePin_Isolation
+[       OK ] AriesSpiHwTest.Test_04_SPI_ChipSelect_SoftwarePin_Isolation (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_05_SPI_BaudDivisor_ShiftBy4_Encoding
+[       OK ] AriesSpiHwTest.Test_05_SPI_BaudDivisor_ShiftBy4_Encoding (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_06_SPI_ClockClamping_Strictly12_5MHz_ICM42688P_Protection
+[       OK ] AriesSpiHwTest.Test_06_SPI_ClockClamping_Strictly12_5MHz_ICM42688P_Protection (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_07_SPI_ClockModes_Mode0_And_Mode3_Bitfields
+[       OK ] AriesSpiHwTest.Test_07_SPI_ClockModes_Mode0_And_Mode3_Bitfields (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_08_SPI_Dynamic_Clock_And_Mode_Switching_NoPhantomEdges
+[       OK ] AriesSpiHwTest.Test_08_SPI_Dynamic_Clock_And_Mode_Switching_NoPhantomEdges (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_09_SPI_SingleByte_FullDuplex_PolledTransfer
+[       OK ] AriesSpiHwTest.Test_09_SPI_SingleByte_FullDuplex_PolledTransfer (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_10_SPI_Segmented_WriteOnly_NullRx_Buffer
+[       OK ] AriesSpiHwTest.Test_10_SPI_Segmented_WriteOnly_NullRx_Buffer (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_11_SPI_Segmented_ReadOnly_NullTx_Buffer
+[       OK ] AriesSpiHwTest.Test_11_SPI_Segmented_ReadOnly_NullTx_Buffer (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_12_SPI_Simultaneous_FullDuplex_Buffer_Alignment
+[       OK ] AriesSpiHwTest.Test_12_SPI_Simultaneous_FullDuplex_Buffer_Alignment (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_13_SPI_MultiSegment_Chaining_busSegment_t
+[       OK ] AriesSpiHwTest.Test_13_SPI_MultiSegment_Chaining_busSegment_t (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_14_SPI_14Byte_GyroBurst_TimingBudget
+[       OK ] AriesSpiHwTest.Test_14_SPI_14Byte_GyroBurst_TimingBudget (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_15_SPI_HighRate_1000_Iterations_Stress_NoStateLeakage
+[       OK ] AriesSpiHwTest.Test_15_SPI_HighRate_1000_Iterations_Stress_NoStateLeakage (14 ms)
+[ RUN      ] AriesSpiHwTest.Test_16_SPI_VariablePayload_Lengths_1_to_256_Bytes
+[       OK ] AriesSpiHwTest.Test_16_SPI_VariablePayload_Lengths_1_to_256_Bytes (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_17_SPI_ChipSelect_Setup_And_Hold_Timing
+[       OK ] AriesSpiHwTest.Test_17_SPI_ChipSelect_Setup_And_Hold_Timing (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_18_SPI_BusTimeout_AutoRecovery_On_MissingSlave
+[       OK ] AriesSpiHwTest.Test_18_SPI_BusTimeout_AutoRecovery_On_MissingSlave (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_19_SPI_SubsequentTransfer_Success_After_TimeoutRecovery
+[       OK ] AriesSpiHwTest.Test_19_SPI_SubsequentTransfer_Success_After_TimeoutRecovery (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_20_SPI_MidBurst_Timeout_Truncation_And_Recovery
+[       OK ] AriesSpiHwTest.Test_20_SPI_MidBurst_Timeout_Truncation_And_Recovery (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_21_SPI_BusErrorCounter_StrictMonotonicity
+[       OK ] AriesSpiHwTest.Test_21_SPI_BusErrorCounter_StrictMonotonicity (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_22_SPI_BusBusy_Lockout_NonBlocking_Interrogation
+[       OK ] AriesSpiHwTest.Test_22_SPI_BusBusy_Lockout_NonBlocking_Interrogation (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_23_SPI_Defensive_NullGuards_And_ZeroLength
+[       OK ] AriesSpiHwTest.Test_23_SPI_Defensive_NullGuards_And_ZeroLength (0 ms)
+[ RUN      ] AriesSpiHwTest.Test_24_SPI_MemoryFootprint_SRAMBudget
+[       OK ] AriesSpiHwTest.Test_24_SPI_MemoryFootprint_SRAMBudget (0 ms)
+[----------] 24 tests from AriesSpiHwTest (14 ms total)
+[----------] Global test environment tear-down
+[==========] 24 tests from 1 test suite ran. (14 ms total)
+[  PASSED  ] 24 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+1. aries_startup_unittest:       6/6 PASS
+2. aries_linker_unittest:        7/7 PASS
+3. aries_atomics_unittest:       7/7 PASS
+4. aries_system_time_unittest:   12/12 PASS
+5. aries_target_config_unittest: 6/6 PASS
+6. aries_mcu_excludes_unittest:  5/5 PASS
+7. aries_pg_bounds_unittest:     10/10 PASS
+8. aries_uart_hw_unittest:       16/16 PASS
+9. aries_uart_rx_unittest:       18/18 PASS
+10. aries_uart_tx_drain_unittest: 14/14 PASS
+11. aries_msp_handshake_unittest: 16/16 PASS
+12. aries_cli_entry_unittest:    17/17 PASS
+13. aries_integration_unittest:  14/14 PASS
+14. aries_io_unittest:           15/15 PASS
+15. aries_exti_unittest:         19/19 PASS
+16. aries_pwm_motor_unittest:    16/16 PASS
+17. aries_spi_hw_unittest:       24/24 PASS
+Cumulative Total:                222/222 PASS (100% pass rate)
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: 9b6a96a07917c1b0aebd1b6880956ada6d94c026eff7f3efc9bf766cf0c4f2a7
+Size:   32,976 bytes (.bin)
+Memory: text=32976, data=0, bss=17568, dec=50544 (49.4 KB in SRAM, 198.6 KB headroom)
+Entry:  0x00202000
+RVC:    0 compressed opcodes
+
+--- 10-POINT SILICON INVARIANT AUDIT ---
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (50544 / 253952 bytes, Headroom: 203408 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x0020c564 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 32976 bytes ready for XMODEM SRAM upload)
+Outcome: 10-Point Silicon Audit Passed Successfully.
+
+--- PHYSICAL SILICON HARDWARE BENCH TEST ---
+Log Source: tempfiles/phase 17.txt
+Result: PASS (All 19/19 Self-Tests Passed)
+Test 19 Verification:
+  - Header J1 SPI0 (0x10000600) initialized and bound to PA5-PA8 [OK]
+  - 12.5 MHz prescaler clamping verified (Divisor 1 on 25 MHz request) [OK]
+  - ICM-42688P 24 MHz max rating protected against overclocking [OK]
+  - Dedicated PA8 software Chip Select verified [OK]
+  - Mode 0 & Mode 3 phase/polarity switching verified [OK]
+  - 2-byte synchronous polled transfer executed with zero hangs [OK]
+Heartbeat & CLI Verification:
+  - 1.0 Hz live heartbeat running cleanly (#1 to #19, and #20 to #31)
+  - LED0 on PA22 toggling continuously
+  - Interactive CLI entered, executed 'version' & 'status', exited cleanly to heartbeat
+Outcome: Phase 17 Physical Silicon Bench Verification Confirmed 100% Successful.
+

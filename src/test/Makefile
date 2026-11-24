@@ -137,6 +137,13 @@ aries_pwm_motor_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src \
 		$(ROOT)/src/platform/ARIES/include
 
+aries_spi_hw_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
+aries_spi_hw_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src \
+		$(ROOT)/src/platform/ARIES/include
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \

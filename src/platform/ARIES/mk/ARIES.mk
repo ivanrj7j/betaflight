@@ -97,9 +97,10 @@ MCU_COMMON_SRC := \
     ARIES/exti_aries.c \
     ARIES/pwm_motor_aries.c \
     ARIES/stub_drivers.c \
-    drivers/serial_pinconfig.c
+    drivers/serial_pinconfig.c \
+    drivers/bus_spi_config.c \
+    ARIES/bus_spi_aries.c
     # Future Phase Drivers (uncomment as phases are implemented):
-    # ARIES/bus_spi_aries.c (Phase 17)
     # ARIES/config_flash_aries.c (Phase 18)
 
 # Surgical exclusion of unused upstream peripherals to fit within 248 KB SRAM budget

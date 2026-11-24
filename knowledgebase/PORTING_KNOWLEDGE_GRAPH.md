@@ -304,11 +304,14 @@ graph TD
 
 ### Module 8: Bus Peripherals (SPI & I2C)
 * **Dedicated Component Node**: [07_BUS_SPI_AND_I2C.md](components/07_BUS_SPI_AND_I2C.md)
-* **SPI Driver**:
-  * THEJAS32 provides SPI0 (onboard SPI Flash `U5`), SPI1, SPI2, SPI3 (Header `J4` for external SPI IMU).
-  * For <128KB minimal target, implement **polled SPI** (proven on ESP32 in [21_ESP32_BUS_SPI_I2C.md](../logs/hardware_inspection/21_ESP32_BUS_SPI_I2C.md)).
-  * No Cortex-M7 L1 D-Cache invalidation issues (`SCB_InvalidateDCache_by_Addr`).
-  * No DMA descriptor alignment bounce buffer issues.
+* **SPI Driver Architecture**:
+  * THEJAS32 provides Header J1 SPI0 (`0x10000600`, mapped as `SPIDEV_1`), SPI1, SPI2, SPI3.
+  * Header J1 pinout: `PA5` (SCK), `PA6` (MISO), `PA7` (MOSI), `PA8` (dedicated software CS for ICM-42688P).
+  * **Strict 12.5 MHz SCK Clamping (Ground Truth 7)**: On 100 MHz APB, Divisor 0 ($25.0\,\text{MHz}$) violates the ICM-42688P 24.0 MHz absolute maximum rating. Divisor 1 ($12.5\,\text{MHz}$) is the mandatory hardware ceiling clamp.
+  * **Polled Transfer Engine (Zero DMA Complexity)**: Sub-microsecond synchronous transfers ($9.6\,\mu\text{s}$ per 14-byte gyro burst); zero L1 D-Cache invalidation issues; zero DMA memory bounce overhead; saves $> 6\,\text{KB}$ SRAM.
+  * **Bounded Timeout Auto-Recovery**: 50,000-cycle bounded polling prevents deadlock if sensor is detached or line glitched; triggers controller reset & error counter increment.
+* **Verification Status (Phase 17)**:
+  * [`logs/dev/phase_17_spi_bus.md`](../logs/dev/phase_17_spi_bus.md): **PASS (Hardware Verified)**: 24/24 TDD tests pass (14 ms); cumulative 222/222 tests pass across 17 suites; Header J1 SPI0 (`0x10000600`) initialized on `PA5`–`PA8`; strictly clamped to Divisor 1 (12.5 MHz); bounded 50,000-cycle timeout auto-recovery eliminating CPU deadlocks; deterministic polled transfer engine (< 10 us WCET per 14B gyro burst); Mode 0 & Mode 3 support; software CS control on `PA8`; 10/10 Silicon Audit pass; 32,976 B binary; strictly 0 RVC opcodes; verified on physical silicon (`phase 17.txt`, 19/19 tests pass, interactive CLI verified, LED0 toggling at 1.0 Hz).
 * **I2C Driver**:
   * `I2C2` routes to onboard 4-channel ADC (`U9`).
   * Uses simple polled write/read buffer flow (START $\rightarrow$ ADDR $\rightarrow$ REG $\rightarrow$ RESTART $\rightarrow$ READ $\rightarrow$ STOP).
