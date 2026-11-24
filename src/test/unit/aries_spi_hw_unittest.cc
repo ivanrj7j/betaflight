@@ -249,7 +249,7 @@ void test_spiResetController(void)
 
 uint8_t test_spiTransferByte(uint8_t out)
 {
-    uint32_t timeout = 50000;
+    uint32_t timeout = 1000;
 
     // 1. Wait until TX register is empty
     while ((mock_spi0_hw.Status & THEJAS32_SPI_STAT_BUSY) && --timeout);

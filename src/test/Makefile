@@ -144,6 +144,18 @@ aries_spi_hw_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src \
 		$(ROOT)/src/platform/ARIES/include
 
+aries_icm42688p_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c \
+		$(USER_DIR)/drivers/accgyro/accgyro_spi_icm426xx.c
+
+aries_icm42688p_unittest_DEFINES := \
+		USE_GYRO_SPI_ICM42688P= \
+		USE_ACC_SPI_ICM42688P=
+
+aries_icm42688p_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src \
+		$(ROOT)/src/platform/ARIES/include
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \

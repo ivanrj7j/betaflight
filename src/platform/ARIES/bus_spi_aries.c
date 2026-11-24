@@ -45,7 +45,7 @@
 #define THEJAS32_SPI_BAUD_DIV_32      3 // 3.125 MHz (Slow Safe Boot / JEDEC ID)
 #define THEJAS32_SPI_BAUD_DIV_64      4 // 1.5625 MHz
 
-#define THEJAS32_SPI_TIMEOUT_CYCLES   50000
+#define THEJAS32_SPI_TIMEOUT_CYCLES   1000
 
 const spiHardware_t spiHardware[SPIDEV_COUNT] = {
     {
@@ -65,6 +65,16 @@ static inline thejas32_spi_reg_t *thejas32_spi_get_hw(const spiResource_t *insta
     return (thejas32_spi_reg_t *)instance;
 }
 
+static inline spiDevice_e thejas32_spi_device_from_hw(const thejas32_spi_reg_t *hw)
+{
+    for (size_t i = 0; i < ARRAYLEN(spiHardware); i++) {
+        if ((thejas32_spi_reg_t *)spiHardware[i].reg == hw) {
+            return spiHardware[i].device;
+        }
+    }
+    return SPIDEV_1;
+}
+
 static void thejas32_spi_reset_controller(thejas32_spi_reg_t *hw)
 {
     // C-DAC VEGA SDK Reset & Drain Protocol
@@ -81,7 +91,10 @@ static void thejas32_spi_reset_controller(thejas32_spi_reg_t *hw)
     dummy = hw->RxData;
     (void)dummy;
 
-    spiDevice[SPIDEV_1].errorCount++;
+    spiDevice_e dev = thejas32_spi_device_from_hw(hw);
+    if (dev < SPIDEV_COUNT) {
+        spiDevice[dev].errorCount++;
+    }
 }
 
 void spiPinConfigure(const struct spiPinConfig_s *pConfig)
@@ -212,13 +225,14 @@ bool spiInternalReadWriteBufPolled(spiResource_t *instance, const uint8_t *txDat
     }
 
     thejas32_spi_reg_t *hw = thejas32_spi_get_hw(instance);
-    uint32_t start_errors = spiDevice[SPIDEV_1].errorCount;
+    spiDevice_e dev = thejas32_spi_device_from_hw(hw);
+    uint32_t start_errors = (dev < SPIDEV_COUNT) ? spiDevice[dev].errorCount : 0;
 
     for (int i = 0; i < len; i++) {
         uint8_t bOut = txData ? txData[i] : 0xFF; // Send 0xFF dummy byte when reading
         uint8_t bIn = thejas32_spi_transfer_byte(hw, bOut);
 
-        if (spiDevice[SPIDEV_1].errorCount > start_errors) {
+        if (dev < SPIDEV_COUNT && spiDevice[dev].errorCount > start_errors) {
             // Hardware timeout / error occurred during transfer
             return false;
         }

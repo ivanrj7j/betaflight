@@ -310,8 +310,9 @@ graph TD
   * **Strict 12.5 MHz SCK Clamping (Ground Truth 7)**: On 100 MHz APB, Divisor 0 ($25.0\,\text{MHz}$) violates the ICM-42688P 24.0 MHz absolute maximum rating. Divisor 1 ($12.5\,\text{MHz}$) is the mandatory hardware ceiling clamp.
   * **Polled Transfer Engine (Zero DMA Complexity)**: Sub-microsecond synchronous transfers ($9.6\,\mu\text{s}$ per 14-byte gyro burst); zero L1 D-Cache invalidation issues; zero DMA memory bounce overhead; saves $> 6\,\text{KB}$ SRAM.
   * **Bounded Timeout Auto-Recovery**: 50,000-cycle bounded polling prevents deadlock if sensor is detached or line glitched; triggers controller reset & error counter increment.
-* **Verification Status (Phase 17)**:
+* **Verification Status (Phase 17 & 18)**:
   * [`logs/dev/phase_17_spi_bus.md`](../logs/dev/phase_17_spi_bus.md): **PASS (Hardware Verified)**: 24/24 TDD tests pass (14 ms); cumulative 222/222 tests pass across 17 suites; Header J1 SPI0 (`0x10000600`) initialized on `PA5`–`PA8`; strictly clamped to Divisor 1 (12.5 MHz); bounded 50,000-cycle timeout auto-recovery eliminating CPU deadlocks; deterministic polled transfer engine (< 10 us WCET per 14B gyro burst); Mode 0 & Mode 3 support; software CS control on `PA8`; 10/10 Silicon Audit pass; 32,976 B binary; strictly 0 RVC opcodes; verified on physical silicon (`phase 17.txt`, 19/19 tests pass, interactive CLI verified, LED0 toggling at 1.0 Hz).
+  * [`logs/dev/phase_18_icm42688p_imu.md`](../logs/dev/phase_18_icm42688p_imu.md): **PASS (Hardware Verified)**: 22/22 TDD tests pass (3 ms); cumulative 244/244 tests pass across 18 suites; Header J1 SPI0 (`0x10000600`) at 12.5 MHz SCK; `WHO_AM_I` (`0x75 == 0x47`) probing with unattached fallback; 1.0 kHz ODR clamping (`DEFAULT_PID_PROCESS_DENOM 8`); Low-Noise mode (`0x0F`); Anti-Alias Filter (258 Hz cutoff) & low-latency UI filter; PA0 EXTI DRDY interrupt routing; deterministic 14-byte contiguous polled telemetry burst (`0x1D`..`0x2A`, Temp 2B + Accel 6B + Gyro 6B); orientation alignment matrix; 10/10 Silicon Audit pass; 35,608 B binary; strictly 0 RVC opcodes; verified on physical silicon (`phase 18.txt`, 20/20 tests pass, 14-byte telemetry burst in 18 us, unattached fallback graceful, interactive CLI verified, LED0 toggling at 1.0 Hz).
 * **I2C Driver**:
   * `I2C2` routes to onboard 4-channel ADC (`U9`).
   * Uses simple polled write/read buffer flow (START $\rightarrow$ ADDR $\rightarrow$ REG $\rightarrow$ RESTART $\rightarrow$ READ $\rightarrow$ STOP).
@@ -426,6 +427,7 @@ graph LR
         E13["13_Makefiles (Multilib RVC & MCU_EXCLUDES)"]
         E14["14_Target_Config (1kHz Clamping & 8KB EEPROM)"]
         E15["15_Core_Diffs (CLI Enter & Repository Isolation)"]
+        E16["16_IMU_ICM42688P (14B Burst & 1kHz ODR)"]
     end
 
     subgraph PortingPlan ["Target Architecture: ARIES v3.0 (THEJAS32)"]
@@ -441,11 +443,12 @@ graph LR
         M10["Module 10: <128KB Minimal Modular Stripping"]
     end
 
-    subgraph AuditNodes ["Code Audit & Technical Debt Nodes (01 - 04)"]
+    subgraph AuditNodes ["Code Audit & Technical Debt Nodes (01 - 05)"]
         A01["01_Active_Rebuild_Audit (11 Findings Resolved)"]
         A02["02_Working_Tree_Review (10 Debts Managed)"]
         A03["03_Whole_Repo_Audit (8 Findings Hardened)"]
         A04["04_Phases_14_to_16_Audit (13 Debts Cataloged)"]
+        A05["05_Phases_17_to_18_Audit (4 Findings Remediated)"]
     end
 
     L01 & L17 & R04 & E05 --> M3
@@ -453,7 +456,7 @@ graph LR
     L05 & L06 & L07 & L15 & L18 & R01 & R02 & R06 & E06 & E15 --> M4
     L08 & L19 & E07 --> M5
     L09 & L22 & R02 & E11 --> M7
-    L10 & L21 & R02 & E09 --> M8
+    L10 & L21 & R02 & E09 & E16 --> M8
     L11 & L23 & E12 --> M9
     L12 & L13 & L25 & R02 & R10 & E02 & E13 --> M1
     L14 & L16 & L13 & L25 & R02 & R07 & E10 & E14 --> M10
@@ -461,6 +464,7 @@ graph LR
     L08 & L24 & E08 --> M6
     A01 & A02 & A03 --> M4
     A04 --> M6 & M7
+    A05 --> M5 & M7 & M8
 ```
 
 ---
@@ -486,10 +490,12 @@ The following matrix synthesizes the line-by-line technical audits conducted on 
 | **[E13](codebase_evaluations/13_EVAL_MAKEFILES_ARIES_MK_TARGET_MK.md)** | `ARIES.mk`, `target.mk` | 5 Scored | Hardcoded host toolchain path `/home/ivan/...` breaks cross-platform builds; unpruned 850 KB image overflows SRAM. | Dynamic toolchain resolution; directory-level `MCU_EXCLUDES` pruning > 250 KB bloat; `LD_SCRIPT` binding. | **Multilib RVC override & MCU pruning:** Pure RV32IM multilibs + pruned tree enforces $\le 248\text{ KB}$ SRAM budget. |
 | **[E14](codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md)** | `target.h`, `config.h` | 5 Scored | Reducing `EEPROM_SIZE` from 8192 to 4096 triggers boot panic because Betaflight PGs exceed 4.8 KB. | Static compile-time assertion guarding `EEPROM_SIZE >= 8192` and `DEFAULT_PID_PROCESS_DENOM >= 8`. | Locked 1.0 kHz flight loop (`DEFAULT_PID_PROCESS_DENOM 8`) leaves $> 65\%$ CPU headroom; 12-pin matrix zero collisions. |
 | **[E15](codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)** | `src/main/` | 5 Scored | Injected `#ifdef THEJAS32` and `THEJAS_LOG` debug strings directly into 9 core files, violating platform isolation. | Encapsulate target diagnostics in weak platform hooks; gate logs behind `#if defined(THEJAS32_DEBUG_LOG)`. | **Instant CLI activation:** Pressing Enter (`\r`) or `#` eliminates the 100ms guard-time barrier for serial monitors. |
+| **[E16](codebase_evaluations/16_EVAL_ACCGYRO_SPI_ICM42688P.md)** | `accgyro_spi_icm42688p.c`, `bootstrap_diag.c` | 9 Scored | Overclocking sensor to 25 MHz on APB bus; infinite hangs on unattached slave; silkscreen orientation assumptions. | Clamp SPI0 to 12.5 MHz (Divisor 1); add bounded timeout recovery with unattached fallback; runtime orientation matrix. | **Contiguous 14-byte burst read pipeline:** Reads Temp, Accel, and Gyro in $18\,\mu\text{s}$ total on silicon ($< 1.8\%$ loop CPU); zero DMA descriptors; hardware AAF 258 Hz filter; verified on silicon (`phase 18.txt`). |
 | **[A01](code_audit/01_ACTIVE_REBUILD_BRANCH_AUDIT.md)** | `src/platform/ARIES/` | 8 Scored | Background transmit hook `thejas32_uart_poll_tx` uncalled; mutable VTable in `.bss`; 921.6k baud clock divisor error (3.12%). | Call `thejas32_uart_poll_tx` from serial task; move VTable to `const` in `.rodata`; clamp logging baud rates. | **Quality Audit Complete**: All 11 findings resolved (pins, 32-bit memory copy, CTZ, parity, VTable in `.rodata`, poll hook, baud docs, Makefile fallback); 72/72 tests passing. |
 | **[A02](code_audit/02_WORKING_TREE_REVIEW_AND_TECHNICAL_DEBT.md)** | Working Tree Integration & Debt Ledger | 7 Scored | Non-atomic `uartIrqHandler` call in generic `serial_uart.c` races with hardware ISR; unneeded `IIR` read in polled reception. | Wrap in `ATOMIC_BLOCK`; actively clamp 921.6k baud; map `persistentObjects` to `.noinit` section. | **All 7 Findings & 3 Rot-Risk Debts Resolved**: Wrapped `uartIrqHandler` in `ATOMIC_BLOCK(NVIC_PRIO_MAX)`; purged redundant `IIR` read; clamped baud rates $> 460.8\text{k}$ to $420\text{k}$; mapped `persistentObjects` to `.noinit` (NOLOAD); unified `__ctzsi2` in `system.c`; 10/10 debts managed; 138/138 tests pass across 13 suites. |
 | **[A03](code_audit/03_WHOLE_REPO_SENIOR_DEV_AUDIT.md)** | Whole-Repository Quality Audit & Architecture Hardening | 7 Scored | Hardcoded 8N1 in `serial_uart_aries.c` ignores `options` parameter; unhandled IRQs in `handle_trap` risk infinite trap storms. | Dynamically configure LCR parity/stop bits; mask unhandled IRQs with `INTR_EN &= ~(1UL << i)`; add 1000ms CLI exit cooldown. | **Senior Developer Audit Complete**: 8 actionable findings cataloged; single-heartbeat bounce resolved on hardware (`phase13.5.txt`); 139/139 unit tests pass across 13 suites. |
 | **[A04](code_audit/04_PHASES_14_TO_16_AUDIT_AND_DEBT.md)** | Actuator Control, EXTI & Atomic GPIO (Phases 14–16) | 7 Scored | Missing MMIO memory fence in Timer 1 register reload (`TD-13`); Bank-wide EXTI ISR loops all active pins (`TD-12`); direct `#ifdef THEJAS32` hook in upstream `serial_uart.c`. | Insert `__asm__ volatile ("fence" : : : "memory")` after `LoadCount`; enforce 1 active pin limit on Bank 0; extract weak platform hook `uartPlatformPollRx()`. | **Ascending Deadline Soft-PWM Innovation**: Non-blocking Timer 1 IRQ 8 event scheduling (< 3.0 µs CPU overhead, > 99.7% idle headroom); single-instruction address-decoded atomic GPIO stores (< 10 ns); single-cycle $O(1)$ `__builtin_ctz` EXTI dispatch; safe non-null `motorVTable_t` passthrough; 192/192 tests pass across 16 suites. |
+| **[A05](code_audit/05_PHASES_17_TO_18_AUDIT_AND_DEBT.md)** | Actuator Control, Direction RMW, Timer 1 Latch, SPI Timeout & Error Isolation (Phases 17–18) | 8 Scored | Direction register RMW race condition in `io_aries.c`; missing Timer 1 EOI clear causing 0 µs pulse termination; 50,000-cycle SPI timeout overrunning loop; hardcoded `SPIDEV_1` error count. | Wrap open-drain direction register in `thejas32_atomic_enter/exit`; clear EOI latch in `ariesPwmMotorUpdateComplete`; clamp SPI timeout to 1,000 cycles (10 µs); isolate error counts via `thejas32_spi_device_from_hw(hw)`. | **Cross-Module Integration Hardened**: Real-time bounded timeout (< 140 µs worst-case 14B burst failure, < 14% loop budget); race-free open-drain direction toggling; 0-dropout motor PWM; 248/248 unit and integration tests pass across 18 suites. |
 
 ---
 

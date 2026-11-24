@@ -71,6 +71,7 @@ void IOConfigGPIO(IO_t io, ioConfig_t cfg)
     volatile uint16_t *dir = (volatile uint16_t *)(base + 0x40000);
 
     uint8_t mode = cfg & 0x03;
+    uint32_t prev = thejas32_atomic_enter();
     if (mode == THEJAS32_GPIO_MODE_OUTPUT_OD) {
         // Track open-drain emulation bitmask
         open_drain_mask |= (1UL << pin);
@@ -83,6 +84,7 @@ void IOConfigGPIO(IO_t io, ioConfig_t cfg)
         open_drain_mask &= ~(1UL << pin);
         *dir &= ~(1U << pin_in_bank); // 0 = Input
     }
+    thejas32_atomic_exit(prev);
 
     __asm__ __volatile__("fence" ::: "memory");
 }
@@ -105,7 +107,9 @@ FAST_CODE void IOHi(IO_t io)
         // Open-Drain HIGH: Release the line (Direction = Input / High-Z)
         // External pull-up resistor pulls the bus up to 3.3V without contention
         volatile uint16_t *dir = (volatile uint16_t *)(base + 0x40000);
+        uint32_t prev = thejas32_atomic_enter();
         *dir &= ~(1U << pin_in_bank);
+        thejas32_atomic_exit(prev);
     } else {
         // Push-Pull HIGH: Single-instruction atomic address-decoded store
         volatile uint16_t *reg = (volatile uint16_t *)(base + ((1U << pin_in_bank) << 2));
@@ -132,9 +136,11 @@ FAST_CODE void IOLo(IO_t io)
     if (open_drain_mask & (1UL << pin)) {
         // Open-Drain LOW: Actively drive down (Direction = Output, Data = 0)
         volatile uint16_t *dir = (volatile uint16_t *)(base + 0x40000);
-        *dir |= (1U << pin_in_bank);
         volatile uint16_t *reg = (volatile uint16_t *)(base + ((1U << pin_in_bank) << 2));
+        uint32_t prev = thejas32_atomic_enter();
+        *dir |= (1U << pin_in_bank);
         *reg = 0;
+        thejas32_atomic_exit(prev);
     } else {
         // Push-Pull LOW: Single-instruction atomic address-decoded store
         volatile uint16_t *reg = (volatile uint16_t *)(base + ((1U << pin_in_bank) << 2));

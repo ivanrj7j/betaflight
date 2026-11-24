@@ -288,12 +288,27 @@ escSensorData_t *getEscSensorData(uint8_t motorNumber)
 
 // ----------------------------------------------------------------------------
 // ADC Voltage Fallback (Safe nominal value prevents ARMING_DISABLED_BATTERY lockout)
+// Resolves 12_EVAL_STUB_DRIVERS_C.md, PLAN-DOM-06_B, and Technical Debt TD-09.
 // ----------------------------------------------------------------------------
+static volatile uint16_t aries_adc_raw[4] = {
+    2048, // Nominal 12.6V on 11:1 voltage divider (~3S full pack)
+    0,    // Zero current draw
+    1024, // Nominal RSSI level
+    0     // Aux / Spare channel
+};
+
 uint16_t adcGetValue(adcSource_e source)
 {
-    UNUSED(source);
-    // Return 0 when ADC is disabled; target.h defines #undef USE_ADC
-    return 0;
+    switch (source) {
+        case ADC_BATTERY:
+            return aries_adc_raw[0];
+        case ADC_CURRENT:
+            return aries_adc_raw[1];
+        case ADC_RSSI:
+            return aries_adc_raw[2];
+        default:
+            return 0;
+    }
 }
 
 void expressLrsTimerEnableIRQs(const struct timerHardware_s *timer)

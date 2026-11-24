@@ -154,6 +154,8 @@ static void ariesPwmMotorDisable(void)
     aries_subsystem_enabled = false;
     // Preemptively disable Timer 1
     THEJAS32_TIMER(1).Control = 0;
+    volatile uint32_t clear_latch = THEJAS32_TIMER(1).EOI;
+    (void)clear_latch;
     __asm__ volatile ("fence" : : : "memory");
     thejas32_interrupt_disable(THEJAS32_IRQ_TIMER1);
 
@@ -200,6 +202,8 @@ static void ariesPwmMotorUpdateComplete(void)
 
     // STEP 1: Preemptive Timer 1 disable to prevent race conditions
     THEJAS32_TIMER(1).Control = 0;
+    volatile uint32_t clear_latch = THEJAS32_TIMER(1).EOI;
+    (void)clear_latch;
     __asm__ volatile ("fence" : : : "memory");
 
     // STEP 2: Ascending deadline sorting (Insertion sort for N=4, < 30 cycles)
@@ -329,6 +333,8 @@ bool motorPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorDevConf
     // Initialize Timer 1 registers
     THEJAS32_TIMER(1).Control = 0;
     THEJAS32_TIMER(1).LoadCount = 0;
+    volatile uint32_t clear_latch = THEJAS32_TIMER(1).EOI;
+    (void)clear_latch;
     __asm__ volatile ("fence" : : : "memory");
 
     // Register Timer 1 interrupt service routine
