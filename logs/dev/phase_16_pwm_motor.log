@@ -1,0 +1,88 @@
+=== PHASE 16 HARDWARE TIMER 1 ASCENDING DEADLINE SOFT-PWM & MOTOR VTABLE LOG ===
+Timestamp: 2026-11-21T13:02:00+05:30
+Active Branch: rebuild
+Target: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz, 248 KB SRAM)
+
+--- HOST UNIT TEST EXECUTION ---
+Command: make -C src/test CC=gcc CXX=g++ test_aries_pwm_motor_unittest
+Running main() from ../../lib/test/gtest/src/gtest_main.cc
+[==========] Running 16 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 16 tests from AriesPwmMotorTest
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Timer1_Registration_And_PeripheralBase
+[       OK ] AriesPwmMotorTest.Test_PWM_Timer1_Registration_And_PeripheralBase (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Motor_Pin_Matrix_Allocation
+[       OK ] AriesPwmMotorTest.Test_PWM_Motor_Pin_Matrix_Allocation (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Ascending_Deadline_Sort_ArbitraryOrder
+[       OK ] AriesPwmMotorTest.Test_PWM_Ascending_Deadline_Sort_ArbitraryOrder (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Ascending_Deadline_Sort_EqualValues
+[       OK ] AriesPwmMotorTest.Test_PWM_Ascending_Deadline_Sort_EqualValues (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Simultaneous_Pin_Raise_At_T0
+[       OK ] AriesPwmMotorTest.Test_PWM_Simultaneous_Pin_Raise_At_T0 (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Sequential_Falling_Edges_On_Timer1_IRQs
+[       OK ] AriesPwmMotorTest.Test_PWM_Sequential_Falling_Edges_On_Timer1_IRQs (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_100_Cycle_Grouping_Threshold
+[       OK ] AriesPwmMotorTest.Test_PWM_100_Cycle_Grouping_Threshold (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Preemptive_Timer_Disable_Prevents_Race
+[       OK ] AriesPwmMotorTest.Test_PWM_Preemptive_Timer_Disable_Prevents_Race (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Hardware_EOI_Clearing_On_Every_ISR
+[       OK ] AriesPwmMotorTest.Test_PWM_Hardware_EOI_Clearing_On_Every_ISR (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_AllMotors_Complete_Disables_Timer1_And_IRQ
+[       OK ] AriesPwmMotorTest.Test_PWM_AllMotors_Complete_Disables_Timer1_And_IRQ (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_MotorVTable_NonNull_Pointers
+[       OK ] AriesPwmMotorTest.Test_PWM_MotorVTable_NonNull_Pointers (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Convert_External_To_Motor_Passthrough
+[       OK ] AriesPwmMotorTest.Test_PWM_Convert_External_To_Motor_Passthrough (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Safety_Clamping_MinMax_Bounds
+[       OK ] AriesPwmMotorTest.Test_PWM_Safety_Clamping_MinMax_Bounds (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Disarm_Idle_DutyCycle
+[       OK ] AriesPwmMotorTest.Test_PWM_Disarm_Idle_DutyCycle (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_CPU_Overhead_Budget_Under_3_Microseconds
+[       OK ] AriesPwmMotorTest.Test_PWM_CPU_Overhead_Budget_Under_3_Microseconds (0 ms)
+[ RUN      ] AriesPwmMotorTest.Test_PWM_Defensive_Null_And_Index_Guards
+[       OK ] AriesPwmMotorTest.Test_PWM_Defensive_Null_And_Index_Guards (0 ms)
+[----------] 16 tests from AriesPwmMotorTest (3 ms total)
+[----------] Global test environment tear-down
+[==========] 16 tests from 1 test suite ran. (3 ms total)
+[  PASSED  ] 16 tests.
+
+--- CUMULATIVE SUITE SUMMARY ---
+1. aries_startup_unittest:       6/6 PASS
+2. aries_linker_unittest:        7/7 PASS
+3. aries_atomics_unittest:       7/7 PASS
+4. aries_system_time_unittest:   12/12 PASS
+5. aries_target_config_unittest: 6/6 PASS
+6. aries_mcu_excludes_unittest:  5/5 PASS
+7. aries_pg_bounds_unittest:     10/10 PASS
+8. aries_uart_hw_unittest:       16/16 PASS
+9. aries_uart_rx_unittest:       18/18 PASS
+10. aries_uart_tx_drain_unittest: 14/14 PASS
+11. aries_msp_handshake_unittest: 16/16 PASS
+12. aries_cli_entry_unittest:    17/17 PASS
+13. aries_integration_unittest:  12/12 PASS
+14. aries_io_unittest:           15/15 PASS
+15. aries_exti_unittest:         15/15 PASS
+16. aries_pwm_motor_unittest:    16/16 PASS
+Cumulative Total:                192/192 PASS (100% pass rate)
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: 299e6bf884ce0b25fc4c5c5db19295f61049c3ed5dbe821104167048d606cae2
+Size:   29,184 bytes (.bin)
+Memory: text=29184, data=0, bss=17440, dec=46624 (45.5 KB in SRAM, 207.3 KB headroom)
+Entry:  0x00202000
+RVC:    0 compressed opcodes
+
+--- 10-POINT SILICON INVARIANT AUDIT ---
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (46624 / 253952 bytes, Headroom: 207328 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x0020b620 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 29184 bytes ready for XMODEM SRAM upload)
+Outcome: 10-Point Silicon Audit Passed Successfully.

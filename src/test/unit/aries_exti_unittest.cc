@@ -181,15 +181,7 @@ void test_EXTIConfig(IO_t io, extiCallbackRec_t *cb, int irqPriority, ioConfig_t
 
     test_extiChannels[pin].handler = cb;
     test_extiChannels[pin].trigger = (uint8_t)trigger;
-    test_extiChannels[pin].enabled = true;
-
-    if (pin < 16) {
-        test_bank0_active_mask |= (1U << pin);
-        mock_interrupt_enable(THEJAS32_IRQ_GPIO0);
-    } else {
-        test_bank1_active_mask |= (1U << (pin - 16));
-        mock_interrupt_enable(THEJAS32_IRQ_GPIO1);
-    }
+    test_extiChannels[pin].enabled = false; // Config sets parameters; dormant until EXTIEnable
 }
 
 void test_EXTIEnable(IO_t io)
@@ -306,12 +298,18 @@ TEST_F(AriesExtiTest, Test_EXTI_Config_Bank0_PA0_GyroDRDY_PinBinding)
     extiCallbackRec_t cb;
     test_EXTIHandlerInit(&cb, test_callback_recorder);
 
-    // Act
-    test_EXTIConfig(pa0, &cb, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    // Act: EXTIConfig sets parameters but leaves hardware interrupt masked
+    test_EXTIConfig(pa0, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
 
-    // Assert: Pin 0 must be active in Bank 0 mask, IRQ 10 unmasked in controller
+    // Assert: Channel parameters recorded, but dormant until EXTIEnable
     EXPECT_EQ(test_extiChannels[0].handler, &cb);
     EXPECT_EQ(test_extiChannels[0].trigger, (uint8_t)BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXPECT_FALSE(test_extiChannels[0].enabled);
+    EXPECT_EQ(test_bank0_active_mask, 0x0000U);
+    EXPECT_FALSE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0));
+
+    // Act: EXTIEnable unmasks IRQ 10 and activates channel in mask
+    test_EXTIEnable(pa0);
     EXPECT_TRUE(test_extiChannels[0].enabled);
     EXPECT_EQ(test_bank0_active_mask, 0x0001U);
     EXPECT_TRUE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0));
@@ -325,12 +323,18 @@ TEST_F(AriesExtiTest, Test_EXTI_Config_Bank1_PA22_PinBinding)
     extiCallbackRec_t cb;
     test_EXTIHandlerInit(&cb, test_callback_recorder);
 
-    // Act
-    test_EXTIConfig(pa22, &cb, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_FALLING);
+    // Act: EXTIConfig sets parameters but leaves hardware interrupt masked
+    test_EXTIConfig(pa22, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_FALLING);
 
-    // Assert: Pin 22 mapped to bit 6 in Bank 1 mask; IRQ 11 unmasked
+    // Assert: Dormant until EXTIEnable
     EXPECT_EQ(test_extiChannels[22].handler, &cb);
     EXPECT_EQ(test_extiChannels[22].trigger, (uint8_t)BETAFLIGHT_EXTI_TRIGGER_FALLING);
+    EXPECT_FALSE(test_extiChannels[22].enabled);
+    EXPECT_EQ(test_bank1_active_mask, 0x0000U);
+    EXPECT_FALSE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO1));
+
+    // Act: EXTIEnable unmasks IRQ 11
+    test_EXTIEnable(pa22);
     EXPECT_TRUE(test_extiChannels[22].enabled);
     EXPECT_EQ(test_bank1_active_mask, (1U << 6));
     EXPECT_TRUE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO1));
@@ -346,7 +350,8 @@ TEST_F(AriesExtiTest, Test_EXTI_FastPath_CTZ_SingleChannel_GyroDRDY_ZeroOverhead
         UNUSED(rec);
         callback_invocation_log.push_back(0);
     };
-    test_EXTIConfig(pa0, &cb, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(pa0, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIEnable(pa0);
 
     // Act: Simulate hardware IRQ 10 firing on 1.0 kHz Gyro DRDY edge
     sim_gpio0_isr();
@@ -368,9 +373,13 @@ TEST_F(AriesExtiTest, Test_EXTI_FastPath_CTZ_MultipleChannels_ArbitraryDispatch)
     cb4.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(4); };
     cb15.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(15); };
 
-    test_EXTIConfig(p0, &cb0, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
-    test_EXTIConfig(p4, &cb4, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
-    test_EXTIConfig(p15, &cb15, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p0, &cb0, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p4, &cb4, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p15, &cb15, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+
+    test_EXTIEnable(p0);
+    test_EXTIEnable(p4);
+    test_EXTIEnable(p15);
 
     EXPECT_EQ(test_bank0_active_mask, (1U << 0) | (1U << 4) | (1U << 15));
 
@@ -394,8 +403,11 @@ TEST_F(AriesExtiTest, Test_EXTI_FastPath_Bank1_CTZ_PinOffset_Calculation)
     cb16.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(16); };
     cb22.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(22); };
 
-    test_EXTIConfig(p16, &cb16, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_FALLING);
-    test_EXTIConfig(p22, &cb22, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_FALLING);
+    test_EXTIConfig(p16, &cb16, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_FALLING);
+    test_EXTIConfig(p22, &cb22, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_FALLING);
+
+    test_EXTIEnable(p16);
+    test_EXTIEnable(p22);
 
     // Act: Fire Bank 1 ISR
     sim_gpio1_isr();
@@ -412,17 +424,22 @@ TEST_F(AriesExtiTest, Test_EXTI_Enable_Disable_ActiveMask_Transitions)
     IO_t pa0 = mock_get_ioRec(0);
     extiCallbackRec_t cb;
     cb.fn = [](extiCallbackRec_t *) {};
-    test_EXTIConfig(pa0, &cb, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
-    EXPECT_EQ(test_bank0_active_mask, 0x0001U);
+    test_EXTIConfig(pa0, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXPECT_EQ(test_bank0_active_mask, 0x0000U);
 
-    // Act: Disable channel
+    // Act 1: Enable channel
+    test_EXTIEnable(pa0);
+    EXPECT_EQ(test_bank0_active_mask, 0x0001U);
+    EXPECT_TRUE(test_extiChannels[0].enabled);
+
+    // Act 2: Disable channel
     test_EXTIDisable(pa0);
 
     // Assert: Mask cleared, channel marked disabled
     EXPECT_EQ(test_bank0_active_mask, 0x0000U);
     EXPECT_FALSE(test_extiChannels[0].enabled);
 
-    // Act: Re-enable channel
+    // Act 3: Re-enable channel
     test_EXTIEnable(pa0);
 
     // Assert: Mask re-asserted, channel marked enabled
@@ -438,8 +455,12 @@ TEST_F(AriesExtiTest, Test_EXTI_Disable_AllChannels_DisablesControllerIRQ)
     extiCallbackRec_t cb;
     cb.fn = [](extiCallbackRec_t *) {};
 
-    test_EXTIConfig(p0, &cb, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
-    test_EXTIConfig(p1, &cb, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p0, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p1, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXPECT_FALSE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0));
+
+    test_EXTIEnable(p0);
+    test_EXTIEnable(p1);
     EXPECT_TRUE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0));
 
     // Act 1: Disable first pin
@@ -459,7 +480,9 @@ TEST_F(AriesExtiTest, Test_EXTI_Release_ClearsHandlerAndDisables)
     IO_t pa5 = mock_get_ioRec(5);
     extiCallbackRec_t cb;
     cb.fn = [](extiCallbackRec_t *) {};
-    test_EXTIConfig(pa5, &cb, 0, IOCFG_IN_FLOATING, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(pa5, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIEnable(pa5);
+    EXPECT_TRUE(test_extiChannels[5].enabled);
 
     // Act
     test_EXTIRelease(pa5);
@@ -544,4 +567,133 @@ TEST_F(AriesExtiTest, Test_EXTI_Line_Macro_Bitmask)
         IO_t io = mock_get_ioRec(pin);
         EXPECT_EQ(test_IO_EXTI_Line(io), (1U << pin));
     }
+}
+
+// -----------------------------------------------------------------------------
+// Regression & Hardware-Trap Resilience Unit Tests (Post Phase 16 Silicon Fixes)
+// -----------------------------------------------------------------------------
+
+TEST_F(AriesExtiTest, Test_EXTI_Config_Dormant_DoesNotEnableInterruptOrActiveMask)
+{
+    // Rationale: EXTIConfig sets handler pointers and triggers, but MUST NOT
+    // enable the channel in active bitmasks or unmask IRQ 10/11 in the interrupt controller.
+    // Premature unmasking causes infinite trap loops on floating input pins (Phase 16.1 silicon hang).
+    IO_t pa0 = mock_get_ioRec(0);
+    IO_t pa1 = mock_get_ioRec(1);
+    IO_t pa16 = mock_get_ioRec(16);
+    IO_t pa22 = mock_get_ioRec(22);
+
+    extiCallbackRec_t cb0, cb1, cb16, cb22;
+    test_EXTIHandlerInit(&cb0, test_callback_recorder);
+    test_EXTIHandlerInit(&cb1, test_callback_recorder);
+    test_EXTIHandlerInit(&cb16, test_callback_recorder);
+    test_EXTIHandlerInit(&cb22, test_callback_recorder);
+
+    // Act: Configure channels across Bank 0 and Bank 1
+    test_EXTIConfig(pa0, &cb0, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(pa1, &cb1, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_FALLING);
+    test_EXTIConfig(pa16, &cb16, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(pa22, &cb22, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_BOTH);
+
+    // Assert: Channel descriptors populated, but strictly dormant
+    EXPECT_FALSE(test_extiChannels[0].enabled);
+    EXPECT_FALSE(test_extiChannels[1].enabled);
+    EXPECT_FALSE(test_extiChannels[16].enabled);
+    EXPECT_FALSE(test_extiChannels[22].enabled);
+
+    // Crucial Invariant: Active masks and controller IRQs MUST strictly be zero!
+    EXPECT_EQ(test_bank0_active_mask, 0x0000U);
+    EXPECT_EQ(test_bank1_active_mask, 0x0000U);
+    EXPECT_EQ(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0), 0UL);
+    EXPECT_EQ(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO1), 0UL);
+}
+
+TEST_F(AriesExtiTest, Test_EXTI_SimulatedLevelTrigger_TrapStorm_Prevention)
+{
+    // Rationale: When an unattached pin floats HIGH, a level-triggered IRQ asserts continuously.
+    // This test simulates the hardware trap arbitration loop to prove that keeping the channel dormant
+    // prevents trap storms, and disabling an asserted channel immediately kills the storm.
+
+    IO_t pa0 = mock_get_ioRec(0);
+    extiCallbackRec_t cb;
+    static uint32_t s_trap_count;
+    s_trap_count = 0;
+    cb.fn = [](extiCallbackRec_t *self) {
+        UNUSED(self);
+        s_trap_count++;
+    };
+
+    test_EXTIConfig(pa0, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+
+    // Simulated hardware condition: External pin PA0 is physically floating HIGH
+    bool hw_pin_level_high = true;
+
+    // Simulated RISC-V interrupt arbitration loop:
+    // Trap fires ONLY if line is high AND IRQ is unmasked in controller AND enabled in channel mask
+    auto simulate_hardware_trap_cycle = [&]() {
+        if (hw_pin_level_high && (mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0))) {
+            sim_gpio0_isr();
+            return true;
+        }
+        return false;
+    };
+
+    // Phase 1: Configured but dormant. Loop runs 1000 cycles.
+    for (int i = 0; i < 1000; i++) {
+        bool trapped = simulate_hardware_trap_cycle();
+        EXPECT_FALSE(trapped);
+    }
+    EXPECT_EQ(s_trap_count, 0U); // 0 traps -> 0 CPU cycles stolen!
+
+    // Phase 2: Explicitly enable channel. Trap fires.
+    test_EXTIEnable(pa0);
+    EXPECT_TRUE(simulate_hardware_trap_cycle());
+    EXPECT_EQ(s_trap_count, 1U);
+
+    // Phase 3: Disable channel after self-test.
+    test_EXTIDisable(pa0);
+    EXPECT_EQ(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0), 0UL);
+
+    // Loop runs 1000 cycles with line still HIGH.
+    for (int i = 0; i < 1000; i++) {
+        bool trapped = simulate_hardware_trap_cycle();
+        EXPECT_FALSE(trapped);
+    }
+    // Trap count must strictly remain 1 (no re-entrancy storm)
+    EXPECT_EQ(s_trap_count, 1U);
+}
+
+TEST_F(AriesExtiTest, Test_EXTI_HardwarePullDown_Vs_Floating_PinConfiguration)
+{
+    // Rationale: Header J1 PA0 must be configured with internal pull-down (IOCFG_IPD)
+    // rather than floating (IOCFG_IN_FLOATING) when unpopulated to suppress antenna noise.
+    IO_t pa0 = mock_get_ioRec(0);
+    extiCallbackRec_t cb;
+    test_EXTIHandlerInit(&cb, test_callback_recorder);
+
+    // Configure with IOCFG_IPD
+    test_EXTIConfig(pa0, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+
+    // Invariant: Configuration must accept IOCFG_IPD cleanly
+    EXPECT_EQ(test_extiChannels[0].handler, &cb);
+    EXPECT_FALSE(test_extiChannels[0].enabled);
+}
+
+TEST_F(AriesExtiTest, Test_EXTI_Bank0_SingleActivePin_Erratum6_Constraint)
+{
+    // Rationale: Erratum 6 documents that THEJAS32 IRQ 10 lacks per-pin pending registers.
+    // Therefore, Bank 0 must strictly have at most 1 active pin (PA0 Gyro DRDY).
+    IO_t pa0 = mock_get_ioRec(0);
+    extiCallbackRec_t cb0;
+    test_EXTIHandlerInit(&cb0, test_callback_recorder);
+
+    test_EXTIConfig(pa0, &cb0, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIEnable(pa0);
+
+    // Active mask popcount must strictly be 1 for reliable non-crosstalk dispatching
+    uint32_t active_pins_bank0 = (uint32_t)__builtin_popcount(test_bank0_active_mask);
+    EXPECT_EQ(active_pins_bank0, 1U);
+
+    test_EXTIDisable(pa0);
+    EXPECT_EQ(test_bank0_active_mask, 0U);
 }

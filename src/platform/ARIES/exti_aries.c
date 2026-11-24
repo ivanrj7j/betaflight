@@ -49,10 +49,20 @@ static volatile uint16_t exti_bank1_active_mask = 0; // PA16..PA31
  * PA0 is the 1.0 kHz Gyro Data-Ready (DRDY) interrupt on Header J1.
  * Using __builtin_ctz resolves pin 0 in a single clock cycle (< 10 ns),
  * completely bypassing 15 empty branch iterations.
+ *
+ * Concurrency & Fan-Out Guardrail (Erratum 6 / Audit TD-12):
+ * THEJAS32 SoC routes Bank 0 GPIO line transitions into a single central IRQ 10
+ * without hardware pin-level pending status masking registers. To prevent cross-pin
+ * interrupt fan-out, Bank 0 is strictly dedicated to 1 active registered interrupt pin
+ * (PA0 ICM-42688P Gyro DRDY on Header J1).
  */
 FAST_IRQ_HANDLER void thejas32_gpio0_isr(void)
 {
     uint32_t active = (uint32_t)exti_bank0_active_mask;
+    if (active == 0U) {
+        thejas32_interrupt_disable(THEJAS32_IRQ_GPIO0);
+        return;
+    }
     while (active != 0U) {
         uint32_t bit = (uint32_t)__builtin_ctz(active);
         uint32_t pin = bit;
@@ -71,6 +81,10 @@ FAST_IRQ_HANDLER void thejas32_gpio0_isr(void)
 FAST_IRQ_HANDLER void thejas32_gpio1_isr(void)
 {
     uint32_t active = (uint32_t)exti_bank1_active_mask;
+    if (active == 0U) {
+        thejas32_interrupt_disable(THEJAS32_IRQ_GPIO1);
+        return;
+    }
     while (active != 0U) {
         uint32_t bit = (uint32_t)__builtin_ctz(active);
         uint32_t pin = bit + 16;
@@ -123,16 +137,7 @@ void EXTIConfig(IO_t io, extiCallbackRec_t *cb, int irqPriority, ioConfig_t conf
 
     extiChannels[pin].handler = cb;
     extiChannels[pin].trigger = (uint8_t)trigger;
-    extiChannels[pin].enabled = true;
-
-    // Unmask corresponding bank in interrupt controller
-    if (pin < 16) {
-        exti_bank0_active_mask |= (1U << pin);
-        thejas32_interrupt_enable(THEJAS32_IRQ_GPIO0);
-    } else {
-        exti_bank1_active_mask |= (1U << (pin - 16));
-        thejas32_interrupt_enable(THEJAS32_IRQ_GPIO1);
-    }
+    extiChannels[pin].enabled = false; // Strictly disabled until EXTIEnable()
 
     thejas32_atomic_exit(prev_mstatus);
 }

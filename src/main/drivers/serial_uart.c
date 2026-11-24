@@ -437,20 +437,17 @@ static bool isUartTransmitBufferEmpty(const serialPort_t *instance)
     }
 }
 
+__attribute__((weak)) void uartPlatformPollRx(uartPort_t *s)
+{
+    UNUSED(s);
+}
+
 static uint8_t uartRead(serialPort_t *instance)
 {
     uint8_t ch;
     uartPort_t *uartPort = (uartPort_t *)instance;
 
-#ifdef THEJAS32
-    if (uartPort && uartPort->USARTx && uartPort->port.rxBuffer && uartPort->port.rxBufferSize > 0) {
-        if (uartPort->port.rxBufferHead == uartPort->port.rxBufferTail) {
-            ATOMIC_BLOCK(NVIC_PRIO_MAX) {
-                uartIrqHandler((uartPort_t *)uartPort);
-            }
-        }
-    }
-#endif
+    uartPlatformPollRx(uartPort);
 
 #ifdef USE_DMA
     if (uartPort->rxDMAResource) {

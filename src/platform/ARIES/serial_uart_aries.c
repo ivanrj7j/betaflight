@@ -377,4 +377,15 @@ void uartConfigureDma(uartDevice_t *uartdev)
     UNUSED(uartdev);
 }
 
+void uartPlatformPollRx(uartPort_t *s)
+{
+    if (s && s->USARTx && s->port.rxBuffer && s->port.rxBufferSize > 0) {
+        if (s->port.rxBufferHead == s->port.rxBufferTail) {
+            uint32_t prev = thejas32_atomic_enter();
+            uartIrqHandler(s);
+            thejas32_atomic_exit(prev);
+        }
+    }
+}
+
 #endif // USE_UART

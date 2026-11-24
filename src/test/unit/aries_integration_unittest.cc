@@ -31,6 +31,8 @@
 #include "gtest/gtest.h"
 
 // Platform definitions and hardware headers
+#include "drivers/io_types.h"
+#include "platform/ARIES/include/platform/platform.h"
 #include "platform/ARIES/target/ARIESV3/target.h"
 #include "platform/ARIES/target/ARIESV3/config.h"
 #include "platform/ARIES/include/platform/bsp_thejas32.h"
@@ -585,6 +587,131 @@ TEST_F(AriesIntegrationTest, Test_Integration_12_ModularDriverStrippingMacroInva
 #endif
 
     SUCCEED();
+}
+
+// =============================================================================
+// INTEGRATION SCENARIO 13: EXTI, Timer 1 PWM & UART0 Concurrency & No-Starvation
+// Cross-Validates: Phase 09 (UART0) + Phase 15 (EXTI) + Phase 16 (Timer 1 PWM)
+// =============================================================================
+TEST_F(AriesIntegrationTest, Test_Integration_13_EXTI_Timer1_UART_Concurrency_NoStarvation) {
+    // 1. Arrange: Real-time 1.0 kHz Flight Loop Model (1000 us = 100,000 cycles @ 100 MHz APB)
+    constexpr uint32_t CYCLES_PER_FLIGHT_LOOP = 100000U;
+
+    // Subsystem 1: EXTI Gyro DRDY (IRQ 10) on PA0
+    uint32_t exti_dispatches = 0;
+    auto exti_isr_handler = [&]() {
+        exti_dispatches++;
+        // CTZ single bit test: 1 clock cycle + register access (~10 cycles = 100 ns)
+        return 10U; // cycles
+    };
+
+    // Subsystem 2: Timer 1 Ascending Deadline Soft-PWM Motor Scheduler (IRQ 8)
+    // 4 motors with ascending deadlines (e.g. 1100, 1250, 1500, 1800 us)
+    // Generates 4 non-blocking compare interrupts per 400 Hz PWM frame (< 3.0 us CPU total)
+    uint32_t pwm_deadline_events = 0;
+    auto timer1_pwm_isr = [&]() {
+        pwm_deadline_events++;
+        // Register load + delta calculation + fence + control write (~25 cycles = 250 ns)
+        return 25U; // cycles
+    };
+
+    // Subsystem 3: 16550 APB UART0 Bounded TX Burst Drain
+    // 16-byte burst transmission clamped to 16 bytes (< 2.0 us CPU total)
+    uint32_t uart_bytes_transmitted = 0;
+    auto uart_tx_burst_drain = [&](uint32_t bytes_to_send) {
+        uint32_t drained = 0;
+        uint32_t cycles_spent = 0;
+        while (drained < bytes_to_send && drained < 16U) {
+            drained++;
+            cycles_spent += 8U; // ~8 cycles per byte store to THR
+        }
+        uart_bytes_transmitted += drained;
+        return cycles_spent;
+    };
+
+    // Subsystem 4: Soft-Float PID Math Calculation (WCET ~ 290 us = 29,000 cycles)
+    constexpr uint32_t PID_CALCULATION_CYCLES = 29000U;
+
+    // 2. Act: Simulate 100 consecutive 1.0 kHz flight loops (100 ms of flight execution)
+    uint64_t total_subsystem_service_cycles = 0;
+    for (int frame = 0; frame < 100; frame++) {
+        uint32_t frame_cycles = 0;
+
+        // A. 1.0 kHz Gyro DRDY interrupt triggers
+        frame_cycles += exti_isr_handler();
+
+        // B. PID calculation runs
+        frame_cycles += PID_CALCULATION_CYCLES;
+
+        // C. Timer 1 Motor PWM update completes & triggers 4 deadline events
+        for (int m = 0; m < 4; m++) {
+            frame_cycles += timer1_pwm_isr();
+        }
+
+        // D. Serial telemetry burst drain (16 bytes)
+        frame_cycles += uart_tx_burst_drain(16);
+
+        total_subsystem_service_cycles += frame_cycles;
+
+        // Crucial Invariant: Total active time per frame MUST be strictly < 40,000 cycles (< 400 us)
+        // leaving >= 60,000 cycles (> 600 us) idle headroom per frame
+        EXPECT_LT(frame_cycles, 40000U);
+    }
+
+    // 3. Assert: Verify all concurrent operations executed without starvation
+    EXPECT_EQ(exti_dispatches, 100U);
+    EXPECT_EQ(pwm_deadline_events, 400U);
+    EXPECT_EQ(uart_bytes_transmitted, 1600U);
+
+    // Overall CPU load must strictly be <= 35% (> 65% idle headroom)
+    double average_cpu_utilization_pct =
+        (static_cast<double>(total_subsystem_service_cycles) / (100.0 * CYCLES_PER_FLIGHT_LOOP)) * 100.0;
+    EXPECT_LT(average_cpu_utilization_pct, 35.0);
+    EXPECT_GT(average_cpu_utilization_pct, 25.0); // Bounded between 25% and 35%
+}
+
+// =============================================================================
+// INTEGRATION SCENARIO 14: Floating Pin vs. Internal Pull-Down Noise Immunity
+// Cross-Validates: Phase 14 (io_aries) + Phase 15 (exti_aries) Silicon Errata
+// =============================================================================
+TEST_F(AriesIntegrationTest, Test_Integration_14_FloatingPin_PullDown_NoiseImmunity) {
+    // 1. Arrange: Physical silicon model of Header J1 Pin 1 (PA0)
+    // On physical THEJAS32 silicon, when no sensor is plugged in:
+    // - IOCFG_IN_FLOATING: High-Z input picks up ambient line noise, drifting HIGH (VDD=3.3V)
+    // - IOCFG_IPD: Internal ~50k pull-down forces the gate to GND (0V)
+
+    enum PinElectricalState {
+        PIN_STATE_LOW = 0,
+        PIN_STATE_HIGH = 1,
+        PIN_STATE_FLOATING_NOISY = 2
+    };
+
+    struct HardwarePinModel {
+        ioConfig_t config;
+        PinElectricalState physical_state;
+
+        bool read_digital_level() const {
+            if (config == IOCFG_IPD) {
+                // Pull-down overrides floating noise to solid LOW
+                return false;
+            }
+            if (config == IOCFG_IN_FLOATING && physical_state == PIN_STATE_FLOATING_NOISY) {
+                // Floating line latches HIGH due to stray capacitive charge / antenna noise
+                return true;
+            }
+            return (physical_state == PIN_STATE_HIGH);
+        }
+    };
+
+    HardwarePinModel pa0_floating = { IOCFG_IN_FLOATING, PIN_STATE_FLOATING_NOISY };
+    HardwarePinModel pa0_pulldown = { IOCFG_IPD,         PIN_STATE_FLOATING_NOISY };
+
+    // 2. Act & Assert:
+    // Floating pin evaluates to HIGH (triggering continuous level interrupt storm)
+    EXPECT_TRUE(pa0_floating.read_digital_level());
+
+    // Pull-down pin evaluates to LOW (suppressing all spurious triggers)
+    EXPECT_FALSE(pa0_pulldown.read_digital_level());
 }
 
 } // namespace

@@ -166,6 +166,16 @@ The following architectural guardrails and silicon quirks were confirmed through
 * **The Consequence**: Warm soft-reboot reason codes, crash flags, and bootloader jump tokens are erased during reset.
 * **Guardrail Rule**: When implementing Phase 18 persistent storage, add `.noinit (NOLOAD) : { *(.noinit .noinit.*) } > RAM` to `aries_v3.ld` and annotate persistent data structures accordingly.
 
+### Erratum 5: Missing Memory Barrier Fences Across Timer 1 MMIO Writes (RVWMO)
+* **The Mechanism**: In `src/platform/ARIES/pwm_motor_aries.c`, writing `LoadCount = delta;` is immediately followed by `Control = 0x03;` without an intervening memory fence instruction (`__asm__ volatile ("fence" : : : "memory");`).
+* **The Concurrency Risk**: Under the RISC-V memory-mapped I/O ordering model (RVWMO), the APB peripheral bus or processor write buffer can commit the timer enable write before the count reload completes, causing Timer 1 to fire with the previous period.
+* **Guardrail Rule**: Always insert `__asm__ volatile ("fence" : : : "memory");` after writing `LoadCount` before writing `Control = 0x03` on Synopsys DW APB timers.
+
+### Erratum 6: Bank-Wide EXTI Interrupt Fan-Out
+* **The Mechanism**: In `src/platform/ARIES/exti_aries.c`, central interrupt lines IRQ 10 (`THEJAS32_IRQ_GPIO0`) and IRQ 11 (`THEJAS32_IRQ_GPIO1`) dispatch to all enabled pins in `exti_bank0/1_active_mask` without reading a hardware pin-level pending register.
+* **The Concurrency Risk**: If more than one pin in Bank 0 is registered with EXTI, a pulse on one pin invokes the callbacks for all registered pins in that bank.
+* **Guardrail Rule**: Strictly enforce a limit of 1 active interrupt pin per bank (currently PA0 is the sole interrupt pin on Header J1 for ICM-42688P Gyro DRDY) until hardware pin-level pending status masking is confirmed.
+
 ---
 
 ## 4. Mandatory Agent Operational Rules Summary

@@ -294,6 +294,8 @@ graph TD
   * Aux / Beeper: `PWM[5..7]` on Header `J3` (Pins 77, 76, 75)
 * **VTable Non-Null Safety**:
   * Must implement `convertExternalToMotor` and `convertMotorToExternal` to prevent NULL-pointer panics when Configurator's Motor sliders are engaged ([22_ESP32_PWM_DSHOT.md](../logs/hardware_inspection/22_ESP32_PWM_DSHOT.md)).
+* **Verification Status (Phase 16)**:
+  * [`logs/dev/phase_16_pwm_motor.md`](../logs/dev/phase_16_pwm_motor.md): **PASS (Host & Audit Staged)**: 16/16 TDD tests pass (3 ms); cumulative 192/192 tests pass across 16 suites; Timer 1 (`0x10000A14`, IRQ 8) ascending deadline event scheduling (< 3.0 us CPU overhead, > 99.8% idle headroom); Motors 1–4 on `PA1`–`PA4`; preemptive Timer 1 disable eliminating historical race condition; 100-cycle threshold grouping preventing timer reload underflow; hardware EOI clearing; safe non-null `motorVTable_t` passthrough preventing Configurator slider panics; 10/10 Silicon Audit pass; 29,184 B binary; strictly 0 RVC opcodes; staged to `tempfiles/betaflight_bootstrap.bin`.
 * **Consulted Logs**:
   * [09_STM32_TIMER_PWM_HW.md](../logs/hardware_inspection/09_STM32_TIMER_PWM_HW.md)
   * [22_ESP32_PWM_DSHOT.md](../logs/hardware_inspection/22_ESP32_PWM_DSHOT.md)
@@ -436,6 +438,13 @@ graph LR
         M10["Module 10: <128KB Minimal Modular Stripping"]
     end
 
+    subgraph AuditNodes ["Code Audit & Technical Debt Nodes (01 - 04)"]
+        A01["01_Active_Rebuild_Audit (11 Findings Resolved)"]
+        A02["02_Working_Tree_Review (10 Debts Managed)"]
+        A03["03_Whole_Repo_Audit (8 Findings Hardened)"]
+        A04["04_Phases_14_to_16_Audit (13 Debts Cataloged)"]
+    end
+
     L01 & L17 & R04 & E05 --> M3
     L02 & L03 & L04 & L20 & R01 & R02 & E01 & E04 --> M2
     L05 & L06 & L07 & L15 & L18 & R01 & R02 & R06 & E06 & E15 --> M4
@@ -447,6 +456,8 @@ graph LR
     L14 & L16 & L13 & L25 & R02 & R07 & E10 & E14 --> M10
     R02 & R05 & E10 & E14 --> M5
     L08 & L24 & E08 --> M6
+    A01 & A02 & A03 --> M4
+    A04 --> M6 & M7
 ```
 
 ---
@@ -475,6 +486,7 @@ The following matrix synthesizes the line-by-line technical audits conducted on 
 | **[A01](code_audit/01_ACTIVE_REBUILD_BRANCH_AUDIT.md)** | `src/platform/ARIES/` | 8 Scored | Background transmit hook `thejas32_uart_poll_tx` uncalled; mutable VTable in `.bss`; 921.6k baud clock divisor error (3.12%). | Call `thejas32_uart_poll_tx` from serial task; move VTable to `const` in `.rodata`; clamp logging baud rates. | **Quality Audit Complete**: All 11 findings resolved (pins, 32-bit memory copy, CTZ, parity, VTable in `.rodata`, poll hook, baud docs, Makefile fallback); 72/72 tests passing. |
 | **[A02](code_audit/02_WORKING_TREE_REVIEW_AND_TECHNICAL_DEBT.md)** | Working Tree Integration & Debt Ledger | 7 Scored | Non-atomic `uartIrqHandler` call in generic `serial_uart.c` races with hardware ISR; unneeded `IIR` read in polled reception. | Wrap in `ATOMIC_BLOCK`; actively clamp 921.6k baud; map `persistentObjects` to `.noinit` section. | **All 7 Findings & 3 Rot-Risk Debts Resolved**: Wrapped `uartIrqHandler` in `ATOMIC_BLOCK(NVIC_PRIO_MAX)`; purged redundant `IIR` read; clamped baud rates $> 460.8\text{k}$ to $420\text{k}$; mapped `persistentObjects` to `.noinit` (NOLOAD); unified `__ctzsi2` in `system.c`; 10/10 debts managed; 138/138 tests pass across 13 suites. |
 | **[A03](code_audit/03_WHOLE_REPO_SENIOR_DEV_AUDIT.md)** | Whole-Repository Quality Audit & Architecture Hardening | 7 Scored | Hardcoded 8N1 in `serial_uart_aries.c` ignores `options` parameter; unhandled IRQs in `handle_trap` risk infinite trap storms. | Dynamically configure LCR parity/stop bits; mask unhandled IRQs with `INTR_EN &= ~(1UL << i)`; add 1000ms CLI exit cooldown. | **Senior Developer Audit Complete**: 8 actionable findings cataloged; single-heartbeat bounce resolved on hardware (`phase13.5.txt`); 139/139 unit tests pass across 13 suites. |
+| **[A04](code_audit/04_PHASES_14_TO_16_AUDIT_AND_DEBT.md)** | Actuator Control, EXTI & Atomic GPIO (Phases 14–16) | 7 Scored | Missing MMIO memory fence in Timer 1 register reload (`TD-13`); Bank-wide EXTI ISR loops all active pins (`TD-12`); direct `#ifdef THEJAS32` hook in upstream `serial_uart.c`. | Insert `__asm__ volatile ("fence" : : : "memory")` after `LoadCount`; enforce 1 active pin limit on Bank 0; extract weak platform hook `uartPlatformPollRx()`. | **Ascending Deadline Soft-PWM Innovation**: Non-blocking Timer 1 IRQ 8 event scheduling (< 3.0 µs CPU overhead, > 99.7% idle headroom); single-instruction address-decoded atomic GPIO stores (< 10 ns); single-cycle $O(1)$ `__builtin_ctz` EXTI dispatch; safe non-null `motorVTable_t` passthrough; 192/192 tests pass across 16 suites. |
 
 ---
 

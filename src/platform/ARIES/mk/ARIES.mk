@@ -95,10 +95,10 @@ MCU_COMMON_SRC := \
     ARIES/serial_uart_aries.c \
     ARIES/io_aries.c \
     ARIES/exti_aries.c \
+    ARIES/pwm_motor_aries.c \
     ARIES/stub_drivers.c \
     drivers/serial_pinconfig.c
     # Future Phase Drivers (uncomment as phases are implemented):
-    # ARIES/pwm_motor_aries.c (Phase 16)
     # ARIES/bus_spi_aries.c (Phase 17)
     # ARIES/config_flash_aries.c (Phase 18)
 

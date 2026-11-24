@@ -197,7 +197,7 @@ void thejas32_early_uart_putc(char c)
 void thejas32_early_uart_puts(const char *s)
 {
     if (!s) return;
-    char prev = '\0';
+    static char prev = '\0';
     while (*s) {
         if (*s == '\n' && prev != '\r') {
             thejas32_early_uart_putc('\r');

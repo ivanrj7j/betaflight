@@ -165,7 +165,9 @@ __attribute__((always_inline)) static inline void thejas32_atomic_exit(uint32_t 
 #define SPIDEV_COUNT                1
 #define MAX_SPI_PIN_SEL             3
 #define I2CDEV_COUNT                1
+#ifndef GYRO_COUNT
 #define GYRO_COUNT                  1
+#endif
 typedef void* ADC_TypeDef;
 
 typedef struct {

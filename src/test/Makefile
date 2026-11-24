@@ -113,7 +113,8 @@ aries_integration_unittest_SRC := \
 		$(USER_DIR)/common/streambuf.c
 
 aries_integration_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src
+		$(ROOT)/src \
+		$(ROOT)/src/platform/ARIES/include
 
 aries_io_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
@@ -126,6 +127,13 @@ aries_exti_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
 
 aries_exti_unittest_INCLUDE_DIRS := \
+		$(ROOT)/src \
+		$(ROOT)/src/platform/ARIES/include
+
+aries_pwm_motor_unittest_SRC := \
+		$(USER_DIR)/build/atomic.c
+
+aries_pwm_motor_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src \
 		$(ROOT)/src/platform/ARIES/include
 

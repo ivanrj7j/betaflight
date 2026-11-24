@@ -325,3 +325,7 @@ UART_BUFFERS_EXTERN(Pio9);
 #endif
 
 #undef UART_BUFFERS_EXTERN
+
+// Optional platform hook called when software RX ring buffer is empty
+void uartPlatformPollRx(uartPort_t *s);
+

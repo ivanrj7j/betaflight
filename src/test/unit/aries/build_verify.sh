@@ -40,14 +40,17 @@ if command -v riscv32-esp-elf-size >/dev/null 2>&1; then
     CROSS_SIZE="riscv32-esp-elf-size"
     CROSS_OBJDUMP="riscv32-esp-elf-objdump"
     CROSS_READELF="riscv32-esp-elf-readelf"
-elif [ -d "$HOME/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin" ]; then
-    TOOL_BIN="$HOME/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20250707/riscv32-esp-elf/bin"
-    CROSS_SIZE="$TOOL_BIN/riscv32-esp-elf-size"
-    CROSS_OBJDUMP="$TOOL_BIN/riscv32-esp-elf-objdump"
-    CROSS_READELF="$TOOL_BIN/riscv32-esp-elf-readelf"
 else
-    echo "FAIL: No suitable RISC-V binutils found on PATH or standard directory."
-    exit 1
+    CANDIDATE_DIR=$(ls -d $HOME/.espressif/tools/riscv32-esp-elf/*/riscv32-esp-elf/bin 2>/dev/null | head -n 1)
+    if [ -n "$CANDIDATE_DIR" ] && [ -d "$CANDIDATE_DIR" ]; then
+        TOOL_BIN="$CANDIDATE_DIR"
+        CROSS_SIZE="$TOOL_BIN/riscv32-esp-elf-size"
+        CROSS_OBJDUMP="$TOOL_BIN/riscv32-esp-elf-objdump"
+        CROSS_READELF="$TOOL_BIN/riscv32-esp-elf-readelf"
+    else
+        echo "FAIL: No suitable RISC-V binutils found on PATH or standard directory."
+        exit 1
+    fi
 fi
 
 # 3. SRAM Sizing Audit (<= 248 KB)
