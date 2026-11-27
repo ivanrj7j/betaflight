@@ -41,6 +41,7 @@ extern "C" {
 #include "drivers/serial_uart.h"
 #include "drivers/serial_uart_impl.h"
 #include "aries_host_mmio.h"
+void unusedPinsInit(void);
 }
 
 namespace {
@@ -690,6 +691,72 @@ TEST_F(AriesUartHwTest, Test_RealSerialUartAriesC_InitOrderNullGuardsAndPollRxEr
     EXPECT_EQ(THEJAS32_UART(0).UART_LCR, 0x1BU);
     EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x5AU);
     EXPECT_EQ(serialUART(nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED), nullptr);
+}
+
+// =============================================================================
+// TEST 18 (Erratum 11): uartPinConfigure() Claims OWNER_SERIAL_TX/RX Before unusedPinsInit()
+// =============================================================================
+TEST_F(AriesUartHwTest, Test_UART_PinConfigureClaimsSerialOwnersAndSurvivesUnusedPinsInit)
+{
+    // Arrange: Clean GPIO descriptors & host MMIO, configure UART0 (PA30/PA31) & UART1 (PA16/PA17)
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    IO_t u0Tx = IOGetByTag(DEFIO_TAG_E__PA30);
+    IO_t u0Rx = IOGetByTag(DEFIO_TAG_E__PA31);
+    IO_t u1Tx = IOGetByTag(DEFIO_TAG_E__PA16);
+    IO_t u1Rx = IOGetByTag(DEFIO_TAG_E__PA17);
+    IO_t ld1Blue = IOGetByTag(DEFIO_TAG_E__PA23);
+    IO_t ld1Red  = IOGetByTag(DEFIO_TAG_E__PA24);
+    ASSERT_NE(u0Tx, nullptr);
+    ASSERT_NE(u0Rx, nullptr);
+    ASSERT_NE(u1Tx, nullptr);
+    ASSERT_NE(u1Rx, nullptr);
+
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    pinCfg.ioTagTx[1] = DEFIO_TAG_E__PA16;
+    pinCfg.ioTagRx[1] = DEFIO_TAG_E__PA17;
+
+    // Act 1: Configure pins as fc/init.c line 551 does prior to unusedPinsInit() at line 1080
+    uartPinConfigure(&pinCfg);
+
+    // Assert 1: All 4 active UART pins must be claimed (no longer OWNER_FREE)
+    EXPECT_EQ(IOGetOwner(u0Tx), OWNER_SERIAL_TX)
+        << "UART0 TX (PA30) stayed OWNER_FREE after uartPinConfigure()!";
+    EXPECT_EQ(IOGetOwner(u0Rx), OWNER_SERIAL_RX)
+        << "UART0 RX (PA31) stayed OWNER_FREE after uartPinConfigure()!";
+    EXPECT_EQ(IOGetOwner(u1Tx), OWNER_SERIAL_TX)
+        << "UART1 TX (PA16) stayed OWNER_FREE after uartPinConfigure()!";
+    EXPECT_EQ(IOGetOwner(u1Rx), OWNER_SERIAL_RX)
+        << "UART1 RX (PA17) stayed OWNER_FREE after uartPinConfigure()!";
+
+    // Act 2: Set idle-HIGH TX mark lines and stale OUT_PP LOW on unowned LD1 pins, then run unusedPinsInit()
+    IOConfigGPIO(u0Tx, IOCFG_OUT_PP);
+    IOHi(u0Tx);
+    IOConfigGPIO(u1Tx, IOCFG_OUT_PP);
+    IOHi(u1Tx);
+    IOConfigGPIO(ld1Blue, IOCFG_OUT_PP);
+    IOConfigGPIO(ld1Red,  IOCFG_OUT_PP);
+    IOLo(ld1Blue);
+    IOLo(ld1Red);
+
+    unusedPinsInit();
+
+    // Assert 2: Owned UART TX pins retain DIR=1 & HIGH mark level, while unowned LD1 pins go High-Z (DIR=0)
+    EXPECT_NE(thejas32_host_gpio_dir[1] & (1U << (30U - 16U)), 0U)
+        << "unusedPinsInit() overwrote UART0 TX PA30 because it was not owned!";
+    EXPECT_NE(thejas32_host_gpio_data[1][30U - 16U], 0U);
+    EXPECT_NE(thejas32_host_gpio_dir[1] & (1U << (16U - 16U)), 0U)
+        << "unusedPinsInit() overwrote UART1 TX PA16 because it was not owned!";
+    EXPECT_NE(thejas32_host_gpio_data[1][16U - 16U], 0U);
+    EXPECT_EQ(thejas32_host_gpio_dir[1] & (1U << (23U - 16U)), 0U);
+    EXPECT_EQ(thejas32_host_gpio_dir[1] & (1U << (24U - 16U)), 0U);
+
+    // Real-world flight consequence:
+    // Leaving PA16/17/30/31 OWNER_FREE exposes CP2102N UART0 (J9) & CRSF UART1 (J10) pins to unusedPinsInit()
+    // clamping between init.c:551 and initPhase3() line 1080.
 }
 
 } // namespace

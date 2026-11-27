@@ -1277,7 +1277,7 @@ TEST_F(AriesRxCrsfTest, Category1_Test27_RealSerialWriteBufBlocking_PolledTxDrai
 
     // Pre-fill ring near full without THRE asserted, then verify serialWriteBufBlocking drains via uartPollTx
     THEJAS32_UART(0).UART_LSR = 0x00U;
-    uint8_t prefill[240];
+    uint8_t prefill[UART_TX_BUFFER_SIZE - 32U];
     memset(prefill, 'A', sizeof(prefill));
     serialWriteBuf(sp0, prefill, (int)sizeof(prefill));
     EXPECT_LT(serialTxBytesFree(sp0), 64U);
@@ -1295,6 +1295,143 @@ TEST_F(AriesRxCrsfTest, Category1_Test27_RealSerialWriteBufBlocking_PolledTxDrai
         uartPollTx();
     }
     EXPECT_EQ(THEJAS32_UART(0).UART_DR & 0xFFU, (uint32_t)'3');
+}
+
+} // namespace
+
+extern "C" {
+void thejas32_uart1_isr(void);
+}
+
+namespace {
+
+// B4: Real UART1 420 kbaud CRSF Erratum 1 (FCR=0x00) <20 us jitter immunity & OE recovery
+TEST_F(AriesRxCrsfTest, Test_UART1_CRSF_420kBaud_Erratum1_ZeroOreUnder20usCriticalSectionAndOreRecovery)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[1] = DEFIO_TAG_E__PA28;
+    pinCfg.ioTagRx[1] = DEFIO_TAG_E__PA29;
+    uartPinConfigure(&pinCfg);
+
+    rxRuntimeState_t rxState = {};
+    crsfRxInit(rxConfig(), &rxState);
+    crsfFrameDone = false;
+
+    serialPort_t *sp1 = uartOpen(SERIAL_PORT_UART1, crsfDataReceive, &rxState, CRSF_BAUDRATE, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp1, nullptr);
+
+    // Erratum 1: FCR == 0x00 (FIFO disabled); UART1 baud divisor for 420,000 bps is within +-2%
+    EXPECT_EQ(THEJAS32_UART(1).UART_IIR_FCR & 0xC0U, 0U);
+    EXPECT_EQ(sp1->baudRate, (uint32_t)CRSF_BAUDRATE);
+
+    // Build genuine 26-byte CRSF RC Channels Packed frame (all 16 channels = mid-stick 992 = 0x3E0)
+    uint8_t crsfPkt[26] = {};
+    crsfPkt[0] = 0xC8U; // CRSF_ADDRESS_FLIGHT_CONTROLLER
+    crsfPkt[1] = 24U;   // length (type + 22 payload + crc)
+    crsfPkt[2] = 0x16U; // CRSF_FRAMETYPE_RC_CHANNELS_PACKED
+    // Pack 0x3E0 across 11-bit fields or valid mid-stick bit pattern; CRC checks frame integrity
+    for (size_t i = 3U; i < 25U; i++) {
+        crsfPkt[i] = 0xE0U;
+    }
+    crsfPkt[25] = crc8_dvb_s2_update(0U, &crsfPkt[2], 23U);
+
+    // Act 1: Stream 26 bytes at 420,000 baud (23.81 us/byte -> 24 us spacing, < 20 us critical lock)
+    g_mock.simTimeUs = 10000U;
+    for (size_t i = 0U; i < sizeof(crsfPkt); i++) {
+        g_mock.simTimeUs += 24U;
+        THEJAS32_UART(1).UART_DR = crsfPkt[i];
+        THEJAS32_UART(1).UART_LSR = 0x61U; // DR=1, OE=0
+        thejas32_uart1_isr();
+        EXPECT_EQ(THEJAS32_UART(1).UART_LSR & 0x02U, 0U);
+    }
+
+    // Assert 1: Valid CRSF frame decoded cleanly with zero overrun errors
+    EXPECT_TRUE(crsfFrameDone);
+    EXPECT_EQ(crsfFrameStatus(&rxState), (uint8_t)RX_FRAME_COMPLETE);
+
+    // Act 2: Inject simulated >25 us CPU lock Overrun Error (LSR = 0x63: DR + OE), unlatch via ISR,
+    // advance past frame sync gap (>2 ms), then stream second clean frame for recovery proof
+    crsfFrameDone = false;
+    THEJAS32_UART(1).UART_DR = 0x55U;
+    THEJAS32_UART(1).UART_LSR = 0x63U; // DR + OE
+    thejas32_uart1_isr();
+
+    g_mock.simTimeUs += 5000U; // > frameTimeNeededUs resets CRSF parser state to index 0
+    for (size_t i = 0U; i < sizeof(crsfPkt); i++) {
+        g_mock.simTimeUs += 24U;
+        THEJAS32_UART(1).UART_DR = crsfPkt[i];
+        THEJAS32_UART(1).UART_LSR = 0x61U;
+        thejas32_uart1_isr();
+    }
+
+    // Assert 2: UART1 recovers cleanly without latching into permanent ORE lockout
+    EXPECT_TRUE(crsfFrameDone);
+    EXPECT_EQ(crsfFrameStatus(&rxState), (uint8_t)RX_FRAME_COMPLETE);
+
+    // Real-world flight consequence:
+    // At 420 kbaud (23.81 us/byte) under Erratum 1, bounded <20 us critical sections prevent ORE
+    // and LSR unlatching ensures rare latency spikes never permanently mute the RC link.
+}
+
+// F5: ADC disabled / DEFAULT_VOLTAGE_METER_NONE safely guards stale VOLTAGE_METER_ADC configs
+TEST_F(AriesRxCrsfTest, Test_BatterySafety_AdcDisabledOrDefaultVoltageMeterNoneGuardsFaultyConversion)
+{
+    // Arrange & Assert 1: Target compiles without USE_ADC and defaults voltage meter to NONE
+    bool hasUseAdc = false;
+#ifdef USE_ADC
+    hasUseAdc = true;
+#endif
+    EXPECT_FALSE(hasUseAdc) << "THEJAS32 has no internal ADC peripheral!";
+
+    pgResetAll();
+    EXPECT_EQ(batteryConfig()->voltageMeterSource, VOLTAGE_METER_NONE);
+
+    // Act 1: Default batteryInit() with VOLTAGE_METER_NONE holds BATTERY_INIT (never CRITICAL/WARNING)
+    batteryConfigMutable()->currentMeterSource = CURRENT_METER_NONE;
+    batteryInit();
+    for (int i = 0; i < 15; i++) {
+        g_mock.simTimeMs += VOLTAGE_STABLE_TICK_MS;
+        g_mock.simTimeUs += VOLTAGE_STABLE_TICK_MS * 1000U;
+        batteryUpdateVoltage(g_mock.simTimeUs);
+        batteryUpdatePresence();
+        batteryUpdateStates(g_mock.simTimeUs);
+        EXPECT_NE(getBatteryState(), BATTERY_WARNING);
+        EXPECT_NE(getBatteryState(), BATTERY_CRITICAL);
+    }
+    EXPECT_EQ(getBatteryState(), BATTERY_INIT);
+    EXPECT_EQ(getBatteryVoltage(), 0U);
+
+    // Act 2: Even if CLI restores stale VOLTAGE_METER_ADC on target lacking HW ADC,
+    // conversion safely returns 0 and 100 ms stability checks settle to BATTERY_NOT_PRESENT
+    voltageSensorADCConfig_t adcCfg = {};
+    adcCfg.vbatscale = 110U;
+    adcCfg.vbatresdivval = 10U;
+    adcCfg.vbatresdivmultiplier = 1U;
+    EXPECT_EQ(voltageAdcToVoltage(0U, &adcCfg), 0U);
+
+    batteryConfigMutable()->voltageMeterSource = VOLTAGE_METER_ADC;
+    batteryProfilesMutable(0)->vbatmincellvoltage = 330U;
+    batteryProfilesMutable(0)->vbatwarningcellvoltage = 350U;
+    batteryInit();
+    for (int i = 0; i < 15; i++) {
+        g_mock.simTimeMs += VOLTAGE_STABLE_TICK_MS;
+        g_mock.simTimeUs += VOLTAGE_STABLE_TICK_MS * 1000U;
+        batteryUpdateVoltage(g_mock.simTimeUs);
+        batteryUpdatePresence();
+        batteryUpdateStates(g_mock.simTimeUs);
+        EXPECT_NE(getBatteryState(), BATTERY_WARNING);
+        EXPECT_NE(getBatteryState(), BATTERY_CRITICAL);
+    }
+    EXPECT_EQ(getBatteryVoltage(), 0U);
+    EXPECT_EQ(getBatteryState(), BATTERY_NOT_PRESENT);
+
+    // Real-world flight consequence:
+    // Misconfigured VOLTAGE_METER_ADC without internal ADC hardware must fail safe instead of
+    // dividing by zero or falsely locking out arming via bogus 0.0 V low-battery telemetry.
 }
 
 } // namespace

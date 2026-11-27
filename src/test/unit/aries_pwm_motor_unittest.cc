@@ -707,3 +707,385 @@ TEST_F(AriesPwmMotorTest, Test_RealPwmMotorAriesC_InitSortScheduleAndTimer1Isr)
     EXPECT_EQ(THEJAS32_TIMER(1).Control, 0U);
     EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER1), 0U);
 }
+
+// =============================================================================
+// GROUP A (Pre-Phase 20 Safety): Motor Shutdown & 400 Hz PWM Rate Gating
+// =============================================================================
+
+#include <unistd.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <errno.h>
+
+extern "C" {
+#include "drivers/system.h"
+}
+
+namespace {
+
+motorDevice_t initRealAriesPwm(uint16_t pwmRateHz, uint8_t protocol)
+{
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    thejas32_host_mcycle_set(0ULL);
+
+    motorDevConfig_t cfg = {};
+    cfg.motorProtocol = protocol;
+    cfg.motorPwmRate = pwmRateHz;
+    cfg.useContinuousUpdate = 1U;
+    cfg.ioTags[0] = (ioTag_t)((1U << 6) | 1U); // PA1
+    cfg.ioTags[1] = (ioTag_t)((1U << 6) | 2U); // PA2
+    cfg.ioTags[2] = (ioTag_t)((1U << 6) | 3U); // PA3
+    cfg.ioTags[3] = (ioTag_t)((1U << 6) | 4U); // PA4
+
+    motorDevice_t dev = {};
+    EXPECT_TRUE(motorPwmDevInit(&dev, &cfg, 1000U));
+    EXPECT_TRUE(dev.vTable->enable());
+    return dev;
+}
+
+void armMidPulseAllFourMotors(motorDevice_t *dev, uint16_t m0, uint16_t m1, uint16_t m2, uint16_t m3)
+{
+    const uint16_t vals[4] = { m0, m1, m2, m3 };
+    for (uint8_t i = 0; i < 4U; i++) {
+        dev->vTable->writeInt(i, vals[i]);
+    }
+    dev->vTable->updateComplete();
+
+    ASSERT_NE(THEJAS32_TIMER(1).Control, 0U);
+    ASSERT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER1), 0U);
+    for (uint8_t pin = 1U; pin <= 4U; pin++) {
+        ASSERT_NE(thejas32_host_gpio_data[0][pin], 0U);
+    }
+}
+
+void assertAllMotorsHaltedAndLow(void)
+{
+    EXPECT_EQ(THEJAS32_TIMER(1).Control, 0U);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER1), 0U);
+    for (uint8_t pin = 1U; pin <= 4U; pin++) {
+        EXPECT_EQ(thejas32_host_gpio_data[0][pin], 0U)
+            << "Motor pin PA" << (unsigned)pin << " stayed HIGH during emergency stop!";
+    }
+}
+
+struct FailureModeChildReport {
+    uint8_t returnedCleanly;
+    uint8_t timedOut;
+    uint32_t timer1Control;
+    uint32_t intrEn;
+    uint32_t gpioMotor[4];
+};
+
+static int g_childReportWriteFd = -1;
+static void child_alarm_handler(int)
+{
+    FailureModeChildReport rep = {};
+    rep.returnedCleanly = 0U;
+    rep.timedOut = 1U;
+    rep.timer1Control = THEJAS32_TIMER(1).Control;
+    rep.intrEn = THEJAS32_INTR_CTRL.INTR_EN;
+    for (int i = 0; i < 4; i++) {
+        rep.gpioMotor[i] = thejas32_host_gpio_data[0][i + 1];
+    }
+    ssize_t ignored = write(g_childReportWriteFd, &rep, sizeof(rep));
+    (void)ignored;
+    _exit(124);
+}
+
+} // namespace
+
+// A1: Synchronous CPU trap panic MUST stop Timer 1 and force PA1..PA4 LOW
+TEST_F(AriesPwmMotorTest, Test_MotorShutdown_HandleTrapPanicStopsTimer1AndForcesAllMotorsLow)
+{
+    // Arrange: Motors armed mid-pulse at high throttle on PA1..PA4
+    motorDevice_t dev = initRealAriesPwm(400U, PWM_TYPE_PWM);
+    armMidPulseAllFourMotors(&dev, 1800U, 1500U, 1200U, 1900U);
+
+    // Act 1: Trigger Illegal Instruction Trap (mcause = 2) mid-pulse
+    handle_trap(2U, 0x00202100U, nullptr);
+
+    // Assert 1: Timer 1 stopped, IRQ 8 masked, PA1..PA4 all strictly LOW (0)
+    assertAllMotorsHaltedAndLow();
+
+    // Arrange 2: Re-arm mid-pulse and inject Store Access Fault (mcause = 7)
+    armMidPulseAllFourMotors(&dev, 1750U, 1750U, 1750U, 1750U);
+
+    // Act 2: Trigger Store/AMO access fault mid-pulse
+    handle_trap(7U, 0x00203200U, nullptr);
+
+    // Assert 2: Emergency shutdown holds for any synchronous CPU exception
+    assertAllMotorsHaltedAndLow();
+
+    // Real-world flight consequence:
+    // Without hardware motor cutoff inside handle_trap(), an RVC trap or bus fault freezes
+    // CPU scheduling while PA1..PA4 remain latched HIGH or Timer 1 keeps pulsing full throttle.
+}
+
+// A2: systemReset() & systemResetToBootloader() MUST cut all PWM motor outputs first
+TEST_F(AriesPwmMotorTest, Test_MotorShutdown_SystemResetAndBootloaderCutAllPwmOutputs)
+{
+    // Arrange
+    motorDevice_t dev = initRealAriesPwm(400U, PWM_TYPE_PWM);
+    armMidPulseAllFourMotors(&dev, 1600U, 1650U, 1700U, 1750U);
+    thejas32_host_mstatus = 0x8U;
+
+    // Act 1: Soft system reset mid-pulse
+    systemReset();
+
+    // Assert 1: Interrupts cleared AND motors cut LOW before jump to 0x00202000
+    EXPECT_EQ(thejas32_host_mstatus & 0x8U, 0U);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN, 0U);
+    assertAllMotorsHaltedAndLow();
+
+    // Arrange 2: Re-arm mid-pulse and invoke bootloader entry reset
+    armMidPulseAllFourMotors(&dev, 1900U, 1900U, 1900U, 1900U);
+    thejas32_host_mstatus = 0x8U;
+
+    // Act 2: Flash reboot transition
+    systemResetToBootloader(BOOTLOADER_REQUEST_FLASH);
+
+    // Assert 2: Timer 1 stopped and PA1..PA4 forced LOW prior to reset
+    EXPECT_EQ(thejas32_host_mstatus & 0x8U, 0U);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN, 0U);
+    assertAllMotorsHaltedAndLow();
+
+    // Real-world flight consequence:
+    // Leaving ESC pulses floating or running while resetting into bootloader can spin props
+    // unexpectedly during bench flashing or reboot recovery.
+}
+
+// A3: failureMode() MUST shut down motors AND exit cleanly under UNIT_TEST
+TEST_F(AriesPwmMotorTest, Test_MotorShutdown_FailureModeCutsMotorsAndExitsCleanlyInUnitTest)
+{
+    // Arrange: Arm active PWM pulses on PA1..PA4 in parent before fork
+    motorDevice_t dev = initRealAriesPwm(400U, PWM_TYPE_PWM);
+    armMidPulseAllFourMotors(&dev, 1850U, 1850U, 1850U, 1850U);
+
+    int pipefd[2] = { -1, -1 };
+    ASSERT_EQ(pipe(pipefd), 0);
+
+    // Act: Invoke failureMode() in a child guarded by 50 ms alarm so infinite loops never hang suite
+    pid_t pid = fork();
+    ASSERT_GE(pid, 0);
+    if (pid == 0) {
+        close(pipefd[0]);
+        g_childReportWriteFd = pipefd[1];
+        struct sigaction sa = {};
+        sa.sa_handler = child_alarm_handler;
+        sigaction(SIGALRM, &sa, nullptr);
+        ualarm(50000U, 0U); // 50 ms hang guard
+
+        failureMode(FAILURE_CONFIG_STORE_FAILURE);
+
+        ualarm(0U, 0U);
+        FailureModeChildReport rep = {};
+        rep.returnedCleanly = 1U;
+        rep.timedOut = 0U;
+        rep.timer1Control = THEJAS32_TIMER(1).Control;
+        rep.intrEn = THEJAS32_INTR_CTRL.INTR_EN;
+        for (int i = 0; i < 4; i++) {
+            rep.gpioMotor[i] = thejas32_host_gpio_data[0][i + 1];
+        }
+        ssize_t ignored = write(pipefd[1], &rep, sizeof(rep));
+        (void)ignored;
+        close(pipefd[1]);
+        _exit(0);
+    }
+
+    close(pipefd[1]);
+    FailureModeChildReport rep = {};
+    ssize_t nread = read(pipefd[0], &rep, sizeof(rep));
+    close(pipefd[0]);
+
+    int status = 0;
+    waitpid(pid, &status, 0);
+
+    // Assert: failureMode() returns cleanly under UNIT_TEST AND forces motors/Timer 1 off
+    ASSERT_EQ(nread, (ssize_t)sizeof(rep));
+    EXPECT_EQ(rep.timedOut, 0U) << "failureMode() lacked #ifdef UNIT_TEST return and hung while(1)!";
+    EXPECT_EQ(rep.returnedCleanly, 1U);
+    EXPECT_EQ(rep.timer1Control, 0U);
+    EXPECT_EQ(rep.intrEn & (1UL << THEJAS32_IRQ_TIMER1), 0U);
+    for (int i = 0; i < 4; i++) {
+        EXPECT_EQ(rep.gpioMotor[i], 0U)
+            << "Motor PA" << (i + 1) << " remained HIGH during failureMode()!";
+    }
+
+    // Real-world flight consequence:
+    // Fatal init panics (missing IMU / config failure) must guarantee all ESC outputs are forced LOW
+    // before blinking the failure LED pattern.
+}
+
+// A4: Direct vTable->shutdown() is idempotent and isolates PA0/PA5/PA22
+TEST_F(AriesPwmMotorTest, Test_MotorShutdown_EmergencyStopIdempotentAndIsolatesNonMotorPins)
+{
+    // Arrange: Arm motors + assert unrelated Bank 0 (PA0 EXTI, PA5 SCK) & Bank 1 (PA22 LED0) pins
+    motorDevice_t dev = initRealAriesPwm(400U, PWM_TYPE_PWM);
+    armMidPulseAllFourMotors(&dev, 1400U, 1500U, 1600U, 1700U);
+    thejas32_host_gpio_data[0][0] = 1U;
+    thejas32_host_gpio_data[0][5] = (1U << 5);
+    thejas32_host_gpio_data[1][6] = (1U << 6); // PA22
+
+    // Act: Invoke shutdown twice consecutively
+    dev.vTable->shutdown();
+    dev.vTable->shutdown();
+
+    // Assert: Motors cut & Timer 1 stopped; PA0/PA5/PA22 completely undisturbed
+    assertAllMotorsHaltedAndLow();
+    EXPECT_NE(thejas32_host_gpio_data[0][0], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][5], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[1][6], 0U);
+
+    // Real-world flight consequence:
+    // Shutdown uses THEJAS32 address-decoded per-pin GPIO writes so cutting motor outputs cannot
+    // glitch active SPI SCK lines or Bank 1 LED/telemetry pins.
+}
+
+// A5: 1 kHz PID loop calling updateComplete() @ 1000 us MUST NOT truncate active 1800 us pulses
+TEST_F(AriesPwmMotorTest, Test_PwmRateGate_1kHzPidLoopSkipsUpdateDuringActive1800usPulse)
+{
+    // Arrange: Start staggered 4-motor frame at t = 0 us (max pulse = 1800 us)
+    motorDevice_t dev = initRealAriesPwm(400U, PWM_TYPE_PWM);
+    thejas32_host_mcycle_set(0ULL);
+    armMidPulseAllFourMotors(&dev, 1800U, 1100U, 1500U, 1200U);
+    EXPECT_EQ(THEJAS32_TIMER(1).LoadCount, 110000UL);
+
+    // Act 1: At t = 1000 us (1 kHz PID tick), pulses are STILL active on PA1..PA4!
+    thejas32_host_mcycle_advance(100000ULL); // +1000 us (100 MHz)
+    dev.vTable->writeInt(0, 1950U);
+    dev.vTable->writeInt(1, 1950U);
+    dev.vTable->writeInt(2, 1950U);
+    dev.vTable->writeInt(3, 1950U);
+    dev.vTable->updateComplete();
+
+    // Assert 1: Update MUST be skipped; Timer 1 stays at original 1100 us deadline (NOT overwritten to 1950 us)
+    EXPECT_EQ(THEJAS32_TIMER(1).LoadCount, 110000UL);
+    EXPECT_NE(thejas32_host_gpio_data[0][1], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][2], 0U);
+
+    // Act 2: Execute original 4 descending events through Timer 1 ISR to completion
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER1);
+    handle_trap(0x8000000BUL, 0U, nullptr); // 1100 us -> PA2 drops, delta 100 us
+    EXPECT_EQ(thejas32_host_gpio_data[0][2], 0U);
+    EXPECT_EQ(THEJAS32_TIMER(1).LoadCount, 10000UL);
+
+    handle_trap(0x8000000BUL, 0U, nullptr); // 1200 us -> PA4 drops, delta 300 us
+    EXPECT_EQ(thejas32_host_gpio_data[0][4], 0U);
+    EXPECT_EQ(THEJAS32_TIMER(1).LoadCount, 30000UL);
+
+    handle_trap(0x8000000BUL, 0U, nullptr); // 1500 us -> PA3 drops, delta 300 us
+    EXPECT_EQ(thejas32_host_gpio_data[0][3], 0U);
+    EXPECT_EQ(THEJAS32_TIMER(1).LoadCount, 30000UL);
+
+    handle_trap(0x8000000BUL, 0U, nullptr); // 1800 us -> PA1 drops, Timer 1 stops
+
+    // Assert 2: Frame completed full 1800 us cleanly without 1 kHz pulse chopping
+    assertAllMotorsHaltedAndLow();
+
+    // Real-world flight consequence:
+    // Because Betaflight sets useContinuousUpdate = true for standard PWM, calling updateComplete() at 1 kHz
+    // without pulse-active gating truncates every >1000 us command and stretches pins HIGH indefinitely.
+}
+
+// A6: 400 Hz period gate blocks < 2500 us idle updates and survives 32-bit micros() rollover
+TEST_F(AriesPwmMotorTest, Test_PwmRateGate_400HzPeriodBlocksTooEarlyIdleUpdateAndHandlesMicrosWrap)
+{
+    // Arrange: Start short 1050 us disarmed frame at t = 0 us (400 Hz -> 2500 us min period)
+    motorDevice_t dev = initRealAriesPwm(400U, PWM_TYPE_PWM);
+    thejas32_host_mcycle_set(0ULL);
+    armMidPulseAllFourMotors(&dev, 1050U, 1050U, 1050U, 1050U);
+
+    // Finish the short pulse at t = 1050 us (Timer 1 is now IDLE)
+    thejas32_host_mcycle_set(1050ULL * 100ULL);
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER1);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    assertAllMotorsHaltedAndLow();
+
+    // Act 1: PID tick arrives at t = 2000 us (< 2500 us period) even though pulses are finished
+    thejas32_host_mcycle_set(2000ULL * 100ULL);
+    dev.vTable->writeInt(0, 1300U);
+    dev.vTable->updateComplete();
+
+    // Assert 1: Strictly rate-gated until >= 2500 us so standard ESCs never see >400 Hz updates
+    EXPECT_EQ(THEJAS32_TIMER(1).Control, 0U);
+    EXPECT_EQ(thejas32_host_gpio_data[0][1], 0U);
+
+    // Act 2: Advance to t = 2500 us (exactly 1/400 s period) -> update fires cleanly
+    thejas32_host_mcycle_set(2500ULL * 100ULL);
+    for (uint8_t i = 0; i < 4U; i++) {
+        dev.vTable->writeInt(i, 1300U);
+    }
+    dev.vTable->updateComplete();
+    EXPECT_NE(THEJAS32_TIMER(1).Control, 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][1], 0U);
+
+    // Drain that frame cleanly
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER1);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    assertAllMotorsHaltedAndLow();
+
+    // Act 3: Position micros() at 0xFFFFFC18 (-1000 us before 32-bit wrap), start frame, then test across rollover
+    thejas32_host_mcycle_set(0xFFFFFC18ULL * 100ULL);
+    armMidPulseAllFourMotors(&dev, 1050U, 1050U, 1050U, 1050U);
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER1);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    assertAllMotorsHaltedAndLow();
+
+    // +2000 us later (micros() = 0x000003E8 = +1000 us after wrap): elapsed = 2000 us < 2500 us -> MUST still gate!
+    thejas32_host_mcycle_set(0x1000003E8ULL * 100ULL);
+    dev.vTable->writeInt(0, 1400U);
+    dev.vTable->updateComplete();
+    EXPECT_EQ(THEJAS32_TIMER(1).Control, 0U);
+
+    // +2500 us later (micros() = 0x000005DC = +1500 us after wrap): elapsed = 2500 us -> MUST fire!
+    thejas32_host_mcycle_set(0x1000005DCULL * 100ULL);
+    dev.vTable->writeInt(0, 1400U);
+    dev.vTable->updateComplete();
+    EXPECT_NE(THEJAS32_TIMER(1).Control, 0U);
+
+    // Real-world flight consequence:
+    // Signed or non-wrapping micros() comparison freezes motors for 71.58 minutes at rollover,
+    // while omitting the 2500 us gate overdrives 400 Hz ESCs into brownout/desync.
+}
+
+// A7: Honors configured motorPwmRate (50 Hz servo vs 4000 Hz OneShot125) without fixed stall
+TEST_F(AriesPwmMotorTest, Test_PwmRateGate_HonorsCustomRateAndOneShotPeriodWithoutStaleFrameFreeze)
+{
+    // Case 1: 50 Hz standard servo/ESC rate -> 20,000 us period
+    motorDevice_t dev50 = initRealAriesPwm(50U, PWM_TYPE_PWM);
+    thejas32_host_mcycle_set(0ULL);
+    armMidPulseAllFourMotors(&dev50, 1050U, 1050U, 1050U, 1050U);
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER1);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+
+    // At t = 5000 us (< 20000 us), must stay gated
+    thejas32_host_mcycle_set(5000ULL * 100ULL);
+    dev50.vTable->writeInt(0, 1500U);
+    dev50.vTable->updateComplete();
+    EXPECT_EQ(THEJAS32_TIMER(1).Control, 0U);
+
+    // At t = 20000 us, fires cleanly
+    thejas32_host_mcycle_set(20000ULL * 100ULL);
+    dev50.vTable->writeInt(0, 1500U);
+    dev50.vTable->updateComplete();
+    EXPECT_NE(THEJAS32_TIMER(1).Control, 0U);
+
+    // Case 2: OneShot125 @ 4000 Hz -> 250 us period (must NOT be throttled to 2500 us)
+    motorDevice_t devOs = initRealAriesPwm(4000U, PWM_TYPE_ONESHOT125);
+    thejas32_host_mcycle_set(0ULL);
+    armMidPulseAllFourMotors(&devOs, 125U, 125U, 125U, 125U);
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER1);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    assertAllMotorsHaltedAndLow();
+
+    // At t = 300 us (>= 250 us period and pulse finished at 125 us), OneShot125 fires next frame cleanly
+    thejas32_host_mcycle_set(300ULL * 100ULL);
+    devOs.vTable->writeInt(0, 200U);
+    devOs.vTable->updateComplete();
+    EXPECT_NE(THEJAS32_TIMER(1).Control, 0U);
+
+    // Real-world flight consequence:
+    // Deriving frame period dynamically from motorConfig->motorPwmRate supports both 50 Hz planes/servos
+    // and fast OneShot125 loops without artificially throttling high-rate protocols.
+}

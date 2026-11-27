@@ -559,3 +559,206 @@ TEST(AriesSystemTimeTest, Test_RealSystemC_TimebaseTrapDispatchAndReset) {
     EXPECT_NE(thejas32_host_mie & 0x800U, 0U);
     EXPECT_NE(thejas32_host_mstatus & 0x8U, 0U);
 }
+
+// =============================================================================
+// GROUPS C, D, F (Pre-Phase 20): Quiet Boot, Bootloader Safety & 64-Bit Millis
+// =============================================================================
+
+#include <stdio.h>
+#include <string.h>
+
+extern "C" {
+void systemInit(void);
+void systemResetToBootloader(uint8_t requestType);
+}
+
+static bool systime_read_repo_file(const char *relPath, char *buf, size_t bufSize)
+{
+    static const char *const prefixes[] = { "../../", "../", "./", "../../../" };
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s%s", prefixes[i], relPath);
+        FILE *f = fopen(path, "rb");
+        if (f) {
+            size_t n = fread(buf, 1, bufSize - 1U, f);
+            buf[n] = '\0';
+            fclose(f);
+            return n > 0U;
+        }
+    }
+    return false;
+}
+
+// C1: ARIES.mk defaults ARIES_DEV_LOGGING=0 for production builds
+TEST(AriesSystemTimeTest, Test_QuietBoot_AriesMkDefaultsDevLoggingToZero)
+{
+    // Arrange
+    static char mkBuf[32768];
+    ASSERT_TRUE(systime_read_repo_file("src/platform/ARIES/mk/ARIES.mk", mkBuf, sizeof(mkBuf)));
+
+    // Act & Assert: Default production build flags MUST NOT hard-enable ARIES_DEV_LOGGING=1
+    EXPECT_EQ(strstr(mkBuf, "-DARIES_DEV_LOGGING=1"), nullptr)
+        << "ARIES.mk must default ARIES_DEV_LOGGING=0 so boot banners do not jam MSP/CLI!";
+    EXPECT_NE(strstr(mkBuf, "ARIES_DEV_LOGGING"), nullptr);
+
+    // Real-world flight consequence:
+    // Emitting diagnostic ASCII banners on UART0 during boot breaks MSP frame synchronization
+    // and fills flash/SRAM with dead telemetry strings.
+}
+
+// C2: targetPreInit() & systemInit() emit zero UART0 TX chars when ARIES_DEV_LOGGING==0
+TEST(AriesSystemTimeTest, Test_QuietBoot_TargetPreInitAndSystemInitSilentWhenDevLoggingDisabled)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    THEJAS32_UART(0).UART_LSR = 0x60U;
+
+    // Act: Initialize clock/UART0/system under production logging rules
+    targetPreInit();
+    const uint32_t uartDrAfterPreInit = THEJAS32_UART(0).UART_DR & 0xFFU;
+    systemInit();
+    const uint32_t uartDrAfterSysInit = THEJAS32_UART(0).UART_DR & 0xFFU;
+
+    // Assert 1: targetPreInit() emits 0 bytes (0U); systemInit() sets BRG DLL=54 (0x36) with 0 banner chars
+    EXPECT_EQ(uartDrAfterPreInit, 0U);
+    EXPECT_NE(uartDrAfterSysInit, (uint32_t)'\n');
+    EXPECT_EQ(uartDrAfterSysInit, 0x36U);
+
+    // Assert 2: Verify system.c gates boot debug prints behind ARIES_DEV_LOGGING > 0
+    static char sysBuf[32768];
+    ASSERT_TRUE(systime_read_repo_file("src/platform/ARIES/system.c", sysBuf, sizeof(sysBuf)));
+    const char *logCall = strstr(sysBuf, "thejas32_early_uart_puts(\"[ARIES]");
+    if (logCall != nullptr) {
+        const char *guard = strstr(sysBuf, "ARIES_DEV_LOGGING");
+        EXPECT_TRUE(guard != nullptr && guard < logCall)
+            << "Boot banner in system.c must be gated behind ARIES_DEV_LOGGING > 0!";
+    }
+
+    // Real-world flight consequence:
+    // Unconditional UART0 boot banners corrupt the host MSP stream during reboot reconnects.
+}
+
+// D4: BOOTLOADER_REQUEST_ROM stops interrupts/motors and does NOT reuse firmware SRAM reboot
+TEST(AriesSystemTimeTest, Test_BootloaderReset_RomRequestDoesNotReuseFirmwareResetAddress)
+{
+    // Arrange: Enable interrupts and reset host counters
+    thejas32_host_reset_all();
+    THEJAS32_INTR_CTRL.INTR_EN = 0xFFFFFFFFUL;
+    thejas32_host_mstatus = 0x8U;
+
+    // Act: BOOTLOADER_REQUEST_ROM (0)
+    systemResetToBootloader(0U);
+
+    // Assert: Must disable all IRQs + MIE, AND must NOT silently invoke firmware reset (0x00202000)
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN, 0U);
+    EXPECT_EQ(thejas32_host_mstatus & 0x8U, 0U);
+    EXPECT_EQ(thejas32_host_reset_count, 0U)
+        << "BOOTLOADER_REQUEST_ROM must not masquerade as a 0x00202000 firmware soft reset!";
+
+    // Real-world flight consequence:
+    // Jumping back to SRAM 0x00202000 when user clicks 'Bootloader' in Configurator leaves the
+    // board running Betaflight again instead of entering safe bootloader/halt mode.
+}
+
+// D5: BOOTLOADER_REQUEST_FLASH cleanly shuts down interrupts and triggers SRAM reboot path
+TEST(AriesSystemTimeTest, Test_BootloaderReset_FlashRequestShutsDownInterruptsAndRebootsToSram)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    THEJAS32_INTR_CTRL.INTR_EN = 0xFFFFFFFFUL;
+    thejas32_host_mstatus = 0x8U;
+
+    // Act: BOOTLOADER_REQUEST_FLASH (1)
+    systemResetToBootloader(1U);
+
+    // Assert: All interrupts disabled and firmware soft-reset executed cleanly
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN, 0U);
+    EXPECT_EQ(thejas32_host_mstatus & 0x8U, 0U);
+    EXPECT_EQ(thejas32_host_reset_count, 1U);
+
+    // Real-world flight consequence:
+    // Firmware soft-reboot path must deterministically reset to 0x00202000 with IRQs masked.
+}
+
+// F1: 64-bit millis() accurate past 71.58 min (2^32 us), 31.73 days, and 49.71 day rollover
+TEST(AriesSystemTimeTest, Test_SystemTime_Millis64BitNoOverflowAt71Min31DayAnd49DayRollovers)
+{
+    // Arrange: 100 MHz CPU => 100,000 cycles per millisecond
+    thejas32_host_reset_all();
+
+    // Case 1: t = 0 ms
+    thejas32_host_mcycle_set(0ULL);
+    EXPECT_EQ(millis(), 0UL);
+
+    // Case 2: Just past 71.58 minutes (2^32 us = 4,294,967.296 ms -> 4,294,968 ms)
+    // Calling reciprocal math on 32-bit micros() wraps back to 0 ms here!
+    thejas32_host_mcycle_set(429496800000ULL);
+    EXPECT_EQ(millis(), 4294968UL)
+        << "millis() wrapped prematurely at 71.58 min because it derived from 32-bit micros()!";
+
+    // Case 3: Around 31.73 days (2,742,400,000 ms = 274,240,000,000,000 cycles)
+    thejas32_host_mcycle_set(2742400000ULL * 100000ULL);
+    EXPECT_EQ(millis(), 2742400000UL);
+
+    // Case 4: Across full 49.71-day uint32_t ms rollover (0xFFFFFFFF -> 0x00000000 -> 0x00000001)
+    thejas32_host_mcycle_set(4294967295ULL * 100000ULL);
+    EXPECT_EQ(millis(), 0xFFFFFFFFUL);
+    thejas32_host_mcycle_advance(100000ULL);
+    EXPECT_EQ(millis(), 0UL);
+    thejas32_host_mcycle_advance(100000ULL);
+    EXPECT_EQ(millis(), 1UL);
+
+    // Real-world flight consequence:
+    // Uptime wrap at 71.58 minutes resets OSD flight timers, scheduler delta checks, and CLI quiet guards.
+}
+
+// F2: Remove dead compute_millis_fast() helper and orphan shortcut: comments in system.c
+TEST(AriesSystemTimeTest, Test_SystemTime_NoDeadComputeMillisFastAndZeroTrailingShortcutsInSystemC)
+{
+    // Arrange
+    static char sysBuf[32768];
+    ASSERT_TRUE(systime_read_repo_file("src/platform/ARIES/system.c", sysBuf, sizeof(sysBuf)));
+
+    // Assert
+    EXPECT_EQ(strstr(sysBuf, "compute_millis_fast"), nullptr)
+        << "Dead compute_millis_fast() helper must be removed once millis() uses 64-bit mcycle!";
+    EXPECT_EQ(strstr(sysBuf, "shortcut:"), nullptr)
+        << "Unresolved orphan shortcut: comment in system.c must be resolved/removed!";
+
+    // Real-world flight consequence:
+    // Dead timebase helpers and untracked shortcut comments hide overflow regressions in future edits.
+}
+
+// F7: Real system.c handle_trap() spurious/multi-IRQ mask preservation and 64-bit mcycle carry
+TEST(AriesSystemTimeTest, Test_RealSystemC_HandleTrapSpuriousAndConcurrentIrqPreservationAndMcycleWrap)
+{
+    // Arrange: Clear host state, arm three valid peripheral IRQs in INTR_EN
+    thejas32_host_reset_all();
+    const uint32_t armedMask = (1UL << THEJAS32_IRQ_UART0) |
+                               (1UL << THEJAS32_IRQ_UART1) |
+                               (1UL << THEJAS32_IRQ_TIMER1);
+    THEJAS32_INTR_CTRL.INTR_EN = armedMask;
+    THEJAS32_INTR_CTRL.INTR_STATUS = 0U;
+    thejas32_host_mstatus = 0U;
+
+    // Act 1: Spurious external interrupt (mcause = 0x8000000B, INTR_STATUS == 0)
+    const uint32_t retPc = handle_trap(0x8000000BUL, 0x00202444U, nullptr);
+
+    // Assert 1: mepc preserved, armed INTR_EN untouched, MIE preserved
+    EXPECT_EQ(retPc, 0x00202444U);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN, armedMask);
+    EXPECT_EQ(thejas32_host_mstatus, 0U);
+
+    // Act 2: Test 64-bit mcycle carry across 32-bit low-word rollover (0xFFFFFFFF -> 0x100000005)
+    thejas32_host_mcycle_set(0x00000000FFFFFFFFULL);
+    const uint64_t before = getCycleCounter64();
+    thejas32_host_mcycle_advance(6ULL);
+    const uint64_t after = getCycleCounter64();
+
+    // Assert 2
+    EXPECT_EQ(before, 0x00000000FFFFFFFFULL);
+    EXPECT_EQ(after, 0x0000000100000005ULL);
+
+    // Real-world flight consequence:
+    // Torn 64-bit CSR mcycle reads at 42.9-second intervals cause huge negative loop delta spikes in PID/EKF.
+}

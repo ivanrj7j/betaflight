@@ -58,6 +58,8 @@ aries_linker_unittest_SRC := \
 
 aries_atomics_unittest_SRC := \
 		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/io_aries.c \
+		$(USER_DIR)/drivers/io.c \
 		$(ARIES_DIR)/stub_drivers.c
 
 aries_atomics_unittest_DEFINES := \
@@ -79,8 +81,11 @@ aries_system_time_unittest_INCLUDE_DIRS := \
 aries_target_config_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
 
+aries_target_config_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
 aries_target_config_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_mcu_excludes_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
@@ -89,12 +94,19 @@ aries_mcu_excludes_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
 aries_pg_bounds_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/config/config_streamer.c \
 		$(USER_DIR)/common/crc.c \
 		$(USER_DIR)/common/streambuf.c
 
+aries_pg_bounds_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
 aries_pg_bounds_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_uart_hw_unittest_SRC := \
 		$(ARIES_UNIT_COMMON_SRC) \
@@ -165,7 +177,6 @@ aries_cli_entry_unittest_SRC := \
 
 aries_cli_entry_unittest_DEFINES := \
 		USE_CLI= \
-		USE_IMMEDIATE_CLI= \
 		USE_MSP_DISPLAYPORT=
 
 aries_cli_entry_unittest_INCLUDE_DIRS := \
@@ -183,6 +194,7 @@ aries_integration_unittest_INCLUDE_DIRS := \
 aries_io_unittest_SRC := \
 		$(ARIES_UNIT_COMMON_SRC) \
 		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/stub_drivers.c \
 		$(USER_DIR)/drivers/io.c
 
 aries_io_unittest_DEFINES := \

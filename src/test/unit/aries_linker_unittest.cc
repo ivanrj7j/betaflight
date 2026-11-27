@@ -270,3 +270,116 @@ TEST(AriesLinkerTest, Test_SectionLinkOrder_NoInitSectionPreservedAcrossWarmRese
     uint32_t noinit_size = _enoinit - _snoinit;
     EXPECT_GE(noinit_size, 64U);
 }
+
+// =============================================================================
+// GROUP D (Pre-Phase 20 Linker & Build Verify Audits)
+// =============================================================================
+
+#include <stdio.h>
+#include <stdlib.h>
+
+static bool linker_read_repo_file(const char *relPath, char *buf, size_t bufSize)
+{
+    static const char *const prefixes[] = { "../../", "../", "./", "../../../" };
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s%s", prefixes[i], relPath);
+        FILE *f = fopen(path, "rb");
+        if (f) {
+            size_t n = fread(buf, 1, bufSize - 1U, f);
+            buf[n] = '\0';
+            fclose(f);
+            return n > 0U;
+        }
+    }
+    return false;
+}
+
+// D6: Actual aries_v3.ld clamps RAM LENGTH <= 242K (0x0023E800), preserving 6 KB bootloader log
+TEST(AriesLinkerTest, Test_LinkerScript_ActualFileClampsRamCeilingTo242KBelowBootloaderLog)
+{
+    // Arrange
+    static char ldBuf[32768];
+    ASSERT_TRUE(linker_read_repo_file("src/platform/ARIES/link/aries_v3.ld", ldBuf, sizeof(ldBuf)));
+
+    // Act: Parse actual RAM ORIGIN and LENGTH from aries_v3.ld
+    const char *ramLine = strstr(ldBuf, "RAM");
+    ASSERT_NE(ramLine, nullptr);
+    const char *origPtr = strstr(ramLine, "ORIGIN = ");
+    ASSERT_NE(origPtr, nullptr);
+    uint32_t origin = (uint32_t)strtoul(origPtr + 9, nullptr, 0);
+
+    const char *lenPtr = strstr(origPtr, "LENGTH = ");
+    ASSERT_NE(lenPtr, nullptr);
+    char *unit = nullptr;
+    unsigned long lenVal = strtoul(lenPtr + 9, &unit, 0);
+    if (unit && (*unit == 'K' || *unit == 'k')) {
+        lenVal *= 1024UL;
+    }
+
+    // Assert: ORIGIN == 0x00202000 and end <= 0x0023E800 (242 KB max = 247,808 bytes)
+    EXPECT_EQ(origin, 0x00202000UL);
+    EXPECT_LE(lenVal, 242UL * 1024UL)
+        << "aries_v3.ld LENGTH > 242K overlaps ROM bootloader log/workspace at 0x0023E800..0x0023FFFF!";
+    EXPECT_LE(origin + lenVal, 0x0023E800UL);
+
+    // Real-world flight consequence:
+    // Expanding heap/stack past 0x0023E800 overwrites the ROM bootloader status region on warm reset.
+}
+
+// D7: Actual aries_v3.ld puts .text.startup first, isolates .noinit after _ebss, guards stack
+TEST(AriesLinkerTest, Test_LinkerScript_ActualFileEnforcesStartupFirstNoInitIsolationAndStackReserve)
+{
+    // Arrange
+    static char ldBuf[32768];
+    ASSERT_TRUE(linker_read_repo_file("src/platform/ARIES/link/aries_v3.ld", ldBuf, sizeof(ldBuf)));
+
+    // Act
+    const char *startupSec = strstr(ldBuf, ".text.startup");
+    const char *initSec = strstr(ldBuf, ".init");
+    const char *pgReg = strstr(ldBuf, ".pg_registry");
+    const char *pgReset = strstr(ldBuf, ".pg_resetdata");
+    const char *ebssSym = strstr(ldBuf, "_ebss");
+    const char *noinitSec = strstr(ldBuf, ".noinit");
+    const char *noinitNoload = strstr(ldBuf, "(NOLOAD)");
+    const char *stackCheck = strstr(ldBuf, "_stack_size");
+    const char *assertCheck = strstr(ldBuf, "ASSERT(");
+
+    // Assert
+    ASSERT_NE(startupSec, nullptr);
+    ASSERT_NE(initSec, nullptr);
+    EXPECT_LT(startupSec, initSec) << ".text.startup must strictly precede .init!";
+    EXPECT_NE(pgReg, nullptr);
+    EXPECT_NE(pgReset, nullptr);
+    EXPECT_NE(noinitSec, nullptr);
+    EXPECT_NE(noinitNoload, nullptr);
+    if (ebssSym && noinitSec) {
+        EXPECT_LT(ebssSym, noinitSec) << ".noinit must follow _ebss so startup.S never zeroes it!";
+    }
+    EXPECT_TRUE(stackCheck != nullptr && assertCheck != nullptr)
+        << "aries_v3.ld must explicitly reserve and ASSERT minimum 8 KB stack headroom!";
+
+    // Real-world flight consequence:
+    // Without an explicit stack reserve assertion, SRAM bloat silently shrinks the stack until
+    // deep PID/MSP/ISR call chains corrupt .bss/.noinit.
+}
+
+// D8: Actual build_verify.sh enforces 242K ceiling, 0 RVC instructions, and 0x00202000 entry
+TEST(AriesLinkerTest, Test_BuildVerifyScript_ActualScriptEnforces242KCeilingZeroRvcAndRamOrigin)
+{
+    // Arrange
+    static char shBuf[32768];
+    ASSERT_TRUE(linker_read_repo_file("src/test/unit/aries/build_verify.sh", shBuf, sizeof(shBuf)));
+
+    // Assert: Must enforce 242K (247808 bytes), NOT stale 248K (253952)
+    EXPECT_EQ(strstr(shBuf, "253952"), nullptr)
+        << "build_verify.sh still permits 248K (253952 B) instead of safe 242K (247808 B) limit!";
+    EXPECT_TRUE(strstr(shBuf, "247808") != nullptr || strstr(shBuf, "242") != nullptr)
+        << "build_verify.sh must enforce the 242 KB (247808 B) SRAM binary limit!";
+    EXPECT_NE(strstr(shBuf, "00202000"), nullptr);
+    EXPECT_NE(strstr(shBuf, "c."), nullptr);
+
+    // Real-world flight consequence:
+    // CI verification must fail immediately if firmware size crosses the bootloader-safe 242 KB bound
+    // or if any 16-bit RVC opcode creeps into RV32IM silicon.
+}

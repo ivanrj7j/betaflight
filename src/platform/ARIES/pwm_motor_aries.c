@@ -28,6 +28,7 @@
 #include "drivers/motor_impl.h"
 #include "drivers/motor_types.h"
 #include "drivers/pwm_output.h"
+#include "drivers/time.h"
 #include "pg/motor.h"
 #include "platform/bsp_thejas32.h"
 #include "target.h"
@@ -58,6 +59,33 @@ static deadline_entry_t aries_sorted_deadlines[ARIES_MAX_MOTORS];
 static uint8_t aries_motor_count = 0;
 static volatile uint8_t aries_current_deadline_idx = 0;
 static bool aries_subsystem_enabled = false;
+static uint32_t aries_frame_period_us = 2500UL;
+static uint32_t aries_last_frame_start_us = 0U;
+static bool aries_frame_started = false;
+
+void ariesPwmEmergencyStop(void)
+{
+    THEJAS32_TIMER(1).Control = 0;
+    volatile uint32_t clear_latch = THEJAS32_TIMER(1).EOI;
+    (void)clear_latch;
+    thejas32_interrupt_disable(THEJAS32_IRQ_TIMER1);
+
+    aries_current_deadline_idx = aries_motor_count;
+    aries_frame_started = false;
+
+    if (aries_motor_count > 0U) {
+        for (uint8_t i = 0; i < aries_motor_count; i++) {
+            if (aries_motors[i].io) {
+                IOLo(aries_motors[i].io);
+            }
+        }
+    } else {
+        for (uint16_t pin = 1U; pin <= 4U; pin++) {
+            *thejas32_gpio_data_ptr(pin) = 0U;
+        }
+    }
+    THEJAS32_MEMORY_FENCE();
+}
 
 // -----------------------------------------------------------------------------
 // Timer 1 Ascending Deadline Interrupt Service Routine (IRQ 8)
@@ -205,6 +233,16 @@ static void ariesPwmMotorUpdateComplete(void)
         return;
     }
 
+    // Do not chop active pulses or overdrive ESCs when loop runs faster than configured PWM rate
+    if ((THEJAS32_TIMER(1).Control & 0x01U) != 0U) {
+        return;
+    }
+
+    const uint32_t now_us = micros();
+    if (aries_frame_started && ((uint32_t)(now_us - aries_last_frame_start_us) < aries_frame_period_us)) {
+        return;
+    }
+
     // STEP 1: Preemptive Timer 1 disable to prevent race conditions
     THEJAS32_TIMER(1).Control = 0;
     volatile uint32_t clear_latch = THEJAS32_TIMER(1).EOI;
@@ -234,7 +272,9 @@ static void ariesPwmMotorUpdateComplete(void)
         }
     }
 
-    // STEP 4: Arm Timer 1 for the first deadline
+    // STEP 4: Record frame timestamp and arm Timer 1 for the first deadline
+    aries_last_frame_start_us = now_us;
+    aries_frame_started = true;
     aries_current_deadline_idx = 0;
     uint32_t first_cycles = aries_sorted_deadlines[0].cycles;
     THEJAS32_TIMER(1).LoadCount = first_cycles;
@@ -246,6 +286,7 @@ static void ariesPwmMotorUpdateComplete(void)
 
 static void ariesPwmMotorShutdown(void)
 {
+    ariesPwmEmergencyStop();
     ariesPwmMotorDisable();
 }
 
@@ -304,6 +345,10 @@ bool motorPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorDevConf
     memset(aries_sorted_deadlines, 0, sizeof(aries_sorted_deadlines));
     aries_motor_count = 0;
     aries_subsystem_enabled = false;
+    aries_last_frame_start_us = 0U;
+    aries_frame_started = false;
+    const uint16_t rate_hz = (motorDevConfig && motorDevConfig->motorPwmRate > 0U) ? motorDevConfig->motorPwmRate : 400U;
+    aries_frame_period_us = 1000000UL / rate_hz;
 
     // Default pin mapping: Motor 1-3 on PA1-PA3 (Header J2), Motor 4 on PA4 (Header J1)
     const ioTag_t default_motor_tags[ARIES_MAX_MOTORS] = {

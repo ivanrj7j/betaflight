@@ -148,9 +148,9 @@ void spiInitDevice(spiDevice_e device)
 
     // Default configuration: 8-bit, MSB first, polling mode (interrupts disabled)
     // C-DAC VEGA SDK: Baudrate = (bBaudCFD << 4)
-    // Ground Truth 7: Clamped to Divisor 1 = 12.5 MHz
+    // Ground Truth 7: Clamped to Divisor 1 = 12.5 MHz; default Mode 3 matches leadingEdge=false (ICM-42688P)
     hw->Baudrate = (THEJAS32_SPI_BAUD_DIV_8 << 4);
-    hw->Control = 0; // Mode 0 (CPOL=0, CPHA=0), MSB first, fixed periph 0
+    hw->Control = (THEJAS32_SPI_CTRL_MODE_3 << THEJAS32_SPI_CTRL_MODE_SHIFT);
 
     THEJAS32_MEMORY_FENCE();
 

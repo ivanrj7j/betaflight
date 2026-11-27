@@ -544,3 +544,383 @@ TEST_F(AriesUartTxDrainTest, Test_RealUartTxDrainAriesC_Bounded16BytePollTx) {
     EXPECT_EQ(THEJAS32_UART(0).UART_DR & 0xFFU, (uint32_t)(0x41 + 23));
     EXPECT_TRUE(sp0->vTable->isSerialTransmitBufferEmpty(sp0));
 }
+
+// =============================================================================
+// GROUP B (Pre-Phase 20 Comms): 512 B TX Ring, Erratum 1 & Atomic TX ISR/Tail
+// =============================================================================
+
+#include <stdio.h>
+#include <string.h>
+
+extern "C" {
+uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp);
+void thejas32_uart1_isr(void);
+}
+
+static bool uart_test_read_repo_file(const char *relPath, char *buf, size_t bufSize)
+{
+    static const char *const prefixes[] = { "../../", "../", "./", "../../../" };
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s%s", prefixes[i], relPath);
+        FILE *f = fopen(path, "rb");
+        if (f) {
+            size_t n = fread(buf, 1, bufSize - 1U, f);
+            buf[n] = '\0';
+            fclose(f);
+            return n > 0U;
+        }
+    }
+    return false;
+}
+
+// B1: UART_TX_BUFFER_SIZE >= 512 holds full 306-byte MSP_ADJUSTMENT_RANGES burst without wrap/drop
+TEST_F(AriesUartTxDrainTest, Test_UART_TxBufferSize_AtLeast512BytesHolds306ByteMspAdjustmentRanges)
+{
+    // Arrange: Validate macro AND runtime buffer allocation on UART0
+    EXPECT_GE((size_t)UART_TX_BUFFER_SIZE, 512U)
+        << "UART_TX_BUFFER_SIZE=256 silently truncates 306-byte MSP_ADJUSTMENT_RANGES replies!";
+
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+    EXPECT_GE(sp0->txBufferSize, 512U);
+
+    // Hold THRE LOW while Configurator enqueues full 306-byte framed MSP_ADJUSTMENT_RANGES reply
+    THEJAS32_UART(0).UART_LSR = 0x00U;
+    uint8_t mspFrame[306];
+    mspFrame[0] = '$';
+    mspFrame[1] = 'X';
+    mspFrame[2] = '>';
+    mspFrame[3] = 0x00U; // flag
+    mspFrame[4] = 52U;   // MSP_ADJUSTMENT_RANGES low
+    mspFrame[5] = 0U;    // cmd high
+    for (size_t i = 6U; i < sizeof(mspFrame) - 1U; i++) {
+        mspFrame[i] = (uint8_t)(i ^ 0x5AU);
+    }
+    mspFrame[sizeof(mspFrame) - 1U] = 0xAAU;
+
+    // Act: Single burst write of 306 bytes before any drain occurs
+    sp0->vTable->writeBuf(sp0, mspFrame, (int)sizeof(mspFrame));
+
+    // Assert: All 306 bytes retained (free == txBufferSize - 1 - 306) and drained in exact byte order
+    uint32_t freeAfterWrite = sp0->vTable->serialTotalTxFree(sp0);
+    EXPECT_EQ(sp0->txBufferSize - 1U - freeAfterWrite, sizeof(mspFrame));
+
+    THEJAS32_UART(0).UART_LSR = 0x60U;
+    uint32_t expectedLast = mspFrame[sizeof(mspFrame) - 1U];
+    unsigned safetyLoops = 0U;
+    while (!sp0->vTable->isSerialTransmitBufferEmpty(sp0) && safetyLoops++ < 64U) {
+        uartPollTx();
+    }
+    EXPECT_TRUE(sp0->vTable->isSerialTransmitBufferEmpty(sp0));
+    EXPECT_EQ(THEJAS32_UART(0).UART_DR & 0xFFU, expectedLast);
+
+    // Real-world flight consequence:
+    // MSP_ADJUSTMENT_RANGES (30 x 10 B = 300 B payload -> 306 B framed) overflows a 256-byte TX ring
+    // in one write, corrupting Betaflight Configurator Adjustments tab state.
+}
+
+// B3: Erratum 1 (FCR = 0x00) non-FIFO UART0 sustains >= 1 KB/s full-duplex without ORE
+TEST_F(AriesUartTxDrainTest, Test_UART0_Erratum1_Fcr0x00_NonFifoSustained1KBpsWithoutOre)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+
+    // Erratum 1: FCR must stay 0x00 (FIFO enable bits [7:6]/bit0 NOT latched)
+    EXPECT_EQ(THEJAS32_UART(0).UART_IIR_FCR & 0xC0U, 0U);
+
+    // Act: Stream 1024 RX single-byte interrupts interleaved with 1024 TX bytes in 16-byte service slices
+    uint32_t rxVerified = 0U;
+    uint8_t nextTxByte = 0x10U;
+    for (uint32_t blk = 0U; blk < 64U; blk++) {
+        for (uint32_t k = 0U; k < 16U; k++) {
+            uint8_t b = (uint8_t)((blk * 16U + k) & 0xFFU);
+            THEJAS32_UART(0).UART_DR = b;
+            THEJAS32_UART(0).UART_LSR = 0x61U; // DR=1, ORE=0
+            THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+            handle_trap(0x8000000BUL, 0U, nullptr);
+            EXPECT_EQ(THEJAS32_UART(0).UART_LSR & 0x02U, 0U);
+        }
+        while (sp0->vTable->serialTotalRxWaiting(sp0) > 0U) {
+            EXPECT_EQ(sp0->vTable->serialRead(sp0), (uint8_t)(rxVerified & 0xFFU));
+            rxVerified++;
+        }
+
+        uint8_t txChunk[16];
+        for (size_t i = 0; i < sizeof(txChunk); i++) {
+            txChunk[i] = nextTxByte++;
+        }
+        THEJAS32_UART(0).UART_LSR = 0x60U;
+        sp0->vTable->writeBuf(sp0, txChunk, (int)sizeof(txChunk));
+        uartPollTx();
+        EXPECT_TRUE(sp0->vTable->isSerialTransmitBufferEmpty(sp0));
+    }
+
+    // Assert: All 1024 RX and 1024 TX bytes transferred cleanly under Erratum 1 single-byte HW buffer
+    EXPECT_EQ(rxVerified, 1024U);
+    EXPECT_EQ(THEJAS32_UART(0).UART_DR & 0xFFU, (uint32_t)(uint8_t)(nextTxByte - 1U));
+
+    // Real-world flight consequence:
+    // Because THEJAS32 Erratum 1 breaks 16-byte RX FIFO operation when FCR != 0x00, keeping FCR=0x00
+    // with per-byte ISR drain guarantees zero MSP/telemetry framing corruption.
+}
+
+// B5 (H22): uartEnableTxInterrupt() suppresses ETBEI (0x02), preserves ERBFI (0x01), and locks tail atomically
+TEST_F(AriesUartTxDrainTest, Test_UART_EnableTxInterrupt_SuppressesEtbeiUnderAtomicMIEAndLeavesRxOnly)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+
+    // Case 1: Empty buffer -> UART_DR untouched, ETBEI (bit 1 = 0x02) strictly 0, ERBFI (0x01) active
+    THEJAS32_UART(0).UART_DR = 0xA5U;
+    THEJAS32_UART(0).UART_LSR = 0x60U;
+    uartEnableTxInterrupt((uartPort_t *)sp0);
+    EXPECT_EQ(THEJAS32_UART(0).UART_DR, 0xA5U);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE & 0x02U, 0U);
+    EXPECT_NE(THEJAS32_UART(0).UART_IE & 0x01U, 0U);
+
+    // Case 2: Queued byte while THRE == 0 (HW TX busy) -> byte stays queued AND ETBEI stays 0 (H22 / BSP)
+    THEJAS32_UART(0).UART_LSR = 0x00U;
+    sp0->vTable->serialWrite(sp0, 'Z');
+    EXPECT_EQ(sp0->txBufferSize - 1U - sp0->vTable->serialTotalTxFree(sp0), 1U);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE & 0x02U, 0U)
+        << "H22 / Ground Truth 8: uartEnableTxInterrupt() must NEVER arm ETBEI (0x02) on THEJAS32 DW_apb_uart!";
+    EXPECT_NE(THEJAS32_UART(0).UART_IE & 0x01U, 0U);
+
+    // Case 3: Verify serial_uart_aries.c protects tail updates atomically and never arms ETBEI (0x02U)
+    static char srcBuf[32768];
+    ASSERT_TRUE(uart_test_read_repo_file("src/platform/ARIES/serial_uart_aries.c", srcBuf, sizeof(srcBuf)));
+    const char *fn = strstr(srcBuf, "uartEnableTxInterrupt(");
+    ASSERT_NE(fn, nullptr);
+    const char *nextFn = strstr(fn + 20, "uartIrqHandler");
+    ASSERT_NE(nextFn, nullptr);
+    const char *atomicCall = strstr(fn, "thejas32_atomic_enter");
+    EXPECT_TRUE(atomicCall != nullptr && atomicCall < nextFn)
+        << "uartEnableTxInterrupt() must guard txBufferTail/UART_DR writes with thejas32_atomic_enter/exit!";
+    EXPECT_EQ(strstr(srcBuf, "UART_IE |= 0x02"), nullptr)
+        << "Re-arming UART_IE |= 0x02 triggers H18/H22 THRE interrupt lockup on physical THEJAS32 silicon!";
+
+    // Real-world flight consequence:
+    // Enabling ETBEI (0x02) triggers H18/H22 DW_apb_uart lockup on ARIES v3.0 right after printing CLI prompt '# '.
+}
+
+// B6 (H18): uartIrqHandler() reads UART_IIR_FCR to acknowledge IRQ status, drains ready TX, preserves IRQs
+TEST_F(AriesUartTxDrainTest, Test_UART_IrqHandler_AcknowledgesIirClearsLatchDrainsPendingTxAndPreservesOuterIrqs)
+{
+    // Arrange: Queue 10 bytes while THRE=0, verify IIR acknowledgement read in serial_uart_aries.c
+    static char srcBuf[32768];
+    ASSERT_TRUE(uart_test_read_repo_file("src/platform/ARIES/serial_uart_aries.c", srcBuf, sizeof(srcBuf)));
+    const char *irqFn = strstr(srcBuf, "uartIrqHandler(");
+    ASSERT_NE(irqFn, nullptr);
+    const char *iirRead = strstr(irqFn, "UART_IIR_FCR");
+    EXPECT_NE(iirRead, nullptr)
+        << "H18: uartIrqHandler() must read UART_IIR_FCR on ISR entry to acknowledge DW_apb_uart IRQ status!";
+
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+
+    THEJAS32_UART(0).UART_LSR = 0x00U;
+    const uint8_t payload[10] = { 'B', 'E', 'T', 'A', 'F', 'L', 'I', 'G', 'H', 'T' };
+    sp0->vTable->writeBuf(sp0, payload, 10);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x01U);
+
+    THEJAS32_INTR_CTRL.INTR_EN |= (1UL << THEJAS32_IRQ_TIMER1) | (1UL << THEJAS32_IRQ_UART1);
+    const uint32_t outerMstatus = 0x00000000U; // Trap context: MIE=0 inside ISR
+    thejas32_host_mstatus = outerMstatus;
+
+    // Act: RX/poll/IRQ traps service opportunistic THRE-ready drain while ETBEI remains 0
+    for (int step = 0; step < 12 && !sp0->vTable->isSerialTransmitBufferEmpty(sp0); step++) {
+        THEJAS32_UART(0).UART_LSR = 0x60U;
+        THEJAS32_UART(0).UART_IIR_FCR = 0x02U;
+        THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+        handle_trap(0x8000000BUL, 0U, nullptr);
+    }
+
+    // Assert: Ring drained, last char written, IE strictly 0x01 (ERBFI only, ETBEI=0) & outer IRQs intact
+    EXPECT_TRUE(sp0->vTable->isSerialTransmitBufferEmpty(sp0));
+    EXPECT_EQ(THEJAS32_UART(0).UART_DR & 0xFFU, (uint32_t)'T');
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x01U);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER1), 0U);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_UART1), 0U);
+    EXPECT_EQ(thejas32_host_mstatus, outerMstatus);
+
+    // Real-world flight consequence:
+    // Failing to read UART_IIR_FCR or arming ETBEI leaves THRE pending on DW_apb_uart and freezes CLI/RX.
+}
+
+// B7: Spurious THRE / empty-buffer ISR never underflows txBufferTail, emits stale data, or arms ETBEI
+TEST_F(AriesUartTxDrainTest, Test_UART_TxISR_SpuriousThreWhenEmptyNeverUnderflowsOrCorruptsTail)
+{
+    // Arrange: Advance ring head/tail to non-zero index 17 then empty completely
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+
+    THEJAS32_UART(0).UART_LSR = 0x60U;
+    uint8_t warm[17];
+    memset(warm, 0x33U, sizeof(warm));
+    sp0->vTable->writeBuf(sp0, warm, 17);
+    while (!sp0->vTable->isSerialTransmitBufferEmpty(sp0)) {
+        uartPollTx();
+    }
+    ASSERT_EQ(sp0->txBufferHead, sp0->txBufferTail);
+    const uint32_t headBefore = sp0->txBufferHead;
+    const uint32_t tailBefore = sp0->txBufferTail;
+
+    // Act: Inject spurious IIR=0x02 (THRE) and IIR=0x01 (NO_INT) while buffer is empty
+    THEJAS32_UART(0).UART_DR = 0xA5U;
+    THEJAS32_UART(0).UART_IIR_FCR = 0x02U;
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+
+    THEJAS32_UART(0).UART_IIR_FCR = 0x01U;
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+
+    // Assert: Tail and head stay pinned at 17, sentinel UART_DR untouched, IE strictly RX-only (0x01)
+    EXPECT_EQ(sp0->txBufferHead, headBefore);
+    EXPECT_EQ(sp0->txBufferTail, tailBefore);
+    EXPECT_EQ(THEJAS32_UART(0).UART_DR, 0xA5U);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x01U);
+    EXPECT_TRUE(sp0->vTable->isSerialTransmitBufferEmpty(sp0));
+
+    // Real-world flight consequence:
+    // Underflow of txBufferTail on empty THRE interrupt replays the entire 512-byte ring of old MSP
+    // data onto USB/telemetry.
+}
+
+// B9 (H22 Performance): 1 kHz taskMain() drains TX via uartPollTx() under USE_UART_POLLED_DRAIN
+TEST_F(AriesUartTxDrainTest, Test_Scheduler_1kHzTaskMainDrainsUartTxWithoutTxInterrupts)
+{
+    static char tasksBuf[32768];
+    ASSERT_TRUE(uart_test_read_repo_file("src/main/fc/tasks.c", tasksBuf, sizeof(tasksBuf)));
+    const char *fn = strstr(tasksBuf, "static void taskMain(");
+    ASSERT_NE(fn, nullptr);
+    const char *nextFn = strstr(fn + 20, "static void taskHandleSerial(");
+    ASSERT_NE(nextFn, nullptr);
+    const char *pollCall = strstr(fn, "uartPollTx()");
+    EXPECT_TRUE(pollCall != nullptr && pollCall < nextFn)
+        << "1 kHz taskMain() must call uartPollTx() under USE_UART_POLLED_DRAIN so FCR=0x00 TX drains at >= 1 KB/s without ETBEI!";
+}
+
+// B8: Concurrent TX 512 B + RX 256 B multi-wraparound across UART0 & UART1 with zero data loss
+TEST_F(AriesUartTxDrainTest, Test_UART_ConcurrentTx512AndRx256MultiWraparoundZeroDataLoss)
+{
+    // Arrange: Open both UART0 (115200) and UART1 (420000) simultaneously
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    pinCfg.ioTagTx[1] = DEFIO_TAG_E__PA28;
+    pinCfg.ioTagRx[1] = DEFIO_TAG_E__PA29;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    serialPort_t *sp1 = uartOpen(SERIAL_PORT_UART1, nullptr, nullptr, 420000U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+    ASSERT_NE(sp1, nullptr);
+    ASSERT_GE(sp0->txBufferSize, 512U);
+    ASSERT_GE(sp1->txBufferSize, 512U);
+
+    // Act: Wrap both TX (>512 B) and RX (>256 B) across 700 bytes in staggered bursts
+    uint32_t rxCount0 = 0U;
+    uint32_t rxCount1 = 0U;
+    for (uint32_t round = 0U; round < 10U; round++) {
+        uint8_t tx0[70];
+        uint8_t tx1[70];
+        for (uint32_t i = 0U; i < 70U; i++) {
+            uint8_t v0 = (uint8_t)((round * 70U + i) & 0xFFU);
+            uint8_t v1 = (uint8_t)(v0 ^ 0xA5U);
+            tx0[i] = v0;
+            tx1[i] = v1;
+
+            THEJAS32_UART(0).UART_DR = v0;
+            THEJAS32_UART(0).UART_LSR = 0x61U;
+            THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+            handle_trap(0x8000000BUL, 0U, nullptr);
+
+            THEJAS32_UART(1).UART_DR = v1;
+            THEJAS32_UART(1).UART_LSR = 0x61U;
+            THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART1);
+            handle_trap(0x8000000BUL, 0U, nullptr);
+        }
+
+        // Write 70-byte TX block (accumulates & wraps across 512-byte ring across rounds)
+        THEJAS32_UART(0).UART_LSR = 0x00U;
+        THEJAS32_UART(1).UART_LSR = 0x00U;
+        sp0->vTable->writeBuf(sp0, tx0, 70);
+        sp1->vTable->writeBuf(sp1, tx1, 70);
+
+        // Drain 64 bytes/round via polled drain while leaving partial remainder to force circular wrap
+        THEJAS32_UART(0).UART_LSR = 0x60U;
+        THEJAS32_UART(1).UART_LSR = 0x60U;
+        for (int p = 0; p < 4; p++) {
+            uartPollTx();
+        }
+
+        while (sp0->vTable->serialTotalRxWaiting(sp0) > 0U) {
+            EXPECT_EQ(sp0->vTable->serialRead(sp0), (uint8_t)(rxCount0 & 0xFFU));
+            rxCount0++;
+        }
+        while (sp1->vTable->serialTotalRxWaiting(sp1) > 0U) {
+            EXPECT_EQ(sp1->vTable->serialRead(sp1), (uint8_t)((rxCount1 & 0xFFU) ^ 0xA5U));
+            rxCount1++;
+        }
+    }
+
+    // Drain remaining TX bytes to completion
+    unsigned safety = 0U;
+    while ((!sp0->vTable->isSerialTransmitBufferEmpty(sp0) ||
+            !sp1->vTable->isSerialTransmitBufferEmpty(sp1)) && safety++ < 32U) {
+        uartPollTx();
+    }
+
+    // Assert: All 700 bytes delivered across both ports with zero loss or cross-talk
+    EXPECT_EQ(rxCount0, 700U);
+    EXPECT_EQ(rxCount1, 700U);
+    EXPECT_TRUE(sp0->vTable->isSerialTransmitBufferEmpty(sp0));
+    EXPECT_TRUE(sp1->vTable->isSerialTransmitBufferEmpty(sp1));
+    EXPECT_EQ(THEJAS32_UART(0).UART_DR & 0xFFU, (uint32_t)(699U & 0xFFU));
+    EXPECT_EQ(THEJAS32_UART(1).UART_DR & 0xFFU, (uint32_t)((699U & 0xFFU) ^ 0xA5U));
+
+    // Real-world flight consequence:
+    // Full-duplex MSP telemetry over UART0 concurrent with 420 kbaud CRSF telemetry on UART1
+    // must wrap 512 B TX and 256 B RX rings independently without index collision.
+}

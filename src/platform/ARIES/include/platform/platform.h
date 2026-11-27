@@ -209,6 +209,10 @@ __attribute__((always_inline)) static inline void thejas32_atomic_exit(uint32_t 
 
 #define SPI_IO_CS_CFG               IOCFG_OUT_PP
 
+// Persistent warm-reset storage (retains data across soft resets in .noinit SRAM)
+#define PERSISTENT                  __attribute__((section(".noinit")))
+#define USE_PERSISTENT_OBJECTS
+
 // Bus and device counts
 #define SPIDEV_COUNT                1
 #define MAX_SPI_PIN_SEL             3

@@ -110,6 +110,13 @@ void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
         if (!uartdev->tx.pin && hardware->txPins[0].pin) {
             uartdev->tx.pin = hardware->txPins[0].pin;
         }
+        // Claim bound UART pins before initPhase3() unusedPinsInit() runs.
+        if (uartdev->tx.pin) {
+            IOInit(IOGetByTag(uartdev->tx.pin), OWNER_SERIAL_TX, (uint8_t)RESOURCE_INDEX(resourceIndex));
+        }
+        if (uartdev->rx.pin) {
+            IOInit(IOGetByTag(uartdev->rx.pin), OWNER_SERIAL_RX, (uint8_t)RESOURCE_INDEX(resourceIndex));
+        }
     }
 }
 
@@ -231,7 +238,8 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
         return;
     }
 
-    // shortcut: non-FIFO mode (FCR=0x00) holds only 1-2 bytes before THRE clears (~100-200 B/s @ 100 Hz poll), upgrade to 1 kHz TX poll or DMA if saturated
+    // Erratum 1: FCR=0x00 leaves HW in 1-byte mode; lock MIE around tail/IE updates
+    uint32_t prev = thejas32_atomic_enter();
     uint8_t bytesWritten = 0;
     while ((uartPort->port.txBufferTail != uartPort->port.txBufferHead) &&
            (THEJAS32_UART(ch).UART_LSR & 0x20) &&
@@ -241,6 +249,8 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
         bytesWritten++;
         THEJAS32_MEMORY_FENCE();
     }
+    // H22 / Ground Truth 8: Never set UART_IE bit 1 (ETBEI); TX drains via LSR polling.
+    thejas32_atomic_exit(prev);
 }
 
 // Periodic / polled transmit queue drain hook for background tasks and scheduler
@@ -291,6 +301,10 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
         return;
     }
 
+    // H18: Read UART_IIR_FCR to acknowledge DW_apb_uart interrupt status before servicing LSR/RBR.
+    volatile uint32_t iir = THEJAS32_UART(ch).UART_IIR_FCR;
+    UNUSED(iir);
+
     // Reading Line Status Register (LSR) automatically clears Overrun Error (ORE),
     // Parity Error (PE), and Framing Error (FE) flags on 16550 IP.
     uint32_t lsr = thejas32_uart_read_lsr((uint8_t)ch);
@@ -315,7 +329,7 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
         lsr = thejas32_uart_read_lsr((uint8_t)ch);
     }
 
-    // Opportunistically drain TX FIFO during interrupt service if transmitter ready
+    // Opportunistically drain TX FIFO during interrupt service if transmitter ready (ETBEI stays 0)
     if ((THEJAS32_UART(ch).UART_LSR & 0x20) && (s->port.txBufferTail != s->port.txBufferHead)) {
         uartEnableTxInterrupt(s);
     }

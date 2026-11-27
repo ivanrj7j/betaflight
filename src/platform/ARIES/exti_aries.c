@@ -130,8 +130,9 @@ void EXTIConfig(IO_t io, extiCallbackRec_t *cb, int irqPriority, ioConfig_t conf
         return;
     }
 
-    // Configure GPIO line as input
-    IOConfigGPIO(io, config);
+    // THEJAS32 exposes no SW pull-up/down or trigger polarity regs; pin remains input with fixed BSP polarity
+    (void)config;
+    IOConfigGPIO(io, IOCFG_IN_FLOATING);
 
     uint32_t prev_mstatus = thejas32_atomic_enter();
 

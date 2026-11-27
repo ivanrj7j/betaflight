@@ -54,17 +54,8 @@
 #define DEFIO_TAG_GPIOID(tag) (((tag) >> DEFIO_PORT_BITSHIFT) - 1)
 #define DEFIO_TAG_PIN(tag) ((tag) & DEFIO_PIN_BITMASK)
 
-// Betaflight Resource Owner enum
-typedef enum {
-    OWNER_FREE = 0,
-    OWNER_LED,
-    OWNER_BEEPER,
-    OWNER_MOTOR,
-    OWNER_SERVO,
-    OWNER_SPI_CS,
-    OWNER_SYSTEM,
-    OWNER_TOTAL_COUNT
-} resourceOwner_e;
+// Betaflight Resource Owner enum (must match drivers/resource.h ABI used by stub_drivers.c)
+#include "drivers/resource.h"
 
 // Forward declare ioRec_t structure matching drivers/io_impl.h
 typedef struct gpioResource_s gpioResource_t;
@@ -526,6 +517,170 @@ TEST_F(AriesIoTest, Test_RealIoAriesC_Bank0Bank1MMIOAndOpenDrain) {
     IOHi(nullptr);
     IOLo(nullptr);
     EXPECT_FALSE(IORead(nullptr));
+}
+
+// =============================================================================
+// GROUP E7..E8 (Pre-Phase 20 / Erratum 11): Real stub_drivers.c unusedPinsInit() GPIO Safety
+// =============================================================================
+
+} // namespace
+
+extern "C" {
+void IOInit(IO_t io, resourceOwner_e owner, uint8_t index);
+resourceOwner_e IOGetOwner(IO_t io);
+void unusedPinsInit(void);
+}
+
+namespace {
+
+// E7: unusedPinsInit() places ONLY OWNER_FREE pins in High-Z input (DIR=0), sparing LD1 active-LOW RGB & owned pins
+TEST_F(AriesIoTest, Test_GPIO_UnusedPinsInitSetsUnclaimedPinsHighZAndSparesLd1RgbAndOwnedPins)
+{
+    // Arrange: Initialize all 32 GPIO descriptors, claim flight peripheral pins & set active states
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    IO_t motor0  = IOGetByTag(DEFIO_TAG_MAKE(0, 1));  // PA1 Motor 1
+    IO_t spiCs   = IOGetByTag(DEFIO_TAG_MAKE(0, 8));  // PA8 Gyro SPI0 CS
+    IO_t uart1Tx = IOGetByTag(DEFIO_TAG_MAKE(0, 16)); // PA16 UART1 TX
+    IO_t uart1Rx = IOGetByTag(DEFIO_TAG_MAKE(0, 17)); // PA17 UART1 RX
+    IO_t led0    = IOGetByTag(DEFIO_TAG_MAKE(0, 22)); // PA22 LD1_4 Green (active-LOW: HIGH = OFF)
+    IO_t uart0Tx = IOGetByTag(DEFIO_TAG_MAKE(0, 30)); // PA30 UART0 TX
+    IO_t uart0Rx = IOGetByTag(DEFIO_TAG_MAKE(0, 31)); // PA31 UART0 RX
+    ASSERT_NE(motor0, nullptr);
+    ASSERT_NE(spiCs, nullptr);
+    ASSERT_NE(uart1Tx, nullptr);
+    ASSERT_NE(uart1Rx, nullptr);
+    ASSERT_NE(led0, nullptr);
+    ASSERT_NE(uart0Tx, nullptr);
+    ASSERT_NE(uart0Rx, nullptr);
+
+    IOInit(motor0,  OWNER_MOTOR,     1U);
+    IOInit(spiCs,   OWNER_SPI_CS,    0U);
+    IOInit(uart1Tx, OWNER_SERIAL_TX, 2U);
+    IOInit(uart1Rx, OWNER_SERIAL_RX, 2U);
+    IOInit(led0,    OWNER_LED,       0U);
+    IOInit(uart0Tx, OWNER_SERIAL_TX, 1U);
+    IOInit(uart0Rx, OWNER_SERIAL_RX, 1U);
+
+    IOConfigGPIO(motor0,  IOCFG_OUT_PP);
+    IOConfigGPIO(spiCs,   IOCFG_OUT_PP);
+    IOConfigGPIO(uart1Tx, IOCFG_OUT_PP);
+    IOConfigGPIO(uart1Rx, IOCFG_IN_FLOATING);
+    IOConfigGPIO(led0,    IOCFG_OUT_PP);
+    IOConfigGPIO(uart0Tx, IOCFG_OUT_PP);
+    IOConfigGPIO(uart0Rx, IOCFG_IN_FLOATING);
+    IOLo(motor0);
+    IOHi(spiCs);
+    IOHi(uart1Tx);
+    IOHi(led0);
+    IOHi(uart0Tx);
+
+    // Pre-seed unclaimed pins (headers + active-LOW RGB LD1 PA23 Blue / PA24 Red) as stale push-pull LOW / OD
+    // Erratum 11 regression check: driving PA23=0 & PA24=0 turns LD1 Blue+Red ON (Purple with PA22=1)!
+    for (uint8_t p = 9U; p < 16U; p++) {
+        IO_t unused0 = IOGetByTag(DEFIO_TAG_MAKE(0, p));
+        ASSERT_NE(unused0, nullptr);
+        IOConfigGPIO(unused0, IOCFG_OUT_PP);
+        IOLo(unused0);
+    }
+    for (uint8_t p = 18U; p < 30U; p++) {
+        if (p == 22U) {
+            continue; // PA22 owned by LED0
+        }
+        IO_t unused1 = IOGetByTag(DEFIO_TAG_MAKE(0, p));
+        ASSERT_NE(unused1, nullptr);
+        IOConfigGPIO(unused1, (p == 24U) ? IOCFG_OUT_OD : IOCFG_OUT_PP);
+        IOLo(unused1);
+    }
+
+    // Act
+    unusedPinsInit();
+
+    // Assert 1: All OWNER_FREE pins MUST be switched to High-Z Input (DIR bit == 0), never driven LOW
+    for (uint8_t p = 9U; p < 16U; p++) {
+        EXPECT_EQ(thejas32_host_gpio_dir[0] & (1U << p), 0U)
+            << "Unclaimed PA" << (unsigned)p << " remained driven as output instead of High-Z input!";
+    }
+    for (uint8_t p = 18U; p < 30U; p++) {
+        if (p == 22U) {
+            continue;
+        }
+        uint8_t bp = p - 16U;
+        EXPECT_EQ(thejas32_host_gpio_dir[1] & (1U << bp), 0U)
+            << "Erratum 11: Unclaimed PA" << (unsigned)p << " stayed active output (DIR=1), risking active-LOW LD1 Purple/header short!";
+    }
+    // Explicit RGB LD1 active-LOW protection check: PA23 (Blue, Bank 1 bit 7) and PA24 (Red, Bank 1 bit 8)
+    EXPECT_EQ(thejas32_host_gpio_dir[1] & (1U << (23U - 16U)), 0U)
+        << "PA23 (LD1 Blue active-LOW) must remain High-Z input so Blue channel stays OFF!";
+    EXPECT_EQ(thejas32_host_gpio_dir[1] & (1U << (24U - 16U)), 0U)
+        << "PA24 (LD1 Red active-LOW) must remain High-Z input so Red channel stays OFF!";
+
+    // Assert 2: Claimed pins retain their configured direction and output level undisturbed
+    EXPECT_NE(thejas32_host_gpio_dir[0] & (1U << 1U), 0U);
+    EXPECT_EQ(thejas32_host_gpio_data[0][1], 0U);
+    EXPECT_NE(thejas32_host_gpio_dir[0] & (1U << 8U), 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][8], 0U);
+    EXPECT_NE(thejas32_host_gpio_dir[1] & (1U << (16U - 16U)), 0U);
+    EXPECT_NE(thejas32_host_gpio_data[1][16U - 16U], 0U);
+    EXPECT_EQ(thejas32_host_gpio_dir[1] & (1U << (17U - 16U)), 0U);
+    EXPECT_NE(thejas32_host_gpio_dir[1] & (1U << (22U - 16U)), 0U);
+    EXPECT_NE(thejas32_host_gpio_data[1][22U - 16U], 0U);
+    EXPECT_NE(thejas32_host_gpio_dir[1] & (1U << (30U - 16U)), 0U);
+    EXPECT_NE(thejas32_host_gpio_data[1][30U - 16U], 0U);
+    EXPECT_EQ(IOGetOwner(uart0Rx), OWNER_SERIAL_RX);
+
+    // Real-world flight consequence:
+    // ARIES v3.0 LD1 RGB channels (PA22 Green, PA23 Blue, PA24 Red) are active-LOW (0=ON, 1=OFF) and
+    // external headers expose raw GPIOs; driving OWNER_FREE pins OUT_PP LOW lights solid Purple LD1 and shorts headers.
+}
+
+// E8: unusedPinsInit() clears stale output DIR across all 32 pins in Bank 0 & Bank 1 without cross-bank aliasing
+TEST_F(AriesIoTest, Test_GPIO_UnusedPinsInitCoversBothBanksAsHighZWithoutCrossBankAliasingAndIsIdempotent)
+{
+    // Arrange: Pre-seed all 32 OWNER_FREE pins as stale push-pull outputs, then run unusedPinsInit()
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    for (uint8_t p = 0U; p < 32U; p++) {
+        IO_t io = IOGetByTag(DEFIO_TAG_MAKE(0, p));
+        ASSERT_NE(io, nullptr);
+        IOConfigGPIO(io, IOCFG_OUT_PP);
+        IOLo(io);
+    }
+    ASSERT_EQ(thejas32_host_gpio_dir[0], 0xFFFFU);
+    ASSERT_EQ(thejas32_host_gpio_dir[1], 0xFFFFU);
+
+    // Act 1
+    unusedPinsInit();
+
+    // Assert 1: All 16 Bank 0 + all 16 Bank 1 OWNER_FREE pins placed in High-Z input (DIR == 0)
+    EXPECT_EQ(thejas32_host_gpio_dir[0], 0x0000U);
+    EXPECT_EQ(thejas32_host_gpio_dir[1], 0x0000U);
+
+    // Act 2: Claim PA22 (Bank 1 pin 6) OUT_PP HIGH, inject stale OUT_PP LOW on PA6 (Bank 0 pin 6) + PA23/PA24
+    IO_t led0 = IOGetByTag(DEFIO_TAG_MAKE(0, 22));
+    IO_t pa6  = IOGetByTag(DEFIO_TAG_MAKE(0, 6));
+    IO_t pa23 = IOGetByTag(DEFIO_TAG_MAKE(0, 23));
+    IO_t pa24 = IOGetByTag(DEFIO_TAG_MAKE(0, 24));
+    IOInit(led0, OWNER_LED, 0U);
+    IOConfigGPIO(led0, IOCFG_OUT_PP);
+    IOHi(led0);
+    IOConfigGPIO(pa6,  IOCFG_OUT_PP);
+    IOConfigGPIO(pa23, IOCFG_OUT_PP);
+    IOConfigGPIO(pa24, IOCFG_OUT_PP);
+    IOLo(pa6);
+    IOLo(pa23);
+    IOLo(pa24);
+
+    unusedPinsInit();
+
+    // Assert 2: PA22 keeps Bank 1 bit 6 OUT_PP HIGH, while PA6, PA23, PA24 return cleanly to High-Z (DIR == 0)
+    EXPECT_EQ(thejas32_host_gpio_dir[0], 0x0000U);
+    EXPECT_EQ(thejas32_host_gpio_dir[1], (uint16_t)(1U << (22U - 16U)));
+    EXPECT_NE(thejas32_host_gpio_data[1][22U - 16U], 0U);
+
+    // Real-world flight consequence:
+    // Dual-bank High-Z parking must keep claimed PA22 output untouched without aliasing onto Bank 0 PA6 or PA23/PA24.
 }
 
 } // namespace

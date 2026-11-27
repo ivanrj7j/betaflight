@@ -14,6 +14,7 @@
 #include "common/utils.h"
 
 #include "drivers/io.h"
+#include "drivers/io_impl.h"
 #include "drivers/dma.h"
 #include "drivers/bus_spi.h"
 #include "drivers/timer.h"
@@ -132,8 +133,8 @@ void ARIES_ATOMIC_FN(__atomic_store_4)(volatile void *ptr, unsigned int val, int
 // Persistent Object Storage (Warm-reboot survival in internal SRAM)
 // ----------------------------------------------------------------------------
 #define PERSISTENT_OBJECT_MAGIC_VALUE (('B' << 24) | ('e' << 16) | ('f' << 8) | ('1' << 0))
-// shortcut: .noinit SRAM survives warm soft resets only; lost on cold power-off until MDP_SPI_3 flash driver lands
-static uint32_t persistentObjects[16] __attribute__((section(".noinit")));
+// .noinit SRAM retains values across warm resets only; cold power-off resets storage
+static PERSISTENT uint32_t persistentObjects[16];
 
 void persistentObjectInit(void)
 {
@@ -162,6 +163,13 @@ void persistentObjectWrite(persistentObjectId_e id, uint32_t value)
 // ----------------------------------------------------------------------------
 void unusedPinsInit(void)
 {
+    for (unsigned pin = 0; pin < DEFIO_IO_USED_COUNT; pin++) {
+        IO_t io = &ioRecs[pin];
+        if (ioRecs[pin].owner == OWNER_FREE) {
+            // Erratum 11: park unowned pins High-Z (DIR=0) so active-LOW LD1 PA23/PA24 & headers stay OFF.
+            IOConfigGPIO(io, IOCFG_IN_FLOATING);
+        }
+    }
 }
 
 void debugInit(void)

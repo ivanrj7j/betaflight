@@ -754,3 +754,139 @@ TEST_F(AriesExtiTest, Test_RealExtiAriesC_Bank0SinglePinGuard_And_Bank1MultiPinD
     EXTIDisable(pa22);
     EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO1), 0U);
 }
+
+// =============================================================================
+// GROUP E4..E6 (Pre-Phase 20): EXTI Input Integrity, IRQ 10 Trap & Dormancy
+// =============================================================================
+
+// E4: Pull/trigger configurations keep PA0 strictly as GPIO input, and EXTIRelease disables IRQ 10
+TEST_F(AriesExtiTest, Test_EXTI_ConfigPullAndTriggerHonestyPreservesInputDirAndReleaseDisablesIrq)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    EXTIInit();
+
+    IO_t pa0 = IOGetByTag((uint8_t)(64U + 0U));
+    ASSERT_NE(pa0, nullptr);
+    extiCallbackRec_t cb;
+    EXTIHandlerInit(&cb, [](extiCallbackRec_t *) { callback_invocation_log.push_back(99); });
+
+    // Act 1: Cycle through pull and edge modes (no HW pull/trigger regs exist on THEJAS32)
+    const uint32_t cfgs[] = { IOCFG_IPD, IOCFG_IPU, IOCFG_IN_FLOATING };
+    const extiTrigger_t trigs[] = {
+        BETAFLIGHT_EXTI_TRIGGER_RISING,
+        BETAFLIGHT_EXTI_TRIGGER_FALLING,
+        BETAFLIGHT_EXTI_TRIGGER_BOTH
+    };
+    for (size_t i = 0; i < 3U; i++) {
+        EXTIConfig(pa0, &cb, 0, cfgs[i], trigs[i]);
+        // Must remain input (dir bit 0 == 0) and IRQ 10 must stay masked prior to EXTIEnable()
+        EXPECT_EQ(thejas32_host_gpio_dir[0] & 1U, 0U);
+        EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO0), 0U);
+    }
+
+    // Act 2: Enable PA0 then call EXTIRelease() directly (without separate EXTIDisable())
+    EXTIEnable(pa0);
+    ASSERT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO0), 0U);
+    EXTIRelease(pa0);
+
+    // Assert 2: Release cleanly masks IRQ 10 and detaches callback
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO0), 0U);
+    callback_invocation_log.clear();
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_GPIO0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    EXPECT_TRUE(callback_invocation_log.empty());
+
+    // Real-world flight consequence:
+    // Releasing gyro EXTI during sensor teardown without masking IRQ 10 leaves a dangling ISR vector
+    // firing on every DRDY pulse.
+}
+
+// E5: handle_trap(IRQ 10 / 11) dispatches callback with exact self pointer without cross-bank leakage
+TEST_F(AriesExtiTest, Test_EXTI_HandleTrapIrq10DispatchesRegisteredCallbackWithExactContext)
+{
+    // Arrange
+    static extiCallbackRec_t *lastReceivedSelf = nullptr;
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    EXTIInit();
+
+    IO_t pa0 = IOGetByTag((uint8_t)(64U + 0U));
+    IO_t pa20 = IOGetByTag((uint8_t)(64U + 20U));
+    ASSERT_NE(pa0, nullptr);
+    ASSERT_NE(pa20, nullptr);
+
+    extiCallbackRec_t rec0, rec20;
+    EXTIHandlerInit(&rec0, [](extiCallbackRec_t *self) {
+        lastReceivedSelf = self;
+        callback_invocation_log.push_back(0);
+    });
+    EXTIHandlerInit(&rec20, [](extiCallbackRec_t *self) {
+        lastReceivedSelf = self;
+        callback_invocation_log.push_back(20);
+    });
+
+    EXTIConfig(pa0, &rec0, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXTIConfig(pa20, &rec20, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXTIEnable(pa0);
+    EXTIEnable(pa20);
+    THEJAS32_INTR_CTRL.INTR_EN |= (1UL << THEJAS32_IRQ_TIMER1);
+
+    // Act: Fire ONLY Bank 0 IRQ 10 through handle_trap()
+    callback_invocation_log.clear();
+    lastReceivedSelf = nullptr;
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_GPIO0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+
+    // Assert: Exact &rec0 dispatched once, PA20 untouched, Timer 1 IRQ enable intact
+    ASSERT_EQ(callback_invocation_log.size(), 1U);
+    EXPECT_EQ(callback_invocation_log[0], 0);
+    EXPECT_EQ(lastReceivedSelf, &rec0);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER1), 0U);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO1), 0U);
+
+    // Real-world flight consequence:
+    // Passing a null/stale extiCallbackRec_t * into ICM-42688P's EXTI handler crashes or drops
+    // the gyro timestamp update on every 1 kHz sample.
+}
+
+// E6: EXTI remains dormant between EXTIConfig() and EXTIEnable(), and stops after EXTIDisable()
+TEST_F(AriesExtiTest, Test_EXTI_DormantBeforeEnableIgnoresIrq10AndDisableStopsSubsequentEvents)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    EXTIInit();
+
+    IO_t pa0 = IOGetByTag((uint8_t)(64U + 0U));
+    ASSERT_NE(pa0, nullptr);
+    extiCallbackRec_t rec0;
+    EXTIHandlerInit(&rec0, [](extiCallbackRec_t *) { callback_invocation_log.push_back(1); });
+
+    // Act 1: Configure only (do NOT enable) and inject IRQ 10
+    callback_invocation_log.clear();
+    EXTIConfig(pa0, &rec0, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_GPIO0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+
+    // Assert 1: Strictly dormant (0 callbacks, IRQ 10 unmasked == 0)
+    EXPECT_TRUE(callback_invocation_log.empty());
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO0), 0U);
+
+    // Act 2: Enable -> fires once -> Disable -> ignores subsequent IRQ 10
+    EXTIEnable(pa0);
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_GPIO0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    EXPECT_EQ(callback_invocation_log.size(), 1U);
+
+    EXTIDisable(pa0);
+    callback_invocation_log.clear();
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_GPIO0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    EXPECT_TRUE(callback_invocation_log.empty());
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO0), 0U);
+
+    // Real-world flight consequence:
+    // Early DRDY toggles before gyro calibration finishes must not invoke uninitialized sensor callbacks.
+}

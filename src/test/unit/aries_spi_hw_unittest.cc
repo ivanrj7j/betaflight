@@ -880,3 +880,135 @@ TEST_F(AriesSpiHwTest, Test_25_RealBusSpiAriesC_12_5MHzClampAndTimeoutRecovery)
     EXPECT_FALSE(spiInternalReadWriteBufPolled((spiResource_t *)THEJAS32_SPI_0_1_BASE, tx, rx, 2));
     EXPECT_GT(spiDevice[SPIDEV_1].errorCount, 0U);
 }
+
+// =============================================================================
+// GROUP E1..E3 (Pre-Phase 20): Real bus_spi_aries.c SPI Mode 3 Default & Toggle
+// =============================================================================
+
+// E1: Default leadingEdge=false (Betaflight .bss default) MUST configure SPI Mode 3 (CPOL=1, CPHA=1)
+TEST_F(AriesSpiHwTest, Test_26_RealBusSpiAriesC_DefaultMode3ClockIdleHighForIcm42688p)
+{
+    // Arrange: Zero-initialized spiPinConfig_t mirrors Betaflight .bss / bus_spi_config.c default
+    // where leadingEdge == false expects Mode 3 (CPOL=1, CPHA=1, clock idle HIGH) for ICM-42688P.
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    spiPinConfig_t spiCfg[SPIDEV_COUNT] = {};
+    spiCfg[0].ioTagSck  = DEFIO_TAG_E__PA5;
+    spiCfg[0].ioTagMiso = DEFIO_TAG_E__PA6;
+    spiCfg[0].ioTagMosi = DEFIO_TAG_E__PA7;
+    spiPinConfigure(spiCfg);
+
+    // Act: Initialize SPIDEV_1 without explicit spiSetClkPhasePolarity() override
+    spiInitDevice(SPIDEV_1);
+
+    // Assert: Real SPI0 Control mode bits [5:4] MUST equal Mode 3 (3U), NOT Mode 0 (0U)!
+    const uint32_t hwMode = (THEJAS32_SPI(0).Control >> THEJAS32_SPI_CTRL_MODE_SHIFT) & 0x03U;
+    EXPECT_EQ(hwMode, (uint32_t)THEJAS32_SPI_CTRL_MODE_3)
+        << "bus_spi_aries.c defaulted leadingEdge=false to Mode 0 instead of ICM-42688P Mode 3!";
+    EXPECT_GE(THEJAS32_SPI(0).Baudrate, (1UL << 4));
+
+    // Real-world flight consequence:
+    // accgyro_spi_icm426xx.c leaves bus->leadingEdge at false without calling spiSetClkPhasePolarity(),
+    // so initializing SPI0 in Mode 0 corrupts gyro MISO reads or drops WHO_AM_I on cold start.
+}
+
+// E2: Dynamic Mode 0 (leadingEdge=true) <-> Mode 3 (leadingEdge=false) switching preserves Baudrate
+TEST_F(AriesSpiHwTest, Test_27_RealBusSpiAriesC_DynamicMode0AndMode3SwitchingPreservesBaudClamp)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    spiPinConfig_t spiCfg[SPIDEV_COUNT] = {};
+    spiCfg[0].ioTagSck  = DEFIO_TAG_E__PA5;
+    spiCfg[0].ioTagMiso = DEFIO_TAG_E__PA6;
+    spiCfg[0].ioTagMosi = DEFIO_TAG_E__PA7;
+    spiPinConfigure(spiCfg);
+    spiInitDevice(SPIDEV_1);
+
+    busSegment_t termSeg = {}; // len == 0 terminates spiProcessSegmentsPolled() immediately
+    busDevice_t realBus = {};
+    realBus.busType = BUS_TYPE_SPI;
+    realBus.busType_u.spi.instance = (spiResource_t *)THEJAS32_SPI_0_1_BASE;
+    realBus.busType_u.spi.speed = 1U;
+    realBus.curSegment = &termSeg;
+    extDevice_t realDev = {};
+    realDev.bus = &realBus;
+    realDev.busType_u.spi.speed = 1U;
+    spiSetClkDivisor(&realDev, 1U); // 12.5 MHz
+
+    // Act & Assert 1: leadingEdge = true -> SPI Mode 0 (CPOL=0, CPHA=0) applied on spiSequenceStart
+    spiSetClkPhasePolarity(&realDev, true);
+    spiSequenceStart(&realDev);
+    EXPECT_EQ((THEJAS32_SPI(0).Control >> THEJAS32_SPI_CTRL_MODE_SHIFT) & 0x03U, (uint32_t)THEJAS32_SPI_CTRL_MODE_0);
+    EXPECT_GE(THEJAS32_SPI(0).Baudrate, (1UL << 4));
+
+    // Act & Assert 2: leadingEdge = false -> SPI Mode 3 (CPOL=1, CPHA=1) applied on spiSequenceStart
+    realBus.curSegment = &termSeg; // Previous spiSequenceStart set curSegment = BUS_SPI_FREE
+    spiSetClkPhasePolarity(&realDev, false);
+    spiSequenceStart(&realDev);
+    EXPECT_EQ((THEJAS32_SPI(0).Control >> THEJAS32_SPI_CTRL_MODE_SHIFT) & 0x03U, (uint32_t)THEJAS32_SPI_CTRL_MODE_3);
+    EXPECT_GE(THEJAS32_SPI(0).Baudrate, (1UL << 4));
+
+    // Real-world flight consequence:
+    // Shared-bus flash/OSD (Mode 0) and ICM-42688P (Mode 3) transfers must match STM32/ESP32 semantics
+    // without silently unlocking the 12.5 MHz clock clamp.
+}
+
+// E3: CS wrapping (PA4 LOW during transfer -> HIGH after) with Mode 3 active during ICM-42688P WHO_AM_I
+TEST_F(AriesSpiHwTest, Test_28_RealBusSpiAriesC_ChipSelectAndMode3PolledWhoAmITransfer)
+{
+    // Arrange
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    spiPinConfig_t spiCfg[SPIDEV_COUNT] = {};
+    spiCfg[0].ioTagSck  = DEFIO_TAG_E__PA5;
+    spiCfg[0].ioTagMiso = DEFIO_TAG_E__PA6;
+    spiCfg[0].ioTagMosi = DEFIO_TAG_E__PA7;
+    spiPinConfigure(spiCfg);
+    spiInitDevice(SPIDEV_1);
+
+    IO_t csPin = IOGetByTag(DEFIO_TAG_E__PA4);
+    ASSERT_NE(csPin, nullptr);
+    IOConfigGPIO(csPin, IOCFG_OUT_PP);
+    IOHi(csPin);
+    ASSERT_NE(thejas32_host_gpio_data[0][4], 0U);
+
+    busSegment_t termSeg = {};
+    busDevice_t realBus = {};
+    realBus.busType = BUS_TYPE_SPI;
+    realBus.busType_u.spi.instance = (spiResource_t *)THEJAS32_SPI_0_1_BASE;
+    realBus.busType_u.spi.speed = 1U;
+    realBus.curSegment = &termSeg;
+    extDevice_t realDev = {};
+    realDev.bus = &realBus;
+    realDev.busType_u.spi.speed = 1U;
+    spiSetClkDivisor(&realDev, 1U);
+    spiSetClkPhasePolarity(&realDev, false); // Mode 3
+    spiSequenceStart(&realDev);
+
+    // Verify Mode 3 BEFORE asserting CS LOW so SCK idles HIGH before first falling clock edge
+    ASSERT_EQ((THEJAS32_SPI(0).Control >> THEJAS32_SPI_CTRL_MODE_SHIFT) & 0x03U, (uint32_t)THEJAS32_SPI_CTRL_MODE_3);
+
+    // Act: Assert CS LOW, execute 2-byte WHO_AM_I (0x75 | 0x80) transfer, deassert CS HIGH
+    IOLo(csPin);
+    EXPECT_EQ(thejas32_host_gpio_data[0][4], 0U);
+
+    uint8_t tx[2] = { 0xF5U, 0x00U };
+    uint8_t rx[2] = { 0x00U, 0x00U };
+    THEJAS32_SPI(0).Status = THEJAS32_SPI_STAT_TX_EMPTY | THEJAS32_SPI_STAT_RX_COMPLETE;
+    THEJAS32_SPI(0).RxData = 0x47U; // ICM-42688P WHO_AM_I
+    EXPECT_TRUE(spiInternalReadWriteBufPolled((spiResource_t *)THEJAS32_SPI_0_1_BASE, tx, rx, 2));
+
+    IOHi(csPin);
+
+    // Assert: Byte read cleanly, Mode 3 & 12.5 MHz clamp held, CS returned HIGH
+    EXPECT_EQ(rx[1], 0x47U);
+    EXPECT_EQ((THEJAS32_SPI(0).Control >> THEJAS32_SPI_CTRL_MODE_SHIFT) & 0x03U, (uint32_t)THEJAS32_SPI_CTRL_MODE_3);
+    EXPECT_GE(THEJAS32_SPI(0).Baudrate, (1UL << 4));
+    EXPECT_NE(thejas32_host_gpio_data[0][4], 0U);
+
+    // Real-world flight consequence:
+    // Asserting CS LOW while SCK is still idling in Mode 0 before switching to Mode 3 injects a false
+    // clock edge on ICM-42688P, shifting the first SPI command frame by 1 bit.
+}

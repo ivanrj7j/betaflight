@@ -140,6 +140,11 @@ static void taskMain(timeUs_t currentTimeUs)
 #ifdef USE_FLASHFS
     flashfsEraseAsync();
 #endif
+
+#if defined(USE_UART_POLLED_DRAIN)
+    // Drain non-FIFO UART TX at 1 kHz (>= 1 KB/s) without arming flaky DW_apb_uart ETBEI
+    uartPollTx();
+#endif
 }
 
 static void taskHandleSerial(timeUs_t currentTimeUs)

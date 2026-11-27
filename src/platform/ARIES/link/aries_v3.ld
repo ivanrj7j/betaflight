@@ -21,11 +21,11 @@ ENTRY(_start)
 /*
  * Memory Region Definition:
  * Usable SRAM starts at 0x00202000 directly above the ROM bootloader partition.
- * Length is strictly 248 KB (0x3E000 bytes). Top of physical SRAM is 0x0023FFFF.
+ * Clamped to 242 KB (0x3C800 bytes, top 0x0023E7FF) preserving 6 KB ROM bootloader workspace.
  */
 MEMORY
 {
-    RAM (wxa!ri) : ORIGIN = 0x00202000, LENGTH = 248K
+    RAM (wxa!ri) : ORIGIN = 0x00202000, LENGTH = 242K
 }
 
 SECTIONS
@@ -147,14 +147,16 @@ SECTIONS
      * Global Boundary & Pointer Symbols:
      */
     _end = .;
+    _stack_size = _estack - _sstack;
     PROVIDE(_Min_Stack_Size = 0x2000);
     PROVIDE(__global_pointer$ = _sdata + 0x800);
     PROVIDE(__bss_start = _sbss);
     PROVIDE(__bss_end = _ebss);
 
     /*
-     * Compile-Time SRAM Budget Guardrail:
-     * Prevents oversized builds from wrapping or overflowing physical THEJAS32 256 KB SRAM.
+     * Compile-Time SRAM & Stack Budget Guardrails:
+     * Prevents image overflow into the 0x0023E800..0x0023FFFF ROM bootloader region.
      */
-    ASSERT(_end <= (ORIGIN(RAM) + LENGTH(RAM)), "FATAL: Total firmware image + stack exceeds 248 KB physical SRAM!")
+    ASSERT(_stack_size >= 0x2000, "FATAL: Reserved stack size fell below 8 KB minimum!")
+    ASSERT(_end <= (ORIGIN(RAM) + LENGTH(RAM)), "FATAL: Total firmware image + stack exceeds 242 KB bootloader-safe SRAM!")
 }

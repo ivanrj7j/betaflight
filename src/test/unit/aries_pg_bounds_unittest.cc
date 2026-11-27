@@ -483,3 +483,152 @@ TEST_F(AriesPgBoundsTest, Test_PGBounds_MultiProfileStrideIsolation_PIDAndRatePr
 }
 
 } // namespace
+
+#include <stdio.h>
+
+extern "C" {
+#include "platform/ARIES/include/platform/platform.h"
+#include "config/config_streamer.h"
+#include "drivers/persistent.h"
+extern uint8_t eepromData[EEPROM_SIZE];
+}
+
+namespace {
+
+static bool pg_read_repo_file(const char *relPath, char *buf, size_t bufSize)
+{
+    static const char *const prefixes[] = { "../../", "../", "./", "../../../" };
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s%s", prefixes[i], relPath);
+        FILE *f = fopen(path, "rb");
+        if (f) {
+            size_t n = fread(buf, 1, bufSize - 1U, f);
+            buf[n] = '\0';
+            fclose(f);
+            return n > 0U;
+        }
+    }
+    return false;
+}
+
+// D1: platform.h MUST define PERSISTENT (.noinit) and enable USE_PERSISTENT_OBJECTS
+TEST_F(AriesPgBoundsTest, Test_Persistence_PlatformDefinesPersistentAttributeAndUsePersistentObjects)
+{
+    // Compile-time / preprocessor verification against ARIES platform.h
+    bool hasPersistentObjectsMacro = false;
+#ifdef USE_PERSISTENT_OBJECTS
+    hasPersistentObjectsMacro = true;
+#endif
+    EXPECT_TRUE(hasPersistentObjectsMacro)
+        << "platform.h must define USE_PERSISTENT_OBJECTS so warm-boot bootloader flags survive!";
+
+    static char platBuf[32768];
+    ASSERT_TRUE(pg_read_repo_file("src/platform/ARIES/include/platform/platform.h", platBuf, sizeof(platBuf)));
+    EXPECT_NE(strstr(platBuf, "USE_PERSISTENT_OBJECTS"), nullptr);
+    EXPECT_NE(strstr(platBuf, "section(\".noinit\")"), nullptr)
+        << "PERSISTENT must expand to __attribute__((section(\".noinit\"))) in platform.h!";
+
+    // Real-world flight consequence:
+    // Without PERSISTENT (.noinit) and USE_PERSISTENT_OBJECTS, startup.S zeroes all reset reason
+    // tokens and RAM EEPROM state on every soft reboot.
+}
+
+// D2: Real config_streamer.c eepromData placement (.noinit), chunked write & overrun guard
+TEST_F(AriesPgBoundsTest, Test_ConfigStreamer_RamEepromRealWriteBoundaryAndPersistentSectionPlacement)
+{
+    // Arrange: Verify PERSISTENT is defined AND config_streamer.c annotates eepromData with PERSISTENT
+    bool persistentDefined = false;
+#ifdef PERSISTENT
+    persistentDefined = true;
+#endif
+    EXPECT_TRUE(persistentDefined)
+        << "platform.h must define PERSISTENT so config_streamer.c places eepromData[8192] in .noinit instead of .bss!";
+
+    static char csBuf[16384];
+    ASSERT_TRUE(pg_read_repo_file("src/main/config/config_streamer.c", csBuf, sizeof(csBuf)));
+    const char *ramDef = strstr(csBuf, "CONFIG_IN_RAM");
+    ASSERT_NE(ramDef, nullptr);
+    const char *nextBranch = strstr(ramDef, "#else");
+    const char *eepromDecl = strstr(ramDef, "eepromData[EEPROM_SIZE]");
+    const char *persistTag = strstr(ramDef, "PERSISTENT");
+    EXPECT_TRUE(eepromDecl != nullptr && persistTag != nullptr &&
+                (nextBranch == nullptr || persistTag < nextBranch))
+        << "eepromData[8192] under CONFIG_IN_RAM must carry PERSISTENT (.noinit) instead of .bss!";
+
+    // Arrange 2: Stream realistic 5,200-byte multi-chunk image into real eepromData[]
+    memset(eepromData, 0xFF, EEPROM_SIZE);
+    std::vector<uint8_t> image(5200U);
+    for (size_t i = 0; i < image.size(); i++) {
+        image[i] = (uint8_t)((i * 13U + 7U) & 0xFFU);
+    }
+
+    config_streamer_t streamer;
+    config_streamer_init(&streamer);
+    config_streamer_start(&streamer, (uintptr_t)eepromData, EEPROM_SIZE);
+
+    // Act 1: Write unaligned 7, 19, 31, and 256-byte bursts to exercise buffer coalescing
+    size_t offset = 0U;
+    static const size_t chunkPattern[] = { 7U, 19U, 31U, 256U };
+    size_t patIdx = 0U;
+    while (offset < image.size()) {
+        size_t chunk = chunkPattern[patIdx++ % 4U];
+        if (offset + chunk > image.size()) {
+            chunk = image.size() - offset;
+        }
+        EXPECT_EQ(config_streamer_write(&streamer, &image[offset], chunk), CONFIG_RESULT_SUCCESS);
+        offset += chunk;
+    }
+    EXPECT_EQ(config_streamer_flush(&streamer), CONFIG_RESULT_SUCCESS);
+    EXPECT_EQ(config_streamer_finish(&streamer), CONFIG_RESULT_SUCCESS);
+
+    // Assert 1: Byte-for-byte intact in real eepromData[0..5199]
+    EXPECT_EQ(memcmp(eepromData, image.data(), image.size()), 0);
+
+    // Act 2: Fill exact full 8192-byte EEPROM_SIZE boundary safely via chunked unaligned writes
+    std::vector<uint8_t> fullImage(EEPROM_SIZE);
+    for (size_t i = 0; i < fullImage.size(); i++) {
+        fullImage[i] = (uint8_t)((i ^ 0xA5U) & 0xFFU);
+    }
+    config_streamer_init(&streamer);
+    config_streamer_start(&streamer, (uintptr_t)eepromData, EEPROM_SIZE);
+    EXPECT_EQ(config_streamer_write(&streamer, fullImage.data(), fullImage.size()), CONFIG_RESULT_SUCCESS);
+    EXPECT_EQ(config_streamer_flush(&streamer), CONFIG_RESULT_SUCCESS);
+    EXPECT_EQ(config_streamer_finish(&streamer), CONFIG_RESULT_SUCCESS);
+    EXPECT_EQ(memcmp(eepromData, fullImage.data(), EEPROM_SIZE), 0);
+
+    // Real-world flight consequence:
+    // Placing eepromData in .bss wipes user PID/rate tuning on every soft reboot, and the full
+    // 8192-byte RAM backing store must accept arbitrary unaligned config_streamer writes cleanly.
+}
+
+// D3: Persistent objects ('Bef1' magic + bootloader reset reason) in .noinit survive warm reset
+TEST_F(AriesPgBoundsTest, Test_Persistence_PersistentObjectInitPreservesBootloaderReasonAcrossWarmReset)
+{
+    // Arrange: Verify stub_drivers.c places persistentObjects[] in PERSISTENT (.noinit)
+    static char stubBuf[32768];
+    ASSERT_TRUE(pg_read_repo_file("src/platform/ARIES/stub_drivers.c", stubBuf, sizeof(stubBuf)));
+    const char *poDecl = strstr(stubBuf, "persistentObjects[");
+    ASSERT_NE(poDecl, nullptr);
+    const char *pAttr = strstr(stubBuf, "PERSISTENT");
+    EXPECT_TRUE(pAttr != nullptr && pAttr < poDecl)
+        << "persistentObjects[] in stub_drivers.c must be placed in PERSISTENT (.noinit)!";
+
+    // Cold power-on: corrupt magic triggers wipe and 'Bef1' (0x42656631) init
+    persistentObjectWrite(PERSISTENT_OBJECT_MAGIC, 0xDEADBEEFU);
+    persistentObjectWrite(PERSISTENT_OBJECT_RESET_REASON, 99U);
+    persistentObjectInit();
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_MAGIC), 0x42656631UL);
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_RESET_REASON), 0UL);
+
+    // Warm reset: store bootloader reason then re-run persistentObjectInit() -> must retain value
+    persistentObjectWrite(PERSISTENT_OBJECT_RESET_REASON, RESET_BOOTLOADER_REQUEST_FLASH);
+    persistentObjectInit();
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_MAGIC), 0x42656631UL);
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_RESET_REASON), (uint32_t)RESET_BOOTLOADER_REQUEST_FLASH);
+
+    // Real-world flight consequence:
+    // Preserving persistentObjects in .noinit lets Configurator bootloader/baud state survive resets.
+}
+
+} // namespace

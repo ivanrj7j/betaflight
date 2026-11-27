@@ -261,3 +261,183 @@ TEST_F(AriesTargetConfigTest, Test_TargetConfig_StaticAssertionGuards) {
 }
 
 } // namespace
+
+#include <stdio.h>
+#include <string.h>
+
+extern "C" {
+#include "platform/ARIES/include/platform/platform.h"
+}
+
+namespace {
+
+static bool tcfg_read_repo_file(const char *relPath, char *buf, size_t bufSize)
+{
+    static const char *const prefixes[] = { "../../", "../", "./", "../../../" };
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s%s", prefixes[i], relPath);
+        FILE *f = fopen(path, "rb");
+        if (f) {
+            size_t n = fread(buf, 1, bufSize - 1U, f);
+            buf[n] = '\0';
+            fclose(f);
+            return n > 0U;
+        }
+    }
+    return false;
+}
+
+static bool tcfg_repo_file_exists(const char *relPath)
+{
+    static const char *const prefixes[] = { "../../", "../", "./", "../../../" };
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s%s", prefixes[i], relPath);
+        FILE *f = fopen(path, "rb");
+        if (f) {
+            fclose(f);
+            return true;
+        }
+    }
+    return false;
+}
+
+// F3: -mstrict-align active in ARIES.mk and DMA_DATA enforces 4-byte alignment
+TEST_F(AriesTargetConfigTest, Test_TargetFlags_StrictAlignInAriesMkAndDmaDataAligned4Bytes)
+{
+    // Arrange & Act: Check ARIES.mk compiler flags
+    static char mkBuf[32768];
+    ASSERT_TRUE(tcfg_read_repo_file("src/platform/ARIES/mk/ARIES.mk", mkBuf, sizeof(mkBuf)));
+    EXPECT_NE(strstr(mkBuf, "-mstrict-align"), nullptr)
+        << "ARIES.mk must enable -mstrict-align because THEJAS32 traps on unaligned loads/stores!";
+
+    // Check DMA_DATA macro in target.h is non-empty (__attribute__((aligned(4))))
+    static char thBuf[32768];
+    ASSERT_TRUE(tcfg_read_repo_file("src/platform/ARIES/target/ARIESV3/target.h", thBuf, sizeof(thBuf)));
+    const char *dmaDef = strstr(thBuf, "#define DMA_DATA");
+    ASSERT_NE(dmaDef, nullptr);
+    const char *eol = strchr(dmaDef, '\n');
+    size_t defLen = eol ? (size_t)(eol - dmaDef) : strlen(dmaDef);
+    std::string dmaLine(dmaDef, defLen);
+    EXPECT_NE(dmaLine.find("aligned"), std::string::npos)
+        << "DMA_DATA in target.h must expand to 4-byte alignment attribute instead of empty!";
+
+    // Runtime alignment proof on unaligned byte packing
+    volatile uint8_t oddPrefix = 0x5AU;
+    (void)oddPrefix;
+    DMA_DATA uint8_t bufA[5] = { 1, 2, 3, 4, 5 };
+    DMA_DATA uint8_t bufB[7] = { 6, 7, 8, 9, 10, 11, 12 };
+    EXPECT_EQ(((uintptr_t)bufA & 3U), 0U);
+    EXPECT_EQ(((uintptr_t)bufB & 3U), 0U);
+
+    // Real-world flight consequence:
+    // Word-casting unaligned uint8_t buffers on RV32IM silicon triggers mcause=4/6 Address Misaligned traps.
+}
+
+// F4: No dead PWM_MOTOR_MIN_FRAME_PERIOD macro and timer_def.h stays accurate for drivers/timer.h
+TEST_F(AriesTargetConfigTest, Test_TargetFlags_NoDeadPwmGateMacroOrUnusedTimerDefHeader)
+{
+    static char pwmBuf[32768];
+    ASSERT_TRUE(tcfg_read_repo_file("src/platform/ARIES/pwm_motor_aries.c", pwmBuf, sizeof(pwmBuf)));
+    EXPECT_EQ(strstr(pwmBuf, "PWM_MOTOR_MIN_FRAME_PERIOD"), nullptr)
+        << "Dead unreferenced PWM_MOTOR_MIN_FRAME_PERIOD macro must not remain in pwm_motor_aries.c!";
+
+    static char tdBuf[4096];
+    ASSERT_TRUE(tcfg_read_repo_file("src/platform/ARIES/timer_def.h", tdBuf, sizeof(tdBuf)));
+    EXPECT_NE(strstr(tdBuf, "USED_TIMERS"), nullptr);
+    EXPECT_EQ(strstr(tdBuf, "is in Phase 17"), nullptr)
+        << "Stale Phase 17 comment in timer_def.h must be updated to reflect Timer 1 scheduler!";
+
+    // Real-world flight consequence:
+    // Dead gating macros and stale header notes create misleading assumptions about ESC timing.
+}
+
+// F6: bootstrap_diag.c free of stale 16-byte TX FIFO text, mismatched THEJAS_LOG claim & fake GPIO ISR
+TEST_F(AriesTargetConfigTest, Test_BootstrapDiag_NoStale16ByteFifoTextOrMockedGpioIsrOrLogMismatch)
+{
+    static char diagBuf[65536];
+    ASSERT_TRUE(tcfg_read_repo_file("src/platform/ARIES/bootstrap_diag.c", diagBuf, sizeof(diagBuf)));
+
+    EXPECT_EQ(strstr(diagBuf, "Clamped to 16 Bytes"), nullptr)
+        << "Stale TX FIFO 'Clamped to 16 Bytes' diagnostic text disagrees with Erratum 1 (FCR=0x00)!";
+    EXPECT_EQ(strstr(diagBuf, "THEJAS_LOG expanded to ((void)0)"), nullptr)
+        << "Diagnostic output falsely reports THEJAS_LOG as ((void)0) when logging is active!";
+    EXPECT_EQ(strstr(diagBuf, "thejas32_gpio0_isr()"), nullptr)
+        << "bootstrap_diag.c must not invoke thejas32_gpio0_isr() in software to fake HW EXTI!";
+
+    // Real-world flight consequence:
+    // Misleading bench telemetry hides Erratum 1 hardware behavior and falsely signs off unverified EXTI wiring.
+}
+
+// F8: Production target invariants (UART_TX_BUFFER_SIZE >= 512, PERSISTENT, !USE_ADC, !USE_IMMEDIATE_CLI, LOG=0)
+TEST_F(AriesTargetConfigTest, Test_TargetConfig_ProductionBufferPersistenceLoggingAndCliInvariants)
+{
+    size_t configuredTxBuf = 256U; // Default fallback in drivers/serial_uart_impl.h
+#ifdef UART_TX_BUFFER_SIZE
+    configuredTxBuf = (size_t)UART_TX_BUFFER_SIZE;
+#endif
+    EXPECT_GE(configuredTxBuf, 512U)
+        << "UART_TX_BUFFER_SIZE must be >= 512 in target.h!";
+
+    bool usePersistent = false;
+#ifdef USE_PERSISTENT_OBJECTS
+    usePersistent = true;
+#endif
+    EXPECT_TRUE(usePersistent)
+        << "USE_PERSISTENT_OBJECTS must be enabled in platform.h!";
+
+    bool useAdc = false;
+#ifdef USE_ADC
+    useAdc = true;
+#endif
+    EXPECT_FALSE(useAdc) << "THEJAS32 SoC has no internal ADC; USE_ADC must remain undefined!";
+#ifdef DEFAULT_VOLTAGE_METER_SOURCE
+    EXPECT_EQ((int)DEFAULT_VOLTAGE_METER_SOURCE, 0); // VOLTAGE_METER_NONE == 0
+#endif
+
+    bool useImmediateCli = false;
+#ifdef USE_IMMEDIATE_CLI
+    useImmediateCli = true;
+#endif
+    EXPECT_FALSE(useImmediateCli)
+        << "USE_IMMEDIATE_CLI must be disabled in production target.h so boot chatter preserves 100 ms CLI guard!";
+
+    int devLog = 0;
+#ifdef ARIES_DEV_LOGGING
+    devLog = ARIES_DEV_LOGGING;
+#endif
+    EXPECT_EQ(devLog, 0)
+        << "ARIES_DEV_LOGGING must default to 0 in production builds!";
+
+    // Real-world flight consequence:
+    // Enforces all 5 production configuration invariants atomically at build & test time.
+}
+
+#define TCFG_STR_HELPER(x) #x
+#define TCFG_STR(x) TCFG_STR_HELPER(x)
+
+// F9 (Erratum 11): PA22 is active-LOW LD1 Green (not Blue LED), LED0_INVERTED stays unset
+TEST_F(AriesTargetConfigTest, Test_TargetConfig_Led0GreenActiveLowAndLd1PolarityDocs) {
+    // 1. Hardware polarity check: ARIES v3.0 RGB LD1 uses active-LOW GPIOs (0=ON, 1=OFF)
+    // PA22 = LD1_4 Green, PA23 = LD1_2/3 Blue, PA24 = LD1_1 Red; Betaflight !LED0_INVERTED outputs HIGH=OFF.
+    EXPECT_STREQ(TCFG_STR(LED0_PIN), "PA22");
+#if defined(LED0_INVERTED)
+    FAIL() << "LED0_INVERTED must stay undefined so LED0_OFF writes HIGH (OFF) on active-LOW LD1 Green!";
+#endif
+
+    // 2. Target documentation must accurately describe PA22 as LD1 Green (never Status Blue LED)
+    static char thBuf[32768];
+    ASSERT_TRUE(tcfg_read_repo_file("src/platform/ARIES/target/ARIESV3/target.h", thBuf, sizeof(thBuf)));
+    EXPECT_EQ(strstr(thBuf, "Status Blue LED"), nullptr)
+        << "target.h mislabels PA22 as 'Status Blue LED'; datasheet specifies LD1_4 (Green, active-LOW)!";
+    EXPECT_NE(strstr(thBuf, "LD1"), nullptr)
+        << "target.h should document PA22 as part of active-LOW RGB LED LD1 (Green)!";
+    EXPECT_NE(strstr(thBuf, "Green"), nullptr)
+        << "target.h should document PA22 LED0 color as Green (PA23=Blue, PA24=Red remain High-Z OFF)!";
+
+    // Real-world flight consequence:
+    // Mislabeling active-LOW RGB LD1 pins hides why leaving PA23/PA24 driven LOW turns onboard LD1 Purple.
+}
+
+} // namespace

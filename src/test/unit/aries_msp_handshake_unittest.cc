@@ -681,3 +681,95 @@ TEST_F(AriesMspHandshakeTest, Test_MSP_OversizedPayload_BufferOverflowGuard) {
 }
 
 } // namespace
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+namespace {
+
+static bool msp_test_read_repo_file(const char *relPath, char *buf, size_t bufSize)
+{
+    static const char *const prefixes[] = { "../../", "../", "./", "../../../" };
+    for (size_t i = 0; i < sizeof(prefixes) / sizeof(prefixes[0]); i++) {
+        char path[512];
+        snprintf(path, sizeof(path), "%s%s", prefixes[i], relPath);
+        FILE *f = fopen(path, "rb");
+        if (f) {
+            size_t n = fread(buf, 1, bufSize - 1U, f);
+            buf[n] = '\0';
+            fclose(f);
+            return n > 0U;
+        }
+    }
+    return false;
+}
+
+static size_t resolve_aries_uart_tx_buffer_size(void)
+{
+    static char targetBuf[32768];
+    if (msp_test_read_repo_file("src/platform/ARIES/target/ARIESV3/target.h", targetBuf, sizeof(targetBuf))) {
+        const char *def = strstr(targetBuf, "#define UART_TX_BUFFER_SIZE");
+        if (def != nullptr) {
+            unsigned long val = strtoul(def + 27, nullptr, 0);
+            if (val > 0UL) {
+                return (size_t)val;
+            }
+        }
+    }
+    // Upstream fallback in drivers/serial_uart_impl.h when target.h omits UART_TX_BUFFER_SIZE
+    return 256U;
+}
+
+// =============================================================================
+// TEST 17 (Group B2): 306-Byte MSP_ADJUSTMENT_RANGES Frame Fits UART_TX_BUFFER_SIZE
+// =============================================================================
+TEST_F(AriesMspHandshakeTest, Test_MSP_AdjustmentRanges_306ByteFrameFitsTargetUartTxBufferWithoutTruncation)
+{
+    // Arrange: Verify target UART_TX_BUFFER_SIZE configured for ARIESV3 is >= 512 bytes
+    // (306 B MSP_ADJUSTMENT_RANGES exceeds default 256 B ring whose usable space is 255 B!).
+    const size_t configuredTxBufferSize = resolve_aries_uart_tx_buffer_size();
+    EXPECT_GE(configuredTxBufferSize, 512U)
+        << "ARIESV3 target.h leaves UART_TX_BUFFER_SIZE at 256 B; MSP_ADJUSTMENT_RANGES (306 B+) will truncate!";
+
+    const size_t usableTxCapacity = configuredTxBufferSize - 1U;
+
+    // Construct a complete 300-byte MSP_ADJUSTMENT_RANGES (30 ranges * 10 B) response
+    // encoded using MSPv2 ('$','X','>', flag, cmd_lo, cmd_hi, size_lo, size_hi, payload[300], crc8)
+    // to validate continuous single-shot TX enqueueing without partial ring wrap.
+    std::vector<uint8_t> adjPayload(300U);
+    for (size_t i = 0; i < adjPayload.size(); i++) {
+        adjPayload[i] = (uint8_t)((i * 7U + 3U) & 0xFFU);
+    }
+
+    std::vector<uint8_t> mspV2Frame;
+    mspV2Frame.push_back('$');
+    mspV2Frame.push_back('X');
+    mspV2Frame.push_back('>');
+    mspV2Frame.push_back(0x00U); // flags
+    mspV2Frame.push_back((uint8_t)(MSP_ADJUSTMENT_RANGES & 0xFFU));
+    mspV2Frame.push_back((uint8_t)((MSP_ADJUSTMENT_RANGES >> 8) & 0xFFU));
+    mspV2Frame.push_back((uint8_t)(adjPayload.size() & 0xFFU));
+    mspV2Frame.push_back((uint8_t)((adjPayload.size() >> 8) & 0xFFU));
+    mspV2Frame.insert(mspV2Frame.end(), adjPayload.begin(), adjPayload.end());
+    const uint8_t crc = crc8_dvb_s2_update(0U, &mspV2Frame[3], mspV2Frame.size() - 3U);
+    mspV2Frame.push_back(crc);
+    ASSERT_EQ(mspV2Frame.size(), 309U); // >= 306 bytes
+
+    // Act: Check real configured ring capacity before enqueueing whole response in one burst
+    size_t acceptedBytes = 0U;
+    if (usableTxCapacity >= mspV2Frame.size()) {
+        serialWriteBufNoFlush(nullptr, mspV2Frame.data(), (int)mspV2Frame.size());
+        acceptedBytes = capturedTxBytes.size();
+    }
+
+    // Assert: Whole >=306 B frame fits into configured TX ring in one pass without splitting/stalling
+    EXPECT_EQ(acceptedBytes, mspV2Frame.size());
+    EXPECT_EQ(capturedTxBytes, mspV2Frame);
+
+    // Real-world flight consequence:
+    // Betaflight Configurator times out on the Adjustments tab when UART_TX_BUFFER_SIZE < 306 B
+    // forces partial drops or retries during a single MSP_ADJUSTMENT_RANGES read.
+}
+
+} // namespace

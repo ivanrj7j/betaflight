@@ -7,7 +7,7 @@
 set -euo pipefail
 
 ELF_FILE="${1:-obj/main/betaflight_ARIESV3.elf}"
-TARGET_MAX_BYTES=253952 # 248 KB SRAM Execution Limit (0x00202000 to 0x0023FFFF)
+TARGET_MAX_BYTES=247808 # 242 KB Bootloader-Safe SRAM Limit (0x00202000 to 0x0023E7FF)
 EXPECTED_ENTRY="0x00202000"
 
 echo "======================================================================"
@@ -53,11 +53,11 @@ else
     fi
 fi
 
-# 3. SRAM Sizing Audit (<= 248 KB)
+# 3. SRAM Sizing Audit (<= 242 KB)
 echo -n "[Audit 3/10] Total Binary Footprint Audit: "
 TOTAL_BYTES=$($CROSS_SIZE -B "$ELF_FILE" | awk 'NR==2 {print $1 + $2 + $3}')
 if [ "$TOTAL_BYTES" -gt "$TARGET_MAX_BYTES" ]; then
-    echo "FAIL (Size $TOTAL_BYTES bytes exceeds 248 KB SRAM limit of $TARGET_MAX_BYTES bytes!)"
+    echo "FAIL (Size $TOTAL_BYTES bytes exceeds 242 KB SRAM limit of $TARGET_MAX_BYTES bytes!)"
     exit 1
 fi
 FREE_BYTES=$((TARGET_MAX_BYTES - TOTAL_BYTES))
@@ -124,17 +124,17 @@ else
     echo "SKIP (PG registry symbols not linked in early bootstrap build)"
 fi
 
-# 9. Top-of-SRAM Upper Ceiling Audit (<= 0x0023FFFF including .noinit + 8 KB .stack)
+# 9. Top-of-SRAM Upper Ceiling Audit (<= 0x0023E7FF including .noinit + 8 KB .stack)
 echo -n "[Audit 9/10] SRAM Upper Bound Ceiling Audit: "
 SRAM_END=$($CROSS_READELF -s "$ELF_FILE" | awk '$8 == "_end" {print $2}' | head -n 1)
 if [ -n "$SRAM_END" ]; then
     SRAM_END_INT=$((16#$SRAM_END))
-    MAX_SRAM_INT=$((16#0023FFFF))
+    MAX_SRAM_INT=$((16#0023E7FF))
     if [ "$SRAM_END_INT" -gt "$MAX_SRAM_INT" ]; then
-        echo "FAIL (_end at 0x$SRAM_END exceeds physical SRAM ceiling 0x0023FFFF)"
+        echo "FAIL (_end at 0x$SRAM_END exceeds 242 KB bootloader-safe SRAM ceiling 0x0023E7FF)"
         exit 1
     fi
-    echo "PASS (_end 0x$SRAM_END <= 0x0023FFFF)"
+    echo "PASS (_end 0x$SRAM_END <= 0x0023E7FF)"
 else
     echo "SKIP (_end symbol not exported)"
 fi
