@@ -70,5 +70,15 @@ In Phase 09 and subsequent Code Audit Node 01 remediations, `serial_uart_aries.c
 5. **Silicon Labs CP2102N Pin Tag Alignment**: Aligned `UART0_TX_PIN = PA30` and `UART0_RX_PIN = PA31` in [`target.h`](../../src/platform/ARIES/target/ARIESV3/target.h) conforming to Silicon Ground Truth 8.
 6. **Verified Unit Tests & Hardware Telemetry**: All 11 unit tests in [`aries_uart_hw_unittest.cc`](../../src/test/unit/aries_uart_hw_unittest.cc) pass (100%), and physical silicon bringup ([`tempfiles/phase9.1.txt`](../../tempfiles/phase9.1.txt)) confirms live register state (`LCR = 0x03030303`, `LSR = 0x00000000`, `IER = 0x00000000`), with 9 live heartbeats and LED0 1.0 Hz toggling.
 
-## 5. Key Takeaways & Overall Score: 9.9 / 10
+## 5. Key Takeaways & Overall Score: 9.9 / 10 (Historical Phase 09; Updated Below)
 `serial_uart_aries.c` completely resolves communication deadlock, interrupt storms, and latency issues on ARIES v3.0. Bounding the TX drain loop, polling background queues at 100 Hz, and locating function pointers in read-only memory guarantee rock-solid coexistence with the 1.0 kHz real-time flight loop.
+
+---
+
+## 6. Phase 19–19C Silicon Errata & Hardening Addendum (`2026-11-27`)
+
+Subsequent silicon testing and post-Phase 19 audits refined several Phase 09 assumptions documented above:
+1. **`Erratum 1` Mandates `FCR = 0x00` (1-Byte Register Mode):** Hardware 16-byte FIFOs (`FCR = 0x07` / `0x01`, scored `9.2/10` in Section 2) cause scrambled/duplicated characters and RX pointer lockups on physical DW_apb_uart silicon; `serial_uart_aries.c` enforces `UART_IIR_FCR = 0x00` matching C-DAC VEGA SDK/BSP.
+2. **512-Byte TX Ring, `1 kHz` TX Drain & Atomic `MIE` (`H22`):** `UART_TX_BUFFER_SIZE` increased from `256` to `512 B` for 306-byte MSP frames, `uartEnableTxInterrupt()` locks via `thejas32_atomic_enter()/exit()` with `ETBEI` (`0x02`) strictly `0`, and `uartPollTx()` runs at `1 kHz` in `taskMain()`.
+3. **Phase 19C Bench Hardening (`334/334` Host PASS, [Code Audit Node 10](../code_audit/10_PHASE_19C_UART_CLI_RX_FREEZE.md)):** Restored `UART0` `LSR & 0x01` acceptance (Phase 13.3 CLI fix), preserved `(lsr & 0x1CU)` rejection + `16`-error `PA17` `IRQ 1` auto-suppression (`50 ms` idle re-arm) on `UART1`, added bounded `TEMT` (`0x40`) + `32 B` stale `FLASHER` RX flush around `DLAB`, and acknowledged `UART_IIR_FCR` strictly inside `thejas32_uart0_isr()`/`thejas32_uart1_isr()`.
+4. **Open Silicon Status:** Flashing the `192,380 B` `b236a26f2` binary confirmed the intermittent `UART0` CLI character drop / `# ` freeze still occurs on physical hardware; diagnosis is paused while advancing to Phase 20 (`MDP_SPI_3`) and must be cleared before live flight testing.

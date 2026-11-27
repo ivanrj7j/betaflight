@@ -1,17 +1,19 @@
 # Phase 19C (Post-Audit Follow-Up): UART0 CLI RX Tolerance, Floating PA17 Storm Suppression & Hardware-ISR IIR Split (Silicon Defect Still Open)
 
+## 1. Header & Traceability
 * **Date:** 2026-11-27
-* **Active Git Branch:** `rebuild` (base commit `a586144a6` + Phase 19B working tree + Phase 19C UART hardening)
-* **Physical Bench Outcome (`COM9`, `192,380 B` `.bin`):** **STILL REPRODUCED ON SILICON** — User flashed `tempfiles/betaflight_ARIESV3.bin` (`7f9d10c93bec39e9cfd67f887b4cea177843758f3672611b9200327de980bfbb`) and confirmed the intermittent CLI input drop / `# ` freeze still occurs; investigation paused by user request to advance to Phase 20 (`MDP_SPI_3`) next.
+* **Driver Commit Hash:** `b236a26f2` (Active branch: `rebuild`)
 * **Target Silicon:** C-DAC ARIES v3.0 (THEJAS32 / VEGA ET1031, RV32IM @ 100 MHz, `0x00202000` SRAM)
-* **Reference Consultations:**
-  * [`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c), [`debug_uart.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/uart/debug_uart.c), [`lib/vega-bsp/cores/arduino/HardwareSerial.cpp`](../../lib/vega-bsp/cores/arduino/HardwareSerial.cpp)
-  * [`logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md`](../hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), [`18_ESP32_SERIAL_UART.md`](../hardware_inspection/18_ESP32_SERIAL_UART.md)
-  * [`logs/dev/phase_13_cli_entry.md`](phase_13_cli_entry.md), [`logs/dev/phase_19b_post_audit_remediation.md`](phase_19b_post_audit_remediation.md), [`knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
+* **Physical Bench Outcome (`COM9`, `192,380 B` `.bin`):** **STILL REPRODUCED ON SILICON** — User flashed [`tempfiles/betaflight_ARIESV3.bin`](../../tempfiles/betaflight_ARIESV3.bin) (`7f9d10c93bec39e9cfd67f887b4cea177843758f3672611b9200327de980bfbb`) and confirmed the intermittent CLI input drop / `# ` freeze still occurs; investigation paused at user request to advance to Phase 20 (`MDP_SPI_3`) next.
+* **Traceability & Consulted References:**
+  * Micro-Plan & Gap Rules: [`PLAN/03_SERIAL_COMMUNICATION_MSP_AND_CLI.md`](../../PLAN/03_SERIAL_COMMUNICATION_MSP_AND_CLI.md), [`CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md`](../../knowledgebase/CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
+  * Evaluation & Audit Nodes: [`06_EVAL_SERIAL_UART_ARIES_C.md`](../../knowledgebase/codebase_evaluations/06_EVAL_SERIAL_UART_ARIES_C.md), [`10_PHASE_19C_UART_CLI_RX_FREEZE.md`](../../knowledgebase/code_audit/10_PHASE_19C_UART_CLI_RX_FREEZE.md)
+  * Triple Reference Consultation: [`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c), [`debug_uart.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/uart/debug_uart.c), [`HardwareSerial.cpp`](../../lib/vega-bsp/cores/arduino/HardwareSerial.cpp), [`06_STM32_SERIAL_UART_DRIVER.md`](../hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md), [`18_ESP32_SERIAL_UART.md`](../hardware_inspection/18_ESP32_SERIAL_UART.md)
+  * Companion Dev Logs: [`phase_13_cli_entry.md`](phase_13_cli_entry.md), [`phase_19b_post_audit_remediation.md`](phase_19b_post_audit_remediation.md)
 
 ---
 
-## 1. High-Level Executive Overview & Silicon Context
+## 2. High-Level Executive Overview & Silicon Context
 
 Back-to-back physical hardware captures on the `191,828 B` Phase 19B build in [`tempfiles/audit19b.3.txt`](../../tempfiles/audit19b.3.txt) (matching earlier failures in [`tempfiles/audit19.2.txt`](../../tempfiles/audit19.2.txt), [`tempfiles/audit19.3.txt`](../../tempfiles/audit19.3.txt), [`tempfiles/audit19.4.txt`](../../tempfiles/audit19.4.txt), and [`tempfiles/audit19b.1.txt`](../../tempfiles/audit19b.1.txt)) exhibited reset-to-reset intermittent CLI character loss and permanent RX hangs:
 * **Run 1 (`FLASHER -> Boot Complete -> Entering CLI Mode -> # `):** hung immediately on CLI entry.
@@ -27,7 +29,7 @@ Comparing active `ARIESV3` runtime paths against working `phase19.4.txt` diagnos
 
 ---
 
-## 2. Unit Test Design Rationales (TDD Step 1 — Red to Green)
+## 3. Unit Test Design Rationales (TDD Step 1 — Red to Green)
 
 Four new AAA tests were authored before editing `.c` code and verified **Red** against the unfixed driver, then verified **Green** alongside all updated `UART0` vs. `UART1` assertions (`19/19` ARIES suites, `334/334 PASS`):
 
@@ -47,7 +49,7 @@ Four new AAA tests were authored before editing `.c` code and verified **Red** a
 
 ---
 
-## 3. Code Implementation Rationales
+## 4. Code Implementation Rationales
 
 * **[`serial_uart_aries.c`](../../src/platform/ARIES/serial_uart_aries.c):**
   * **Bounded `TEMT` + RX Flush across `DLAB` Latch (`thejas32_uart_set_baudrate_ex`):** Waits up to `20000` fenced reads for `UART_LSR & 0x40U` (`TEMT`) before setting `UART_LCR = 0x80 | lcr` so early boot/bootloader characters finish shifting cleanly without blocking indefinitely on mocked/stuck lines; after clearing `DLAB`, drains up to `32` stale RX bytes via `thejas32_uart_read_lsr` / `thejas32_uart_read_rx` prior to `uartReconfigure()` arming `UART_IE`.
@@ -57,7 +59,7 @@ Four new AAA tests were authored before editing `.c` code and verified **Red** a
 
 ---
 
-## 4. Expected vs. Actual Verification Outputs
+## 5. Expected vs. Actual Verification Outputs
 
 * **TDD Red Phase (unfixed driver + new specs):**
   * `make -k -C src/test CC=gcc CXX=g++ -j6 test_aries_uart_rx_unittest test_aries_uart_tx_drain_unittest`:
@@ -73,7 +75,7 @@ Four new AAA tests were authored before editing `.c` code and verified **Red** a
 
 ---
 
-## 5. 10-Point Silicon Invariant Audit Results (`build_verify.sh`)
+## 6. 10-Point Silicon Invariant Audit Results (`build_verify.sh`)
 
 | Audit | Check | Result | Measured Value |
 | :---: | :--- | :---: | :--- |
@@ -90,7 +92,7 @@ Four new AAA tests were authored before editing `.c` code and verified **Red** a
 
 ---
 
-## 6. Retrospective & 0 to 10 Decision Scoring Rubric
+## 7. Retrospective & 0 to 10 Decision Scoring Rubric
 
 | Decision / Action | Score (0–10) | Technical Justification |
 | :--- | :---: | :--- |
