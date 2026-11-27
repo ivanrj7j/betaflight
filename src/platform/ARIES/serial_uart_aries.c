@@ -147,6 +147,13 @@ static inline uint32_t thejas32_uart_clamp_baudrate(uint32_t baudRate)
     return baudRate;
 }
 
+static uint8_t uartErrorStreak[2];
+static bool uartIrqSuppressed[2];
+static uint8_t uartCleanIdleTicks[2];
+
+#define UART1_NOISE_SUPPRESS_THRESHOLD 16U
+#define UART1_IDLE_REARM_TICKS         5U
+
 static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, portOptions_e options, bool resetFifo)
 {
     baudRate = thejas32_uart_clamp_baudrate(baudRate);
@@ -172,6 +179,11 @@ static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, portOpt
         lcr |= 0x08; // Odd parity enable (PEN = 1, EPS = 0)
     }
 
+    // Bounded wait for TX shift register idle (TEMT = 0x40) before latching DLAB across boot/FLASHER handoff
+    for (uint32_t wait = 0U; (wait < 20000U) && ((THEJAS32_UART(ch).UART_LSR & 0x40U) == 0U); wait++) {
+        THEJAS32_MEMORY_FENCE();
+    }
+
     // Step 1: Set DLAB (Divisor Latch Access Bit) = 1 (Bit 7 of UART_LCR) while maintaining framing
     THEJAS32_UART(ch).UART_LCR = 0x80 | lcr;
     THEJAS32_MEMORY_FENCE();
@@ -190,6 +202,12 @@ static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, portOpt
         THEJAS32_UART(ch).UART_IIR_FCR = 0x00;
         THEJAS32_MEMORY_FENCE();
     }
+
+    // Drain any residual FLASHER bootloader / line-noise byte & error flags before IRQ enable
+    uint8_t flushLimit = 32U;
+    while ((thejas32_uart_read_lsr(ch) & 0x01U) && flushLimit--) {
+        (void)thejas32_uart_read_rx(ch);
+    }
 }
 
 static inline void thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate, portOptions_e options)
@@ -207,6 +225,9 @@ void uartReconfigure(uartPort_t *uartPort)
         return;
     }
     uartPort->port.baudRate = thejas32_uart_clamp_baudrate(uartPort->port.baudRate);
+    uartErrorStreak[ch] = 0U;
+    uartIrqSuppressed[ch] = false;
+    uartCleanIdleTicks[ch] = 0U;
 
     thejas32_uart_set_baudrate_ex((uint8_t)ch, uartPort->port.baudRate, uartPort->port.options, false);
 
@@ -264,14 +285,34 @@ void thejas32_uart_poll_tx(void)
     }
 }
 
+static bool uartLineNoiseSeen[2];
+
 // Periodic / polled receive drain hook: enters uartIrqHandler() directly so LSR FE/PE flags are never wiped before inspection
 void thejas32_uart_poll_rx(void)
 {
     for (int dev = 0; dev < UARTDEV_COUNT; dev++) {
         uartPort_t *s = &uartDevice[dev].port;
         if (s->USARTx && s->port.rxBuffer && s->port.rxBufferSize > 0) {
+            int8_t ch = uartGetIndex(s->USARTx);
             uint32_t prev = thejas32_atomic_enter();
+            if (ch >= 0 && ch < 2) {
+                uartLineNoiseSeen[ch] = false;
+            }
             uartIrqHandler(s);
+            if ((ch == 1) && uartIrqSuppressed[1] && (s->port.mode & MODE_RX)) {
+                if (!uartLineNoiseSeen[1] && ((THEJAS32_UART(1).UART_LSR & 0x1DU) == 0U)) {
+                    if (++uartCleanIdleTicks[1] >= UART1_IDLE_REARM_TICKS) {
+                        uartErrorStreak[1] = 0U;
+                        uartCleanIdleTicks[1] = 0U;
+                        uartIrqSuppressed[1] = false;
+                        THEJAS32_UART(1).UART_IE = 0x01U;
+                        thejas32_interrupt_enable(THEJAS32_IRQ_UART1);
+                        THEJAS32_MEMORY_FENCE();
+                    }
+                } else {
+                    uartCleanIdleTicks[1] = 0U;
+                }
+            }
             thejas32_atomic_exit(prev);
         }
     }
@@ -285,6 +326,20 @@ void uartPollRx(void)
 void uartPollTx(void)
 {
     thejas32_uart_poll_tx();
+}
+
+static inline void uartIngestRxByte(uartPort_t *s, uint8_t rxChar)
+{
+    if (s->port.rxCallback) {
+        s->port.rxCallback(rxChar, s->port.rxCallbackData);
+    } else {
+        // RX ring buffer head/tail collision guard prevents corrupting unread data
+        uint16_t nextHead = (s->port.rxBufferHead + 1) % s->port.rxBufferSize;
+        if (nextHead != s->port.rxBufferTail) {
+            s->port.rxBuffer[s->port.rxBufferHead] = rxChar;
+            s->port.rxBufferHead = nextHead;
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -301,29 +356,34 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
         return;
     }
 
-    // H18: Read UART_IIR_FCR to acknowledge DW_apb_uart interrupt status before servicing LSR/RBR.
-    volatile uint32_t iir = THEJAS32_UART(ch).UART_IIR_FCR;
-    UNUSED(iir);
+    // Phase 13.4 / C-DAC BSP: ETBEI stays 0; never read IIR in polled/RX handler (desyncs DW_apb_uart LSR&0x01)
 
     // Reading Line Status Register (LSR) automatically clears Overrun Error (ORE),
-    // Parity Error (PE), and Framing Error (FE) flags on 16550 IP.
+    // Parity Error (PE), Framing Error (FE), and Break (BI) flags on 16550 IP.
     uint32_t lsr = thejas32_uart_read_lsr((uint8_t)ch);
 
     // Check Data Ready (LSR Bit 0) and ingest up to 32 bytes per pass (prevents lockup on break condition)
     uint8_t rxLimit = 32U;
     while ((lsr & 0x01) && rxLimit--) {
         uint8_t rxChar = thejas32_uart_read_rx((uint8_t)ch);
-        // Reject corrupted framing/parity bytes (e.g. inverted wire or floating line break)
-        if ((lsr & 0x0CU) == 0U) {
-            if (s->port.rxCallback) {
-                s->port.rxCallback(rxChar, s->port.rxCallbackData);
-            } else {
-                // RX ring buffer head/tail collision guard prevents corrupting unread data
-                uint16_t nextHead = (s->port.rxBufferHead + 1) % s->port.rxBufferSize;
-                if (nextHead != s->port.rxBufferTail) {
-                    s->port.rxBuffer[s->port.rxBufferHead] = rxChar;
-                    s->port.rxBufferHead = nextHead;
-                }
+        if (ch == 0) {
+            // Phase 13.3 / VEGA SDK: UART0 CLI & binary MSP ingest every DR byte; protocol CRCs guard corrupted frames
+            uartIngestRxByte(s, rxChar);
+        } else if ((lsr & 0x1CU) == 0U) {
+            // UART1 CRSF rejects PE/FE/BI line noise while tolerating OE so valid RC frames recover cleanly
+            uartErrorStreak[1] = 0U;
+            uartIngestRxByte(s, rxChar);
+        } else {
+            uartLineNoiseSeen[1] = true;
+            uartCleanIdleTicks[1] = 0U;
+            if (uartErrorStreak[1] < UART1_NOISE_SUPPRESS_THRESHOLD) {
+                uartErrorStreak[1]++;
+            }
+            if ((uartErrorStreak[1] >= UART1_NOISE_SUPPRESS_THRESHOLD) && !uartIrqSuppressed[1]) {
+                // Floating unpulled PA17 can storm 420 kbaud break/FE IRQs across resets; mask until clean idle
+                THEJAS32_UART(1).UART_IE = 0x00U;
+                thejas32_interrupt_disable(THEJAS32_IRQ_UART1);
+                uartIrqSuppressed[1] = true;
             }
         }
         lsr = thejas32_uart_read_lsr((uint8_t)ch);
@@ -339,12 +399,17 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
 
 static void thejas32_uart0_isr(void)
 {
+    // C-DAC HardwareSerial.cpp: ack IIR strictly inside hardware ISR entry (never inside polled paths)
+    volatile uint32_t iir = THEJAS32_UART(0).UART_IIR_FCR;
+    (void)iir;
     uartIrqHandler(&uartDevice[UARTDEV_0].port);
 }
 
 #ifdef USE_UART1
 void thejas32_uart1_isr(void)
 {
+    volatile uint32_t iir = THEJAS32_UART(1).UART_IIR_FCR;
+    (void)iir;
     uartIrqHandler(&uartDevice[UARTDEV_1].port);
 }
 #endif

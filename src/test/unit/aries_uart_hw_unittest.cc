@@ -642,6 +642,8 @@ TEST_F(AriesUartHwTest, Test_RealSerialUartAriesC_InitOrderNullGuardsAndPollRxEr
     serialPinConfig_t pinCfg = {};
     pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
     pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    pinCfg.ioTagTx[1] = DEFIO_TAG_E__PA16;
+    pinCfg.ioTagRx[1] = DEFIO_TAG_E__PA17;
     uartPinConfigure(&pinCfg);
 
     uartDevice_t *u0dev = uartDeviceFromIdentifier(SERIAL_PORT_UART0);
@@ -657,21 +659,26 @@ TEST_F(AriesUartHwTest, Test_RealSerialUartAriesC_InitOrderNullGuardsAndPollRxEr
 
     // Reconfigure enables RX-only interrupt & controller IRQ after pointers are ready
     serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, real_uart_rx_cb, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    serialPort_t *sp1 = uartOpen(SERIAL_PORT_USART1, real_uart_rx_cb, nullptr, 420000U, MODE_RXTX, SERIAL_NOT_INVERTED);
     ASSERT_NE(sp0, nullptr);
+    ASSERT_NE(sp1, nullptr);
     EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x01U);
     EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_UART0), 0U);
 
-    // Finding 4: uartPollRx must NOT strip FE/PE before uartIrqHandler inspects LSR
-    THEJAS32_UART(0).UART_DR = 0xAAU;
+    // Phase 13.3 + Finding 4: UART0 CLI/MSP accepts LSR.DR regardless of FE; UART1 CRSF rejects FE/PE
+    THEJAS32_UART(0).UART_DR = 0x6BU;
     THEJAS32_UART(0).UART_LSR = 0x69U; // DR(0x01) | FE(0x08) | THRE | TEMT
+    THEJAS32_UART(1).UART_DR = 0xAAU;
+    THEJAS32_UART(1).UART_LSR = 0x69U; // DR(0x01) | FE(0x08) on UART1 -> discarded
     uartPollRx();
-    EXPECT_EQ(g_real_uart_rx_count, 0U) << "Framing-errored byte must be discarded, not forwarded";
+    EXPECT_EQ(g_real_uart_rx_count, 1U) << "UART0 must ingest DR=1 keystrokes despite FE while UART1 discards FE!";
+    EXPECT_EQ(g_real_uart_last_byte, 0x6BU);
 
-    // Clean byte following FE is delivered once per polled pass (1-byte RBR read clears LSR.DR)
-    THEJAS32_UART(0).UART_DR = 0x5CU;
-    THEJAS32_UART(0).UART_LSR = 0x61U; // DR | THRE | TEMT
+    // Clean byte following FE on UART1 is delivered once per polled pass (1-byte RBR read clears LSR.DR)
+    THEJAS32_UART(1).UART_DR = 0x5CU;
+    THEJAS32_UART(1).UART_LSR = 0x61U; // DR | THRE | TEMT
     uartPollRx();
-    EXPECT_EQ(g_real_uart_rx_count, 1U);
+    EXPECT_EQ(g_real_uart_rx_count, 2U);
     EXPECT_EQ(g_real_uart_last_byte, 0x5CU);
 
     // TX-only mode masks UART_IE and controller IRQ

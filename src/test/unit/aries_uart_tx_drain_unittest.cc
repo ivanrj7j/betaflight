@@ -727,17 +727,19 @@ TEST_F(AriesUartTxDrainTest, Test_UART_EnableTxInterrupt_SuppressesEtbeiUnderAto
     // Enabling ETBEI (0x02) triggers H18/H22 DW_apb_uart lockup on ARIES v3.0 right after printing CLI prompt '# '.
 }
 
-// B6 (H18): uartIrqHandler() reads UART_IIR_FCR to acknowledge IRQ status, drains ready TX, preserves IRQs
-TEST_F(AriesUartTxDrainTest, Test_UART_IrqHandler_AcknowledgesIirClearsLatchDrainsPendingTxAndPreservesOuterIrqs)
+// B6 (Phase 13.4 / Audit 02): uartIrqHandler() MUST NOT read UART_IIR_FCR in polled/RX mode (prevents DW_apb_uart RX desync)
+TEST_F(AriesUartTxDrainTest, Test_UART_IrqHandler_OmitsPolledIirReadAndDrainsPendingTxSafely)
 {
-    // Arrange: Queue 10 bytes while THRE=0, verify IIR acknowledgement read in serial_uart_aries.c
+    // Arrange: Verify uartIrqHandler() never reads UART_IIR_FCR (Phase 13.4 DW_apb_uart polled RX freeze fix)
     static char srcBuf[32768];
     ASSERT_TRUE(uart_test_read_repo_file("src/platform/ARIES/serial_uart_aries.c", srcBuf, sizeof(srcBuf)));
     const char *irqFn = strstr(srcBuf, "uartIrqHandler(");
     ASSERT_NE(irqFn, nullptr);
+    const char *irqEnd = strstr(irqFn, "thejas32_uart0_isr");
+    ASSERT_NE(irqEnd, nullptr);
     const char *iirRead = strstr(irqFn, "UART_IIR_FCR");
-    EXPECT_NE(iirRead, nullptr)
-        << "H18: uartIrqHandler() must read UART_IIR_FCR on ISR entry to acknowledge DW_apb_uart IRQ status!";
+    EXPECT_TRUE(iirRead == nullptr || iirRead >= irqEnd)
+        << "Phase 13.4 / Audit 02: Reading UART_IIR_FCR in uartIrqHandler() desynchronizes DW_apb_uart RX status in polled mode!";
 
     thejas32_host_reset_all();
     IOInitGlobal();
@@ -775,7 +777,8 @@ TEST_F(AriesUartTxDrainTest, Test_UART_IrqHandler_AcknowledgesIirClearsLatchDrai
     EXPECT_EQ(thejas32_host_mstatus, outerMstatus);
 
     // Real-world flight consequence:
-    // Failing to read UART_IIR_FCR or arming ETBEI leaves THRE pending on DW_apb_uart and freezes CLI/RX.
+    // Reading UART_IIR_FCR during polled uartRead()/uartPollRx() desyncs DW_apb_uart LSR&0x01 and freezes CLI RX;
+    // reading only LSR/RBR keeps RX live while ETBEI=0 prevents THRE storms.
 }
 
 // B7: Spurious THRE / empty-buffer ISR never underflows txBufferTail, emits stale data, or arms ETBEI
@@ -923,4 +926,74 @@ TEST_F(AriesUartTxDrainTest, Test_UART_ConcurrentTx512AndRx256MultiWraparoundZer
     // Real-world flight consequence:
     // Full-duplex MSP telemetry over UART0 concurrent with 420 kbaud CRSF telemetry on UART1
     // must wrap 512 B TX and 256 B RX rings independently without index collision.
+}
+
+// B9 (TDD Step 1): HW ISRs acknowledge IIR only inside ISR context while polled paths never touch IIR;
+// thejas32_uart_set_baudrate_ex waits boundedly for TEMT (0x40U) before latching DLAB (0x80).
+TEST_F(AriesUartTxDrainTest, Test_UART_HwIsrAcknowledgesIirOnlyInIsrAndDlabWaitsTemt)
+{
+    // Arrange: Inspect driver contracts directly from serial_uart_aries.c alongside live ISR execution
+    static char srcBuf[32768];
+    ASSERT_TRUE(uart_test_read_repo_file("src/platform/ARIES/serial_uart_aries.c", srcBuf, sizeof(srcBuf)));
+
+    const char *baudFn = strstr(srcBuf, "thejas32_uart_set_baudrate_ex(");
+    const char *reconfFn = strstr(srcBuf, "void uartReconfigure(");
+    const char *irqHandlerFn = strstr(srcBuf, "uartIrqHandler(");
+    const char *u0IsrFn = strstr(srcBuf, "static void thejas32_uart0_isr(");
+    const char *u1IsrFn = strstr(srcBuf, "void thejas32_uart1_isr(");
+    const char *uartInitFn = strstr(srcBuf, "uartPort_t *serialUART(");
+    ASSERT_NE(baudFn, nullptr);
+    ASSERT_NE(reconfFn, nullptr);
+    ASSERT_NE(irqHandlerFn, nullptr);
+    ASSERT_NE(u0IsrFn, nullptr);
+    ASSERT_NE(u1IsrFn, nullptr);
+    ASSERT_NE(uartInitFn, nullptr);
+
+    // Assert 1: TEMT (0x40U) checked before DLAB latch inside thejas32_uart_set_baudrate_ex()
+    const char *temtCheck = strstr(baudFn, "0x40");
+    EXPECT_TRUE(temtCheck != nullptr && temtCheck < reconfFn)
+        << "thejas32_uart_set_baudrate_ex() must wait boundedly for UART_LSR TEMT (0x40U) before setting DLAB!";
+
+    // Assert 2: C-DAC BSP HardwareSerial.cpp pattern — UART_IIR_FCR acknowledged ONLY in hardware ISRs
+    const char *iirInU0 = strstr(u0IsrFn, "UART_IIR_FCR");
+    const char *iirInU1 = strstr(u1IsrFn, "UART_IIR_FCR");
+    EXPECT_TRUE(iirInU0 != nullptr && iirInU0 < u1IsrFn)
+        << "thejas32_uart0_isr() must acknowledge UART_IIR_FCR inside hardware ISR context (HardwareSerial.cpp match)";
+    EXPECT_TRUE(iirInU1 != nullptr && iirInU1 < uartInitFn)
+        << "thejas32_uart1_isr() must acknowledge UART_IIR_FCR inside hardware ISR context (HardwareSerial.cpp match)";
+
+    // Act & Assert 3: Verify both hardware ISRs still drain clean RX & keep polled TX intact
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    pinCfg.ioTagTx[1] = DEFIO_TAG_E__PA16;
+    pinCfg.ioTagRx[1] = DEFIO_TAG_E__PA17;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    serialPort_t *sp1 = uartOpen(SERIAL_PORT_UART1, nullptr, nullptr, 420000U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+    ASSERT_NE(sp1, nullptr);
+
+    THEJAS32_UART(0).UART_IIR_FCR = 0x04U; // Pending RDA in IIR
+    THEJAS32_UART(0).UART_DR = '!';
+    THEJAS32_UART(0).UART_LSR = 0x61U;
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+
+    THEJAS32_UART(1).UART_IIR_FCR = 0x04U;
+    THEJAS32_UART(1).UART_DR = 0xC8U;
+    THEJAS32_UART(1).UART_LSR = 0x61U;
+    thejas32_uart1_isr();
+
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), (uint8_t)'!');
+    EXPECT_EQ(sp1->vTable->serialRead(sp1), 0xC8U);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE & 0xFFU, 0x01U);
+    EXPECT_EQ(THEJAS32_UART(1).UART_IE & 0xFFU, 0x01U);
+
+    // Real-world flight consequence:
+    // Reconciles HardwareSerial.cpp ISR IIR acknowledgement with Phase 13.4's rule forbidding
+    // polled UART_IIR_FCR reads inside uartIrqHandler() / uartPollRx() / uartPlatformPollRx().
 }

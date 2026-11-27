@@ -914,9 +914,65 @@ TEST_F(AriesUartRxTest, Test_UARTRX_OverrunRecovery_ContinuousStreamReturnsToCle
 }
 
 // =============================================================================
-// TEST 19: Real serial_uart_aries.c Ring Buffer, FE/PE Filtering & OE Recovery
+// TEST 19: Real serial_uart_aries.c UART1 Ring Buffer, FE/PE Filtering & OE Recovery
 // =============================================================================
 TEST_F(AriesUartRxTest, Test_RealUartRxAriesC_RingBufferAndErrorRecovery) {
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[1] = DEFIO_TAG_E__PA16;
+    pinCfg.ioTagRx[1] = DEFIO_TAG_E__PA17;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp1 = uartOpen(SERIAL_PORT_USART1, nullptr, nullptr, 420000U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp1, nullptr);
+
+    // Inject '$', 'M', framing-errored byte (FE dropped on UART1), parity-errored byte (PE dropped), and overrun+clean '<'
+    const struct { uint8_t dr; uint8_t lsr; } wire[] = {
+        { 0x24U, 0x61U }, // '$'
+        { 0x4DU, 0x61U }, // 'M'
+        { 0xFFU, 0x69U }, // FE -> drop
+        { 0xEEU, 0x65U }, // PE -> drop
+        { 0x3CU, 0x63U }, // '<' with OE -> cleared on LSR read, byte accepted
+    };
+    for (const auto &pkt : wire) {
+        THEJAS32_UART(1).UART_DR = pkt.dr;
+        THEJAS32_UART(1).UART_LSR = pkt.lsr;
+        THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART1);
+        handle_trap(0x8000000BUL, 0U, nullptr);
+    }
+
+    EXPECT_EQ(sp1->vTable->serialTotalRxWaiting(sp1), 3U);
+    EXPECT_EQ(sp1->vTable->serialRead(sp1), 0x24U);
+    EXPECT_EQ(sp1->vTable->serialRead(sp1), 0x4DU);
+    EXPECT_EQ(sp1->vTable->serialRead(sp1), 0x3CU);
+    EXPECT_EQ(sp1->vTable->serialTotalRxWaiting(sp1), 0U);
+}
+
+} // namespace
+
+extern "C" {
+void thejas32_uart_poll_rx(void);
+}
+
+namespace {
+
+static uint32_t g_uart1StormRxCount = 0U;
+static uint8_t g_uart1StormLastByte = 0U;
+
+static void uart1_storm_rx_callback(uint16_t data, void *rxCallbackData)
+{
+    (void)rxCallbackData;
+    g_uart1StormRxCount++;
+    g_uart1StormLastByte = (uint8_t)(data & 0xFFU);
+}
+
+// =============================================================================
+// TEST 20 (TDD Step 1): UART0 CLI/MSP Ingest Accepts LSR Error Flags Without Dropping Keystrokes
+// =============================================================================
+TEST_F(AriesUartRxTest, Test_UART0_CliAndMspIngestAcceptsLsrErrorFlagsWithoutDroppingKeystrokes) {
+    // Arrange: Verify Phase 13.3 THEJAS32 UART0 ground truth — gating on FE/PE drops real CLI input (# ve / # h).
     thejas32_host_reset_all();
     IOInitGlobal();
 
@@ -928,26 +984,149 @@ TEST_F(AriesUartRxTest, Test_RealUartRxAriesC_RingBufferAndErrorRecovery) {
     serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
     ASSERT_NE(sp0, nullptr);
 
-    // Inject '$', 'M', framing-errored byte (FE dropped), parity-errored byte (PE dropped), and overrun+clean '<'
-    const struct { uint8_t dr; uint8_t lsr; } wire[] = {
-        { 0x24U, 0x61U }, // '$'
-        { 0x4DU, 0x61U }, // 'M'
-        { 0xFFU, 0x69U }, // FE -> drop
-        { 0xEEU, 0x65U }, // PE -> drop
-        { 0x3CU, 0x63U }, // '<' with OE -> cleared on LSR read, byte accepted
+    // Act: Inject CLI command "help\r" and binary MSP high-bit bytes across IRQ and 100 Hz polled fallback,
+    // tagging mid-word characters with FE (0x08), PE (0x04), and OE (0x02) alongside DR (0x01).
+    const struct { uint8_t dr; uint8_t lsr; bool viaIsr; } stream[] = {
+        { 'h',   0x61U, true  }, // Clean DR
+        { 'e',   0x69U, true  }, // DR | FE (must NOT be dropped on UART0)
+        { 'l',   0x65U, false }, // DR | PE via 100 Hz poll (must NOT be dropped)
+        { 'p',   0x6DU, true  }, // DR | FE | PE
+        { '\r',  0x63U, true  }, // DR | OE
+        { 0x80U, 0x69U, true  }, // High-bit MSP payload with FE (must NOT mask bit 7)
+        { 0xFFU, 0x61U, false }, // Clean 0xFF binary byte via poll
     };
-    for (const auto &pkt : wire) {
-        THEJAS32_UART(0).UART_DR = pkt.dr;
-        THEJAS32_UART(0).UART_LSR = pkt.lsr;
-        THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+    for (const auto &item : stream) {
+        THEJAS32_UART(0).UART_DR = item.dr;
+        THEJAS32_UART(0).UART_LSR = item.lsr;
+        if (item.viaIsr) {
+            THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+            handle_trap(0x8000000BUL, 0U, nullptr);
+        } else {
+            thejas32_uart_poll_rx();
+        }
+    }
+
+    // Assert: All 7 bytes arrive intact in exact FIFO order without dropping or 7-bit stripping.
+    ASSERT_EQ(sp0->vTable->serialTotalRxWaiting(sp0), 7U);
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), (uint8_t)'h');
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), (uint8_t)'e');
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), (uint8_t)'l');
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), (uint8_t)'p');
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), (uint8_t)'\r');
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), 0x80U);
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), 0xFFU);
+    EXPECT_EQ(sp0->vTable->serialTotalRxWaiting(sp0), 0U);
+
+    // Real-world flight consequence:
+    // Reproduces audit19b.3 Run 2 ("help\r" truncated to "h\r" -> ###ERROR IN input: "h"###);
+    // THEJAS32 UART0 CLI/MSP must ingest whenever LSR.DR (0x01) is set, matching C-DAC VEGA SDK.
+}
+
+// =============================================================================
+// TEST 21 (TDD Step 1): Floating PA17 UART1 Noise Storm Auto-Suppresses IRQ1 & Recovers When Clean
+// =============================================================================
+TEST_F(AriesUartRxTest, Test_UART1_FloatingPinNoiseStorm_AutoSuppressesIrq1WithoutStarvingUart0AndRecoversWhenClean) {
+    // Arrange: Open both UART0 (115200 CLI) and UART1 (420000 CRSF on unpulled floating PA17).
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    g_uart1StormRxCount = 0U;
+    g_uart1StormLastByte = 0U;
+
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    pinCfg.ioTagTx[1] = DEFIO_TAG_E__PA16;
+    pinCfg.ioTagRx[1] = DEFIO_TAG_E__PA17;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    serialPort_t *sp1 = uartOpen(SERIAL_PORT_UART1, uart1_storm_rx_callback, nullptr, 420000U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+    ASSERT_NE(sp1, nullptr);
+    ASSERT_EQ(THEJAS32_UART(1).UART_IE & 0xFFU, 0x01U);
+
+    // Act 1: Flood UART1 with 24 consecutive floating-pin break/framing/parity noise events (DR|FE|BI / PE).
+    for (uint32_t i = 0U; i < 24U; i++) {
+        THEJAS32_UART(1).UART_DR = 0x00U;
+        THEJAS32_UART(1).UART_LSR = (i & 1U) ? 0x1DU : 0x19U; // DR | BI | FE (| PE)
+        THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART1);
         handle_trap(0x8000000BUL, 0U, nullptr);
     }
 
-    EXPECT_EQ(sp0->vTable->serialTotalRxWaiting(sp0), 3U);
-    EXPECT_EQ(sp0->vTable->serialRead(sp0), 0x24U);
-    EXPECT_EQ(sp0->vTable->serialRead(sp0), 0x4DU);
-    EXPECT_EQ(sp0->vTable->serialRead(sp0), 0x3CU);
+    // Assert 1: UART1 discards every noise byte, masks its runaway IRQ1, while UART0 CLI keeps working.
+    EXPECT_EQ(g_uart1StormRxCount, 0U);
+    EXPECT_EQ(THEJAS32_UART(1).UART_IE & 0xFFU, 0x00U)
+        << "Sustained floating PA17 break/FE noise must mask UART1 IE to protect UART0 CLI & scheduler!";
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_UART1), 0U);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE & 0xFFU, 0x01U);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_UART0), 0U);
+
+    const char cmd[] = "ver\r";
+    for (size_t i = 0U; i < sizeof(cmd) - 1U; i++) {
+        THEJAS32_UART(0).UART_DR = (uint8_t)cmd[i];
+        THEJAS32_UART(0).UART_LSR = 0x61U;
+        THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+        handle_trap(0x8000000BUL, 0U, nullptr);
+    }
+    EXPECT_EQ(sp0->vTable->serialTotalRxWaiting(sp0), 4U);
+
+    // Act 2: Simulate attaching an active ELRS receiver (clean idle HIGH LSR = 0x60) across 100 Hz poll ticks.
+    for (uint32_t tick = 0U; tick < 10U; tick++) {
+        THEJAS32_UART(1).UART_LSR = 0x60U; // Idle line, no DR/PE/FE/BI
+        thejas32_uart_poll_rx();
+    }
+
+    // Assert 2: UART1 auto-rearms once the line stays idle cleanly and accepts valid 0xC8 CRSF traffic.
+    EXPECT_EQ(THEJAS32_UART(1).UART_IE & 0xFFU, 0x01U);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_UART1), 0U);
+    THEJAS32_UART(1).UART_DR = 0xC8U;
+    THEJAS32_UART(1).UART_LSR = 0x61U;
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART1);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    EXPECT_EQ(g_uart1StormRxCount, 1U);
+    EXPECT_EQ(g_uart1StormLastByte, 0xC8U);
+
+    // Real-world flight consequence:
+    // Without storm suppression, unpulled floating PA17 (Header J2_15) intermittently floods 420 kbaud
+    // IRQ 1 traps across resets while unattached benches still need live ELRS hot-plug recovery.
+}
+
+// =============================================================================
+// TEST 22 (TDD Step 1): uartOpen/Reconfigure Flushes Stale FLASHER RX & Guards TEMT Boundedly
+// =============================================================================
+TEST_F(AriesUartRxTest, Test_UART_ReconfigureFlushesStaleFlasherRxAndGuardsBusyTemt) {
+    // Arrange: Simulate stale XMODEM/FLASHER byte left in UART0 RBR across jump to 0x00202000.
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    THEJAS32_UART(0).UART_DR = 0x04U;  // Residual XMODEM EOT
+    THEJAS32_UART(0).UART_LSR = 0x69U; // DR | FE | THRE | TEMT
+
+    // Act 1: Open UART0 as init() does after boot banner.
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+
+    // Assert 1: Stale bootloader RBR/FE byte is drained before IRQ0 arms, yielding empty RX ring & DR=0.
+    EXPECT_EQ(THEJAS32_UART(0).UART_LSR & 0x01U, 0U);
+    thejas32_uart_poll_rx();
     EXPECT_EQ(sp0->vTable->serialTotalRxWaiting(sp0), 0U);
+
+    // Act 2: Call uartReconfigure with TEMT=0 (busy line simulation) — must terminate cleanly in bounded time.
+    THEJAS32_UART(0).UART_LSR = 0x00U;
+    uartReconfigure((uartPort_t *)sp0);
+
+    // Assert 2: Framing locked to 8N1 (LCR=0x03) and RX IRQ re-armed without hang.
+    EXPECT_EQ(THEJAS32_UART(0).UART_LCR & 0xFFU, 0x03U);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE & 0xFFU, 0x01U);
+
+    // Real-world flight consequence:
+    // Residual FLASHER XMODEM bytes/errors or unguarded DLAB writes during active TX corrupt the
+    // first CLI prompt (# ) or latch spurious line errors immediately after boot.
 }
 
 } // namespace
