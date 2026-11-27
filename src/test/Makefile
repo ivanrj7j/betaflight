@@ -30,6 +30,26 @@ VPATH := $(VPATH):$(USER_DIR):$(TEST_DIR)
 #   <test_name>_EXPAND (run for each target, call the above with target as $1)
 #   <test_name>_BLACKLIST (targets to exclude from an expanded test's run)
 
+ARIES_DIR = $(ROOT)/src/platform/ARIES
+ARIES_UNIT_COMMON_SRC = \
+		$(USER_DIR)/build/atomic.c \
+		$(TEST_DIR)/aries_host_mmio.c
+
+ARIES_UNIT_INCLUDE_DIRS = \
+		$(USER_DIR) \
+		$(ARIES_DIR)/include \
+		$(ARIES_DIR)/target/ARIESV3 \
+		$(ROOT)/src \
+		$(ARIES_DIR)
+
+ARIES_UNIT_DEFINES = \
+		ARIES \
+		THEJAS32 \
+		ARIESV3 \
+		USE_CONFIG \
+		HSE_VALUE=100000000 \
+		TARGET_FLASH_SIZE=256
+
 aries_startup_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
 
@@ -37,10 +57,24 @@ aries_linker_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
 
 aries_atomics_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c
+
+aries_atomics_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_atomics_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_system_time_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/system.c
+
+aries_system_time_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_system_time_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_target_config_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c
@@ -63,22 +97,52 @@ aries_pg_bounds_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src
 
 aries_uart_hw_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/io/serial_resource.c
+
+aries_uart_hw_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
 
 aries_uart_hw_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_uart_rx_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/io/serial_resource.c
+
+aries_uart_rx_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
 
 aries_uart_rx_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_uart_tx_drain_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/io/serial_resource.c
+
+aries_uart_tx_drain_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
 
 aries_uart_tx_drain_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_msp_handshake_unittest_SRC := \
 		$(USER_DIR)/msp/msp_serial.c \
@@ -117,32 +181,57 @@ aries_integration_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src/platform/ARIES/include
 
 aries_io_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/io_aries.c \
+		$(USER_DIR)/drivers/io.c
+
+aries_io_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
 
 aries_io_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src \
-		$(ROOT)/src/platform/ARIES/include
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_exti_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/exti_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/io.c
+
+aries_exti_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
 
 aries_exti_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src \
-		$(ROOT)/src/platform/ARIES/include
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_pwm_motor_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/pwm_motor_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/io.c
+
+aries_pwm_motor_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
 
 aries_pwm_motor_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src \
-		$(ROOT)/src/platform/ARIES/include
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_spi_hw_unittest_SRC := \
-		$(USER_DIR)/build/atomic.c
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/bus_spi_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/bus_spi.c \
+		$(USER_DIR)/drivers/bus.c \
+		$(USER_DIR)/drivers/io.c
+
+aries_spi_hw_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
 
 aries_spi_hw_unittest_INCLUDE_DIRS := \
-		$(ROOT)/src \
-		$(ROOT)/src/platform/ARIES/include
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 aries_icm42688p_unittest_SRC := \
 		$(USER_DIR)/build/atomic.c \
@@ -155,6 +244,46 @@ aries_icm42688p_unittest_DEFINES := \
 aries_icm42688p_unittest_INCLUDE_DIRS := \
 		$(ROOT)/src \
 		$(ROOT)/src/platform/ARIES/include
+
+aries_rx_crsf_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/io/serial_resource.c \
+		$(USER_DIR)/rx/rx.c \
+		$(USER_DIR)/rx/crsf.c \
+		$(USER_DIR)/common/bitarray.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/filter.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/printf.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/common/time.c \
+		$(USER_DIR)/common/typeconversion.c \
+		$(USER_DIR)/config/feature.c \
+		$(USER_DIR)/drivers/serial.c \
+		$(USER_DIR)/drivers/serial_impl.c \
+		$(USER_DIR)/fc/rc_modes.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/sensors/voltage.c \
+		$(USER_DIR)/sensors/battery.c \
+		$(USER_DIR)/pg/pg.c \
+		$(USER_DIR)/pg/rx.c
+
+aries_rx_crsf_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES) \
+		USE_CRSF_V3= \
+		USE_CRSF_LINK_STATISTICS= \
+		USE_RX_RSSI_DBM= \
+		USE_RX_RSNR= \
+		USE_RX_LINK_QUALITY_INFO= \
+		USE_RX_LINK_UPLINK_POWER=
+
+aries_rx_crsf_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
 
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
@@ -1374,15 +1503,17 @@ define test-specific-stuff
 ifeq ($1,$(basename $1))
 # standard global test
 $1_OBJS = $(patsubst \
+	$(ARIES_DIR)/%,$(OBJECT_DIR)/$1/aries/%,$(patsubst \
 	$(TEST_DIR)/%,$(OBJECT_DIR)/$1/%,$(patsubst \
-	$(USER_DIR)/%,$(OBJECT_DIR)/$1/%,$($1_SRC:=.o)))
+	$(USER_DIR)/%,$(OBJECT_DIR)/$1/%,$($1_SRC:=.o))))
 else
 # test executed for each target, $1 has the form of test.target
 $1_SRC = $(addsuffix .o,$(call $(basename $1)_SRC,$(call target,$1)))
 $1_OBJS = $$(patsubst \
+	$(ARIES_DIR)/%,$(OBJECT_DIR)/$1/aries/%,$$(patsubst \
 	$(TEST_DIR)/%,$(OBJECT_DIR)/$1/%,$$(patsubst \
 	$(USER_DIR)/%,$(OBJECT_DIR)/$1/%,$$(patsubst \
-	$(TARGET_DIR)/$(TARGET)/%,$(OBJECT_DIR)/$1/%,$$($1_SRC))))
+	$(TARGET_DIR)/$(TARGET)/%,$(OBJECT_DIR)/$1/%,$$($1_SRC)))))
 $1_DEFINES = $(call $(basename $1)_DEFINES,$(call target,$1))
 $1_INCLUDE_DIRS = $(call $(basename $1)_INCLUDE_DIRS,$(call target,$1))
 endif
@@ -1405,6 +1536,13 @@ $(OBJECT_DIR)/$1/%.c.o: $(USER_DIR)/%.c
 
 $(OBJECT_DIR)/$1/%.c.o: $(TEST_DIR)/%.c
 	@echo "compiling test c file: $$<" "$(STDOUT)"
+	$(V1) mkdir -p $$(dir $$@)
+	$(V1) $(CC) $(C_FLAGS) $($1_C_FLAGS) $$(call test_cflags,$$($1_INCLUDE_DIRS)) \
+                $$(foreach def,$$($1_DEFINES),-D $$(def)) \
+                -c $$< -o $$@
+
+$(OBJECT_DIR)/$1/aries/%.c.o: $(ARIES_DIR)/%.c
+	@echo "compiling aries c file: $$<" "$(STDOUT)"
 	$(V1) mkdir -p $$(dir $$@)
 	$(V1) $(CC) $(C_FLAGS) $($1_C_FLAGS) $$(call test_cflags,$$($1_INCLUDE_DIRS)) \
                 $$(foreach def,$$($1_DEFINES),-D $$(def)) \

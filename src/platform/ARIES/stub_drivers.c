@@ -33,7 +33,13 @@
  * =============================================================================
  */
 
-unsigned int __atomic_fetch_add_4(volatile void *ptr, unsigned int val, int memorder)
+#ifdef UNIT_TEST
+#define ARIES_ATOMIC_FN(name) aries_test_##name
+#else
+#define ARIES_ATOMIC_FN(name) name
+#endif
+
+unsigned int ARIES_ATOMIC_FN(__atomic_fetch_add_4)(volatile void *ptr, unsigned int val, int memorder)
 {
     UNUSED(memorder);
     uint32_t prev = thejas32_atomic_enter();
@@ -43,7 +49,7 @@ unsigned int __atomic_fetch_add_4(volatile void *ptr, unsigned int val, int memo
     return old;
 }
 
-unsigned int __atomic_fetch_sub_4(volatile void *ptr, unsigned int val, int memorder)
+unsigned int ARIES_ATOMIC_FN(__atomic_fetch_sub_4)(volatile void *ptr, unsigned int val, int memorder)
 {
     UNUSED(memorder);
     uint32_t prev = thejas32_atomic_enter();
@@ -53,7 +59,7 @@ unsigned int __atomic_fetch_sub_4(volatile void *ptr, unsigned int val, int memo
     return old;
 }
 
-unsigned int __atomic_fetch_and_4(volatile void *ptr, unsigned int val, int memorder)
+unsigned int ARIES_ATOMIC_FN(__atomic_fetch_and_4)(volatile void *ptr, unsigned int val, int memorder)
 {
     UNUSED(memorder);
     uint32_t prev = thejas32_atomic_enter();
@@ -63,7 +69,7 @@ unsigned int __atomic_fetch_and_4(volatile void *ptr, unsigned int val, int memo
     return old;
 }
 
-unsigned int __atomic_fetch_or_4(volatile void *ptr, unsigned int val, int memorder)
+unsigned int ARIES_ATOMIC_FN(__atomic_fetch_or_4)(volatile void *ptr, unsigned int val, int memorder)
 {
     UNUSED(memorder);
     uint32_t prev = thejas32_atomic_enter();
@@ -73,7 +79,7 @@ unsigned int __atomic_fetch_or_4(volatile void *ptr, unsigned int val, int memor
     return old;
 }
 
-unsigned int __atomic_exchange_4(volatile void *ptr, unsigned int val, int memorder)
+unsigned int ARIES_ATOMIC_FN(__atomic_exchange_4)(volatile void *ptr, unsigned int val, int memorder)
 {
     UNUSED(memorder);
     uint32_t prev = thejas32_atomic_enter();
@@ -83,7 +89,7 @@ unsigned int __atomic_exchange_4(volatile void *ptr, unsigned int val, int memor
     return old;
 }
 
-bool __atomic_compare_exchange_4(volatile void *ptr, void *expected, unsigned int desired,
+bool ARIES_ATOMIC_FN(__atomic_compare_exchange_4)(volatile void *ptr, void *expected, unsigned int desired,
                                  bool weak, int success_memorder, int failure_memorder)
 {
     UNUSED(weak);
@@ -104,7 +110,7 @@ bool __atomic_compare_exchange_4(volatile void *ptr, void *expected, unsigned in
     }
 }
 
-unsigned int __atomic_load_4(const volatile void *ptr, int memorder)
+unsigned int ARIES_ATOMIC_FN(__atomic_load_4)(const volatile void *ptr, int memorder)
 {
     UNUSED(memorder);
     uint32_t prev = thejas32_atomic_enter();
@@ -113,7 +119,7 @@ unsigned int __atomic_load_4(const volatile void *ptr, int memorder)
     return val;
 }
 
-void __atomic_store_4(volatile void *ptr, unsigned int val, int memorder)
+void ARIES_ATOMIC_FN(__atomic_store_4)(volatile void *ptr, unsigned int val, int memorder)
 {
     UNUSED(memorder);
     uint32_t prev = thejas32_atomic_enter();
@@ -123,12 +129,20 @@ void __atomic_store_4(volatile void *ptr, unsigned int val, int memorder)
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
-// Persistent Object Stubs (Warm-reboot survival in internal SRAM)
+// Persistent Object Storage (Warm-reboot survival in internal SRAM)
 // ----------------------------------------------------------------------------
+#define PERSISTENT_OBJECT_MAGIC_VALUE (('B' << 24) | ('e' << 16) | ('f' << 8) | ('1' << 0))
+// shortcut: .noinit SRAM survives warm soft resets only; lost on cold power-off until MDP_SPI_3 flash driver lands
 static uint32_t persistentObjects[16] __attribute__((section(".noinit")));
 
 void persistentObjectInit(void)
 {
+    if (persistentObjects[PERSISTENT_OBJECT_MAGIC] != PERSISTENT_OBJECT_MAGIC_VALUE) {
+        for (size_t i = 0; i < ARRAYLEN(persistentObjects); i++) {
+            persistentObjects[i] = 0U;
+        }
+        persistentObjects[PERSISTENT_OBJECT_MAGIC] = PERSISTENT_OBJECT_MAGIC_VALUE;
+    }
 }
 
 uint32_t persistentObjectRead(persistentObjectId_e id)
@@ -287,31 +301,26 @@ escSensorData_t *getEscSensorData(uint8_t motorNumber)
 }
 
 // ----------------------------------------------------------------------------
-// ADC Voltage Fallback (Safe nominal value prevents ARMING_DISABLED_BATTERY lockout)
-// Resolves 12_EVAL_STUB_DRIVERS_C.md, PLAN-DOM-06_B, and Technical Debt TD-09.
+// ADC Voltage Stub (Safe only while USE_ADC is #undef'd -> VOLTAGE_METER_NONE)
 // ----------------------------------------------------------------------------
-static volatile uint16_t aries_adc_raw[4] = {
-    2048, // Nominal 12.6V on 11:1 voltage divider (~3S full pack)
-    0,    // Zero current draw
-    1024, // Nominal RSSI level
-    0     // Aux / Spare channel
-};
-
+// shortcut: adcGetValue returns 0 while USE_ADC is #undef'd in target.h; implement U9 I2C2 / 0x10001000 before enabling USE_ADC
 uint16_t adcGetValue(adcSource_e source)
 {
-    switch (source) {
-        case ADC_BATTERY:
-            return aries_adc_raw[0];
-        case ADC_CURRENT:
-            return aries_adc_raw[1];
-        case ADC_RSSI:
-            return aries_adc_raw[2];
-        default:
-            return 0;
-    }
+    UNUSED(source);
+    return 0;
 }
 
 void expressLrsTimerEnableIRQs(const struct timerHardware_s *timer)
 {
     UNUSED(timer);
 }
+
+#if !defined(UNIT_TEST) && !defined(USE_POSITION_HOLD) && !defined(USE_ALTITUDE_HOLD)
+// shortcut: minimal nav/altitude stubs while GPS, baro, position hold, and alt hold remain disabled on ARIESV3
+void positionInit(void) {}
+int32_t getEstimatedAltitudeCm(void) { return 0; }
+void autopilotInit(void) {}
+bool isBelowLandingAltitude(void) { return false; }
+bool autopilotYawControlActive(void) { return false; }
+float autopilotGetYawRate(void) { return 0.0f; }
+#endif

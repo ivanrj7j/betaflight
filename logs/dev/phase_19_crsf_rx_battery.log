@@ -1,0 +1,173 @@
+=== PHASE 19 NON-INVERTED CRSF/ELRS RECEIVER (UART1) & SAFE BATTERY TELEMETRY LOG ===
+Timestamp: 2026-11-26T17:45:00+05:30
+Active Branch: rebuild
+Base Commit: 38029cb23 (Phase 18)
+Target Platform: C-DAC ARIES v3.0 (THEJAS32 RV32IM @ 100 MHz, 248 KB SRAM)
+UART1 Receiver Bus: 0x10000200 (IRQ 1, PA16 TX1 / J2_13, PA17 RX1 / J2_15, 420,000 baud)
+ADC / Lockout Guard: adcGetValue() returns 0 under #undef USE_ADC in target.h (Audit 06 removed dummy aries_adc_raw[])
+
+--- HOST UNIT TEST EXECUTION ---
+Command: make -C src/test CC=gcc CXX=g++ test_aries_rx_crsf_unittest test_rx_crsf_unittest
+
+[Suite 19] test_aries_rx_crsf_unittest (24/24 PASS, 0 ms)
+[ OK ] Category1_Test01_UART1PortIrqAndMmioBinding
+[ OK ] Category1_Test02_UART1_420kBaudDivisor15Precision
+[ OK ] Category1_Test03_UART1_8N1_FcrZeroErrataAndIer
+[ OK ] Category1_Test04_NonInvertedCrsfVsInvertedSbusGuard
+[ OK ] Category1_Test05_CrsfRxInit_ValidAndNullPort
+[ OK ] Category2_Test06_CrsfFrameIngest_Valid0xD5Crc
+[ OK ] Category2_Test07_CrsfCmdFrame_Poly0xBaValidation
+[ OK ] Category2_Test08_CrsfSyncAddressFilter_GarbageAndWrongAddr
+[ OK ] Category2_Test09_CrsfMalformedLengthAndCrcResync
+[ OK ] Category2_Test10_CrsfInterFrameTimeout_1748usReset
+[ OK ] Category3_Test11_Crsf16Channels_BitBoundaryUnpacking
+[ OK ] Category3_Test12_CrsfLinearScaling_172Mid992Max1811
+[ OK ] Category3_Test13_CrsfSubsetChannels0x17_BoundsAndResolutions
+[ OK ] Category3_Test14_CrsfAux1ArmSwitchAndRxModes
+[ OK ] Category3_Test15_CrsfFailsafe_NoFramesTransition
+[ OK ] Category3_Test16_CrsfTelemetryWriteAndBoundedTxDrain
+[ OK ] Category3_Test17_CrsfRxBind_CommandPacket
+[ OK ] Category4_Test18_CrsfLinkStats0x14_Getters
+[ OK ] Category4_Test19_CrsfDiversitySwitchAndV3TxStats0x1D
+[ OK ] Category4_Test20_CrsfLinkStats_250msDecay
+[ OK ] Category5_Test21_SafeBatteryAdcCacheAndScaling
+[ OK ] Category5_Test22_BatteryPresence_VoltageMeterNoneAntiLockout
+[ OK ] Category5_Test23_U9I2c2TimeoutCacheRetentionAndMmioBounds
+[ OK ] Category5_Test24_LoopHeadroom_1kHzPidSerialAndAdcBudget
+
+[Upstream Suite] test_rx_crsf_unittest (12/12 PASS, 0 ms)
+
+--- FULL HOST REGRESSION SUITE SUMMARY (GCC/G++ 11.4.0) ---
+Command: make -C src/test CC=gcc CXX=g++ -j6 -k test
+ARIES Suites (19/19 PASS):
+ 1. test_aries_startup_unittest:        6/6 PASS
+ 2. test_aries_linker_unittest:         7/7 PASS
+ 3. test_aries_atomics_unittest:        7/7 PASS
+ 4. test_aries_system_time_unittest:   12/12 PASS
+ 5. test_aries_target_config_unittest:  6/6 PASS
+ 6. test_aries_mcu_excludes_unittest:   5/5 PASS
+ 7. test_aries_pg_bounds_unittest:     10/10 PASS
+ 8. test_aries_uart_hw_unittest:       16/16 PASS
+ 9. test_aries_uart_rx_unittest:       18/18 PASS
+10. test_aries_uart_tx_drain_unittest: 14/14 PASS
+11. test_aries_msp_handshake_unittest: 16/16 PASS
+12. test_aries_cli_entry_unittest:     17/17 PASS
+13. test_aries_io_unittest:            15/15 PASS
+14. test_aries_exti_unittest:          19/19 PASS
+15. test_aries_pwm_motor_unittest:     16/16 PASS
+16. test_aries_spi_hw_unittest:        24/24 PASS
+17. test_aries_icm42688p_unittest:     22/22 PASS
+18. test_aries_integration_unittest:   19/19 PASS
+19. test_aries_rx_crsf_unittest:       24/24 PASS
+ARIES Subtotal:                       273/273 PASS
+
+Non-ARIES Upstream Suites (78/78 Compiled Binaries PASS):
+Including test_rx_crsf_unittest (12/12), test_telemetry_crsf_unittest, test_telemetry_crsf_msp_unittest,
+test_rx_spi_expresslrs_telemetry_unittest, test_rx_rx_unittest, test_rc_controls_unittest,
+test_scheduler_unittest, test_pid_unittest, test_flight_imu_unittest, test_accgyro_spi_icm426xx_unittest,
+test_msp_serial_unittest, test_cli_unittest, test_pg_unittest, test_battery_profile_unittest,
+test_arming_prevention_unittest, and test_atomic_unittest.
+Non-ARIES Subtotal:                   1,062/1,062 PASS
+
+Runnable Host Totals:                 97/110 targets compiled | 1,335/1,335 cases PASS (0 failed, 0 skipped)
+Blocked Upstream Targets (13/110):    Compile-only gcc/g++ 11.4.0 vs clang incompatibilities (0 runtime failures)
+  - 11 targets: pg/flight_plan.h:33 C11 _Static_assert in C++ -std=gnu++14
+  -  2 targets: rx/expresslrs_common.h:115 C23 enum underlying type in gcc -std=gnu99
+
+--- TARGET BINARY BUILD & AUDIT ---
+Binary: obj/main/betaflight_bootstrap.bin
+Mirror: tempfiles/betaflight_bootstrap.bin
+SHA256: 9b764e22d684effce5c6b14848d9f55eedb355ab120a16210cc1bdacd51db95d
+Size:   45,584 bytes (.bin) | 87,416 bytes (.elf)
+Memory: text=45572, data=12, bss=21024, dec=66608 (0x10430) | _ebss=0x00210424 <= 0x0023FFFF
+Entry:  0x00202000
+RVC:    0 compressed opcodes (grep -E '\sc\.[a-z]' == 0)
+
+--- 10-POINT SILICON INVARIANT AUDIT ---
+Script: ./src/test/unit/aries/build_verify.sh obj/main/betaflight_bootstrap.elf
+[Audit 1/10] Git Branch Check: PASS (rebuild)
+[Audit 2/10] Target ELF File Existence: PASS (obj/main/betaflight_bootstrap.elf found)
+[Audit 3/10] Total Binary Footprint Audit: PASS (66608 / 253952 bytes, Headroom: 187344 bytes)
+[Audit 4/10] Execution Origin Address Audit: PASS (0x00202000 matches physical SRAM origin)
+[Audit 5/10] Compressed Opcode (RVC) Audit: PASS (Strictly 0 compressed instructions detected)
+[Audit 6/10] Float Math Precision Audit: PASS (Zero double-precision float helpers found)
+[Audit 7/10] Trap Vector Address Alignment: SKIP (_trap_vector symbol not present in early bootstrap build)
+[Audit 8/10] Parameter Group Registry Bounds: SKIP (PG registry symbols not linked in early bootstrap build)
+[Audit 9/10] SRAM Upper Bound Ceiling Audit: PASS (_ebss 0x00210424 <= 0x0023FFFF)
+[Audit 10/10] Binary Output (.bin) Check: PASS (obj/main/betaflight_bootstrap.bin generated, 45584 bytes ready for XMODEM SRAM upload)
+Outcome: 10-Point Silicon Audit Passed Successfully.
+
+--- PHYSICAL SILICON HARDWARE VERIFICATION ---
+Initial Run: tempfiles/phase19.txt (all 21 passed functional probes; exposed IIR vs FCR readback check & 386 us budget label)
+Final Fixed Run: tempfiles/phase19.1.txt
+Platform: C-DAC ARIES v3.0 (THEJAS32 SoC @ 100 MHz, RV32IM)
+1. Boot & Self-Tests 01..20: All PASS cleanly.
+2. [TEST 21/21] Phase 19 Non-Inverted CRSF/ELRS Receiver (UART1) & Safe Battery Telemetry:
+   - UART1 Hardware Binding   : 0x10000200 (IRQ 1, SERIAL_PORT_USART1=51) [OPEN]
+   - Header Pin Allocation    : PA16 (TX1 / J2_13), PA17 (RX1 / J2_15) [BOUND]
+   - CRSF Baud & Divisor      : 420,000 baud -> DLL=15, DLM=0 (416,667 bps, -0.79% err) [OK]
+   - 16550 Line & Erratum Regs: LCR=0x00000003 | IE=0x00000001 | IIR=0x00000001 (8N1, Non-Inverted, FIFOs=OFF) [OK]
+   - High-Baud Clamp Guard    : Requested 921,600 -> Active 420000 baud (Divisor 15) [VERIFIED]
+   - CRSF 0x16 / 0xD5 Unpack  : Valid=2, BadCRC=1, TimeoutRst=1 | R=1500us, T=988us, AUX1=2012us [VERIFIED]
+   - Bind Cmd Dual-CRC & TX   : 0xBA=0x0000009E / 0xD5=0x000000E8 | 9B TX burst in 3 us [OK]
+   - Live PA17 ELRS Probe     : Header Unattached / Idle (IRQ1 Safely Masked, 0 Hangs) [OK]
+   - Safe Battery ADC Cache   : VBAT_raw=2048 (1815 cV), RSSI_raw=1024, Curr=0, 3S(1420)=1259cV [OK]
+   - Gap 4 ADC Lockout Guard  : #undef USE_ADC, VOLTAGE_METER_NONE (Zero False Bat Alarms) [OK]
+   - 1.0 kHz Budget Verification: CRSF+TX+ADC=78 us + PID(290) + IMU(18) = 386 us (<= 420 us peak, >58% idle) [PASS]
+   -> STATUS: PASS (CRSF/ELRS UART1 & Safe Battery Telemetry Operational)
+3. Result: [ALL 21 SILICON SELF-TESTS PASSED] Phase 19 CRSF RX & Safe Battery Verified! (prior 45,584 B bootstrap build)
+4. Heartbeat: #1..#10 (20 s uptime), Overflows: 0, LED0 toggling at 1.0 Hz.
+5. Interactive CLI: '#' entered CLI mode, 'version' + 4x 'status' + 'exit' resumed live telemetry cleanly.
+6. Final Hardware Status: Prior bootstrap verified; awaiting host XMODEM flash of remediated ARIESV3 & bootstrap images.
+
+=== POST-AUDIT 06 REMEDIATION & FULL ARIESV3 BUILD LOG (2026-11-27) ===
+Timestamp: 2026-11-27T10:49:00+05:30
+Active Branch: rebuild (38029cb23 + Audit 06 remediation edits)
+Command: make -C src/test CC=gcc CXX=g++ -j6 -k test
+
+ARIES Suites (19/19 PASS -> 284/284 PASS, 10 suites linked against real src/platform/ARIES/*.c):
+  test_aries_startup_unittest:        6/6 PASS
+  test_aries_linker_unittest:         7/7 PASS
+  test_aries_atomics_unittest:        8/8 PASS  (real stub_drivers.c)
+  test_aries_system_time_unittest:   13/13 PASS  (real system.c)
+  test_aries_target_config_unittest:  6/6 PASS
+  test_aries_mcu_excludes_unittest:   5/5 PASS
+  test_aries_pg_bounds_unittest:     10/10 PASS
+  test_aries_uart_hw_unittest:       17/17 PASS  (real serial_uart_aries.c)
+  test_aries_uart_rx_unittest:       19/19 PASS  (real serial_uart_aries.c)
+  test_aries_uart_tx_drain_unittest: 15/15 PASS  (real serial_uart_aries.c)
+  test_aries_msp_handshake_unittest: 16/16 PASS
+  test_aries_cli_entry_unittest:     17/17 PASS
+  test_aries_io_unittest:            16/16 PASS  (real io_aries.c)
+  test_aries_exti_unittest:          20/20 PASS  (real exti_aries.c)
+  test_aries_pwm_motor_unittest:     17/17 PASS  (real pwm_motor_aries.c)
+  test_aries_spi_hw_unittest:        25/25 PASS  (real bus_spi_aries.c)
+  test_aries_icm42688p_unittest:     22/22 PASS
+  test_aries_integration_unittest:   19/19 PASS
+  test_aries_rx_crsf_unittest:       27/27 PASS  (real serial_uart_aries.c + stub_drivers.c + serial.c + crsf.c + voltage.c + battery.c)
+Non-ARIES Upstream Suites: 78/78 binaries -> 1,062/1,062 PASS
+Runnable Totals: 97/110 targets compiled | 1,347/1,347 PASS (0 failed, 0 skipped)
+Blocked Upstream Targets: 13/110 compile-only gcc/g++ 11.4.0 vs clang (11 pg/flight_plan.h + 2 rx/expresslrs_common.h)
+
+--- SILICON BENCH FOLLOW-UP (tempfiles/phase19.2.txt & tempfiles/phase19.3.txt) ---
+phase19.2.txt: Tests 01..17 & 19..21 PASS (VBAT_raw=0, IMU 19 us, loop 390<=420 us, 1.0 Hz heartbeat, CLI PASS);
+               Test 18 caught Timer 1 race (7.55 ms UART TX vs 1.10 ms IRQ 8). Fixed LoadCount capture before puts().
+phase19.3.txt: Full ARIESV3 reached targetPreInit(); caught missing __enable_irq() on RV32IM & polled blocking TX deadlock.
+               Fixed via __enable_irq() in targetPreInit(), uartPollTx() in serialWriteBufBlocking/waitForSerialPortToFinishTransmitting,
+               and boot-complete THEJAS_LOG in ariesPwmMotorPostInit().
+
+--- FULL FIRMWARE ELF & BIN (TARGET=ARIESV3) ---
+ELF:    obj/main/betaflight_ARIESV3.elf (337,308 B file, sha256: 13d51ce86eb36fc3c45d78086c2f4767887056c2e90955dd8e8a527b2ea3789e)
+Size:   text=190676, data=548, bss=30984, dec=222208 (0x36400)
+BIN:    tempfiles/betaflight_ARIESV3.bin (191,224 B, sha256: 458aefb1fc77431b8b44af8fa49f42f0e9cc86e25ac82a7f59170dfe4925e1f7)
+Audit:  ./src/test/unit/aries/build_verify.sh obj/main/betaflight_ARIESV3.elf -> 10/10 PASS
+        Headroom=31744 B | Origin=0x00202000 | RVC=0 | DoubleFloat=0 | trap_entry=0x00202100 | PG=1092 B | _end=0x00238400
+
+--- HARDENED BOOTSTRAP DIAGNOSTIC ELF & BIN ---
+ELF:    obj/main/betaflight_bootstrap.elf (87,356 B file, sha256: 88a5ec4e8d019fcf906baa1accf1b4460da8462ab73341f0653193b62f27a4d3)
+Size:   text=45128, data=4, bss=18964, dec=64096 (0xfa60)
+BIN:    tempfiles/betaflight_bootstrap.bin (45,132 B, sha256: 0f42fb003b9cc50b6075dd9eda19dd5cc87a2116a345937accee2c9a70c02f6a)
+Audit:  ./src/test/unit/aries/build_verify.sh obj/main/betaflight_bootstrap.elf -> PASS (Audit 8 PG skipped in bootstrap)
+        Headroom=189856 B | Origin=0x00202000 | RVC=0 | DoubleFloat=0 | trap_entry=0x00202100 | _end=0x00211a60
+Inline Shortcut Scan: grep -rn "// shortcut:" src/ -> 11 markers verified.
+Hardware Status: PASS (Physical Silicon Verified across BOTH binaries: tempfiles/phase19.4.txt ALL 21/21 PASS + tempfiles/phase19.5.txt Full ARIESV3 Boot, CLI version/status x2, exit Reboot & Scheduler PASS).

@@ -43,22 +43,18 @@
 #include "unittest_macros.h"
 #include "gtest/gtest.h"
 
+extern "C" {
+#include "../main/platform.h"
 #include "common/utils.h"
-#include "drivers/io_types.h"
+#include "drivers/io.h"
+#include "drivers/io_impl.h"
 #include "drivers/motor_types.h"
-#include "platform/ARIES/include/platform/bsp_thejas32.h"
+#include "drivers/pwm_output.h"
+#include "pg/motor.h"
 #include "platform/ARIES/io_def_generated.h"
-
-// Forward declare ioRec_t matching Betaflight drivers/io_impl.h
-typedef struct ioRec_s {
-    void *gpio;
-    uint16_t pin;
-    uint8_t owner;
-    uint8_t index;
-} ioRec_t;
-
-static inline ioRec_t *IO_Rec(IO_t io) { return (ioRec_t *)io; }
-static inline uint16_t IO_Pin(IO_t io) { return io ? IO_Rec(io)->pin : 0; }
+#include "aries_host_mmio.h"
+uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp);
+}
 
 // -----------------------------------------------------------------------------
 // Mock Platform State & Emulation Primitives
@@ -115,7 +111,7 @@ ioRec_t mock_ioRecs[32];
 ioRec_t *mock_get_ioRec(uint8_t pin)
 {
     if (pin >= 32) return NULL;
-    mock_ioRecs[pin].gpio = (void *)(uintptr_t)((pin < 16) ? 0x10080000UL : 0x10180000UL);
+    mock_ioRecs[pin].gpio = (gpioResource_t *)(uintptr_t)((pin < 16) ? 0x10080000UL : 0x10180000UL);
     mock_ioRecs[pin].pin = pin;
     return &mock_ioRecs[pin];
 }
@@ -651,4 +647,63 @@ TEST_F(AriesPwmMotorTest, Test_PWM_Defensive_Null_And_Index_Guards)
     EXPECT_NO_THROW(test_thejas32_pwm_write_int(4, 1500));
     EXPECT_FALSE(test_pwm_is_motor_enabled(4));
     EXPECT_FALSE(test_pwm_is_motor_enabled(255));
+}
+
+TEST_F(AriesPwmMotorTest, Test_RealPwmMotorAriesC_InitSortScheduleAndTimer1Isr)
+{
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    motorDevice_t dev = {};
+    motorDevConfig_t cfg = {};
+    cfg.motorPwmRate = 400;
+    cfg.motorProtocol = MOTOR_PROTOCOL_PWM;
+    cfg.ioTags[0] = DEFIO_TAG_E__PA1;
+    cfg.ioTags[1] = DEFIO_TAG_E__PA2;
+    cfg.ioTags[2] = DEFIO_TAG_E__PA3;
+    cfg.ioTags[3] = DEFIO_TAG_E__PA4;
+
+    ASSERT_TRUE(motorPwmDevInit(&dev, &cfg, 1000));
+    ASSERT_NE(dev.vTable, nullptr);
+    ASSERT_NE(dev.vTable->enable, nullptr);
+    ASSERT_NE(dev.vTable->write, nullptr);
+    ASSERT_NE(dev.vTable->updateComplete, nullptr);
+    ASSERT_NE(dev.vTable->disable, nullptr);
+
+    ASSERT_TRUE(dev.vTable->enable());
+    dev.vTable->write(0, 1800.0f);
+    dev.vTable->write(1, 1100.0f);
+    dev.vTable->write(2, 1500.0f);
+    dev.vTable->write(3, 1100.0f); // Equal deadline grouped with M2
+    dev.vTable->updateComplete();
+
+    // All 4 Bank-0 motor pins raised HIGH; Timer 1 armed with shortest 1100 us deadline (110,000 cycles)
+    EXPECT_NE(thejas32_host_gpio_data[0][1], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][2], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][3], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][4], 0U);
+    EXPECT_EQ(THEJAS32_TIMER(1).LoadCount, 110000UL);
+    EXPECT_EQ(THEJAS32_TIMER(1).Control, 0x03UL);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER1), 0U);
+
+    // Event 1 @ 1100 us: PA2 & PA4 drop together, LoadCount updates to delta 400 us (40,000 cycles)
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER1);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    EXPECT_EQ(thejas32_host_gpio_data[0][2], 0U);
+    EXPECT_EQ(thejas32_host_gpio_data[0][4], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][3], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][1], 0U);
+    EXPECT_EQ(THEJAS32_TIMER(1).LoadCount, 40000UL);
+
+    // Event 2 @ 1500 us: PA3 drops, LoadCount updates to delta 300 us (30,000 cycles)
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    EXPECT_EQ(thejas32_host_gpio_data[0][3], 0U);
+    EXPECT_NE(thejas32_host_gpio_data[0][1], 0U);
+    EXPECT_EQ(THEJAS32_TIMER(1).LoadCount, 30000UL);
+
+    // Event 3 @ 1800 us: PA1 drops, Timer 1 stops & IRQ 8 masked
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    EXPECT_EQ(thejas32_host_gpio_data[0][1], 0U);
+    EXPECT_EQ(THEJAS32_TIMER(1).Control, 0U);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER1), 0U);
 }

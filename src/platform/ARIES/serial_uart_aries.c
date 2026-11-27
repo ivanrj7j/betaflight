@@ -72,14 +72,17 @@ const uartHardware_t uartHardware[UARTDEV_COUNT] = {
 #endif
 };
 
-// Convert hardware register pointer to THEJAS32 UART channel index (0 or 1)
-static inline uint8_t uartGetIndex(const usartResource_t *reg)
+// Convert hardware register pointer to THEJAS32 UART channel index (0, 1, or -1 if invalid)
+static inline int8_t uartGetIndex(const usartResource_t *reg)
 {
-    uint32_t addr = (uint32_t)(uintptr_t)reg;
-    if (addr >= (THEJAS32_UART_BASE + 0x100)) {
+    uintptr_t addr = (uintptr_t)reg;
+    if (addr == THEJAS32_UART_BASE) {
+        return 0;
+    }
+    if (addr == (THEJAS32_UART_BASE + 0x100U)) {
         return 1;
     }
-    return 0;
+    return -1;
 }
 
 // -----------------------------------------------------------------------------
@@ -125,18 +128,21 @@ void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig)
 // - 921,600 baud: Divisor  7 -> 892,857.14 bps (-3.12% error, EXCEEDS +/- 2.5% UART tolerance!)
 // Warning: 921,600 baud will cause framing errors on 100 MHz APB clock without fractional baud hardware.
 // Use 230,400 baud or 420,000 baud for high-speed serial links.
-static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, portOptions_e options, bool resetFifo)
+static inline uint32_t thejas32_uart_clamp_baudrate(uint32_t baudRate)
 {
     if (baudRate == 0) {
-        baudRate = 115200;
+        return 115200U;
     }
-
-    // Clamp high-speed baud rates exceeding asynchronous UART tolerance (+/- 2.5%).
-    // On 100 MHz APB clock, 921,600 baud yields integer divisor 7 (-3.12% error) which induces framing errors.
-    // Clamp to 420,000 baud (divisor 15, -0.79% error) or 230,400 baud (divisor 27, +0.47% error).
+    // shortcut: baud > 460800 clamped to 420000 on 100 MHz APB (-0.79% vs -3.12% @ 921600), upgrade if fractional baud HW exists
     if (baudRate > 460800U) {
-        baudRate = 420000U;
+        return 420000U;
     }
+    return baudRate;
+}
+
+static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, portOptions_e options, bool resetFifo)
+{
+    baudRate = thejas32_uart_clamp_baudrate(baudRate);
 
     // Formula from 16550 IP & VEGA SDK:
     // Divisor = (Clock + (Baud * 8)) / (Baud * 16) [Rounds to nearest integer]
@@ -161,22 +167,21 @@ static void thejas32_uart_set_baudrate_ex(uint8_t ch, uint32_t baudRate, portOpt
 
     // Step 1: Set DLAB (Divisor Latch Access Bit) = 1 (Bit 7 of UART_LCR) while maintaining framing
     THEJAS32_UART(ch).UART_LCR = 0x80 | lcr;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
     // Step 2: Write Divisor Latches (DLL in UART_DR, DLM in UART_IE)
     THEJAS32_UART(ch).UART_DR = divisor & 0xFF;        // DLL (LSB)
     THEJAS32_UART(ch).UART_IE = (divisor >> 8) & 0xFF; // DLM (MSB)
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
     // Step 3: Clear DLAB and lock framing bits
     THEJAS32_UART(ch).UART_LCR = lcr;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
-    // Step 4: Disable hardware FIFOs (FCR = 0x00) matching official C-DAC VEGA SDK (uart.c:104) and BSP (HardwareSerial.cpp:114)
-    // THEJAS32 DW_apb_uart 16550 IP hardware FIFOs have errata causing character desynchronization when enabled.
+    // shortcut: 1-byte UART register mode (FCR=0x00, no HW FIFO), upgrade when DW_apb_uart FIFO erratum is fixed in silicon
     if (resetFifo) {
         THEJAS32_UART(ch).UART_IIR_FCR = 0x00;
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
     }
 }
 
@@ -187,23 +192,33 @@ static inline void thejas32_uart_set_baudrate(uint8_t ch, uint32_t baudRate, por
 
 void uartReconfigure(uartPort_t *uartPort)
 {
-    uint8_t ch = uartGetIndex(uartPort->USARTx);
+    if (!uartPort || !uartPort->USARTx) {
+        return;
+    }
+    int8_t ch = uartGetIndex(uartPort->USARTx);
+    if (ch < 0) {
+        return;
+    }
+    uartPort->port.baudRate = thejas32_uart_clamp_baudrate(uartPort->port.baudRate);
 
-    thejas32_uart_set_baudrate_ex(ch, uartPort->port.baudRate, uartPort->port.options, false);
+    thejas32_uart_set_baudrate_ex((uint8_t)ch, uartPort->port.baudRate, uartPort->port.options, false);
 
-    // Ground Truth 8: Enable RX-only interrupt (bit 0 of UART_IE).
-    // TX interrupt (bit 1) must remain strictly 0 to prevent level-triggered THRE storms!
+    // Ground Truth 8: Enable RX-only interrupt (bit 0 of UART_IE) after uartOpen() initializes rxCallback and buffers.
+    // TX interrupt (bit 1) must remain strictly 0 to prevent level-triggered THRE storms.
+    const uint8_t irq = (ch == 0) ? THEJAS32_IRQ_UART0 : THEJAS32_IRQ_UART1;
     if (uartPort->port.mode & MODE_RX) {
         THEJAS32_UART(ch).UART_IE = 0x01;
+        thejas32_interrupt_enable(irq);
     } else {
         THEJAS32_UART(ch).UART_IE = 0x00;
+        thejas32_interrupt_disable(irq);
     }
 
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 }
 
 // -----------------------------------------------------------------------------
-// Bounded Synchronous FIFO Transmit Drain (Anti-Starvation Engine)
+// Bounded Synchronous Transmit Drain (Anti-Starvation Engine)
 // -----------------------------------------------------------------------------
 void uartEnableTxInterrupt(uartPort_t *uartPort)
 {
@@ -211,11 +226,12 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
         return;
     }
 
-    uint8_t ch = uartGetIndex(uartPort->USARTx);
+    int8_t ch = uartGetIndex(uartPort->USARTx);
+    if (ch < 0) {
+        return;
+    }
 
-    // TX interrupts are permanently disabled to prevent level-triggered THRE interrupt storms.
-    // Instead of an unbounded while loop that could stall the 1.0 kHz flight loop for > 17 ms,
-    // drain up to 16 bytes (the hardware FIFO depth) while LSR THRE is set, taking < 2.0 us bus cycles.
+    // shortcut: non-FIFO mode (FCR=0x00) holds only 1-2 bytes before THRE clears (~100-200 B/s @ 100 Hz poll), upgrade to 1 kHz TX poll or DMA if saturated
     uint8_t bytesWritten = 0;
     while ((uartPort->port.txBufferTail != uartPort->port.txBufferHead) &&
            (THEJAS32_UART(ch).UART_LSR & 0x20) &&
@@ -223,7 +239,7 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
         THEJAS32_UART(ch).UART_DR = uartPort->port.txBuffer[uartPort->port.txBufferTail];
         uartPort->port.txBufferTail = (uartPort->port.txBufferTail + 1) % uartPort->port.txBufferSize;
         bytesWritten++;
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
     }
 }
 
@@ -238,16 +254,27 @@ void thejas32_uart_poll_tx(void)
     }
 }
 
-// Periodic / polled receive FIFO drain hook for background tasks and scheduler (Phase 10)
-// Empties any residual bytes sitting in the 16550 hardware FIFO into software ring buffers
+// Periodic / polled receive drain hook: enters uartIrqHandler() directly so LSR FE/PE flags are never wiped before inspection
 void thejas32_uart_poll_rx(void)
 {
     for (int dev = 0; dev < UARTDEV_COUNT; dev++) {
         uartPort_t *s = &uartDevice[dev].port;
-        if (s->USARTx && s->port.rxBuffer && (THEJAS32_UART(dev).UART_LSR & 0x01)) {
+        if (s->USARTx && s->port.rxBuffer && s->port.rxBufferSize > 0) {
+            uint32_t prev = thejas32_atomic_enter();
             uartIrqHandler(s);
+            thejas32_atomic_exit(prev);
         }
     }
+}
+
+void uartPollRx(void)
+{
+    thejas32_uart_poll_rx();
+}
+
+void uartPollTx(void)
+{
+    thejas32_uart_poll_tx();
 }
 
 // -----------------------------------------------------------------------------
@@ -259,26 +286,33 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
         return;
     }
 
-    uint8_t ch = uartGetIndex(s->USARTx);
+    int8_t ch = uartGetIndex(s->USARTx);
+    if (ch < 0) {
+        return;
+    }
 
     // Reading Line Status Register (LSR) automatically clears Overrun Error (ORE),
     // Parity Error (PE), and Framing Error (FE) flags on 16550 IP.
-    uint32_t lsr = THEJAS32_UART(ch).UART_LSR;
+    uint32_t lsr = thejas32_uart_read_lsr((uint8_t)ch);
 
-    // Check Data Ready (LSR Bit 0) and ingest all available FIFO bytes
-    while (lsr & 0x01) {
-        uint8_t rxChar = THEJAS32_UART(ch).UART_DR & 0xFF;
-        if (s->port.rxCallback) {
-            s->port.rxCallback(rxChar, s->port.rxCallbackData);
-        } else {
-            // RX ring buffer head/tail collision guard prevents corrupting unread data
-            uint16_t nextHead = (s->port.rxBufferHead + 1) % s->port.rxBufferSize;
-            if (nextHead != s->port.rxBufferTail) {
-                s->port.rxBuffer[s->port.rxBufferHead] = rxChar;
-                s->port.rxBufferHead = nextHead;
+    // Check Data Ready (LSR Bit 0) and ingest up to 32 bytes per pass (prevents lockup on break condition)
+    uint8_t rxLimit = 32U;
+    while ((lsr & 0x01) && rxLimit--) {
+        uint8_t rxChar = thejas32_uart_read_rx((uint8_t)ch);
+        // Reject corrupted framing/parity bytes (e.g. inverted wire or floating line break)
+        if ((lsr & 0x0CU) == 0U) {
+            if (s->port.rxCallback) {
+                s->port.rxCallback(rxChar, s->port.rxCallbackData);
+            } else {
+                // RX ring buffer head/tail collision guard prevents corrupting unread data
+                uint16_t nextHead = (s->port.rxBufferHead + 1) % s->port.rxBufferSize;
+                if (nextHead != s->port.rxBufferTail) {
+                    s->port.rxBuffer[s->port.rxBufferHead] = rxChar;
+                    s->port.rxBufferHead = nextHead;
+                }
             }
         }
-        lsr = THEJAS32_UART(ch).UART_LSR;
+        lsr = thejas32_uart_read_lsr((uint8_t)ch);
     }
 
     // Opportunistically drain TX FIFO during interrupt service if transmitter ready
@@ -286,7 +320,7 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
         uartEnableTxInterrupt(s);
     }
 
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 }
 
 static void thejas32_uart0_isr(void)
@@ -295,7 +329,7 @@ static void thejas32_uart0_isr(void)
 }
 
 #ifdef USE_UART1
-static void thejas32_uart1_isr(void)
+void thejas32_uart1_isr(void)
 {
     uartIrqHandler(&uartDevice[UARTDEV_1].port);
 }
@@ -306,31 +340,37 @@ static void thejas32_uart1_isr(void)
 // -----------------------------------------------------------------------------
 uartPort_t *serialUART(uartDevice_t *uartdev, uint32_t baudRate, portMode_e mode, portOptions_e options)
 {
-    uartPort_t *s = &uartdev->port;
-    const uartHardware_t *hardware = uartdev->hardware;
-    if (!hardware) {
+    if (!uartdev || !uartdev->hardware) {
         return NULL;
     }
 
-    uint8_t ch = uartGetIndex(hardware->reg);
+    uartPort_t *s = &uartdev->port;
+    const uartHardware_t *hardware = uartdev->hardware;
+    int8_t ch = uartGetIndex(hardware->reg);
+    if (ch < 0) {
+        return NULL;
+    }
 
-    // Save port state
+    // Save port state (clamped to silicon tolerance limits)
     s->port.options = options;
     s->port.mode = mode;
-    s->port.baudRate = baudRate;
+    s->port.baudRate = thejas32_uart_clamp_baudrate(baudRate);
+
+    // Keep UART RX IRQ masked until uartOpen() sets rxCallback/ring pointers and calls uartReconfigure()
+    THEJAS32_UART(ch).UART_IE = 0x00;
 
     // Initialize baud rate and line framing (parity / stop bits)
-    thejas32_uart_set_baudrate(ch, baudRate, options);
+    thejas32_uart_set_baudrate((uint8_t)ch, baudRate, options);
 
-    // Register with THEJAS32 interrupt controller
+    // Register ISR handler with THEJAS32 interrupt controller (IRQ remains masked until uartReconfigure)
     if (ch == 0) {
+        thejas32_interrupt_disable(THEJAS32_IRQ_UART0);
         thejas32_interrupt_register(THEJAS32_IRQ_UART0, thejas32_uart0_isr);
-        thejas32_interrupt_enable(THEJAS32_IRQ_UART0);
     }
 #ifdef USE_UART1
     else if (ch == 1) {
+        thejas32_interrupt_disable(THEJAS32_IRQ_UART1);
         thejas32_interrupt_register(THEJAS32_IRQ_UART1, thejas32_uart1_isr);
-        thejas32_interrupt_enable(THEJAS32_IRQ_UART1);
     }
 #endif
 
@@ -352,13 +392,7 @@ uartPort_t *serialUART(uartDevice_t *uartdev, uint32_t baudRate, portMode_e mode
         uartdev->rx.pin = hardware->rxPins[0].pin;
     }
 
-    // Enable RX interrupt only (bit 0 of UART_IE); bit 1 (TX) stays 0
-    if (mode & MODE_RX) {
-        THEJAS32_UART(ch).UART_IE = 0x01;
-    } else {
-        THEJAS32_UART(ch).UART_IE = 0x00;
-    }
-
+    THEJAS32_MEMORY_FENCE();
     return s;
 }
 

@@ -147,6 +147,7 @@ SECTIONS
      * Global Boundary & Pointer Symbols:
      */
     _end = .;
+    PROVIDE(_Min_Stack_Size = 0x2000);
     PROVIDE(__global_pointer$ = _sdata + 0x800);
     PROVIDE(__bss_start = _sbss);
     PROVIDE(__bss_end = _ebss);

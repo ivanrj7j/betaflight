@@ -20,16 +20,33 @@
 
 #include "platform/bsp_thejas32.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef __ASM
 #define __ASM __asm__
 #endif
 
+#ifdef UNIT_TEST
+extern uint32_t thejas32_host_mstatus;
+extern uint32_t thejas32_host_mie;
+
+#ifndef __NOP
+#define __NOP() do {} while (0)
+#endif
+
+#ifndef __WFI
+#define __WFI() do {} while (0)
+#endif
+#else
 #ifndef __NOP
 #define __NOP() __asm__ volatile ("nop")
 #endif
 
 #ifndef __WFI
 #define __WFI() __asm__ volatile ("wfi")
+#endif
 #endif
 
 #define __REV(x)   __builtin_bswap32(x)
@@ -55,6 +72,36 @@ typedef enum { ARIES_IRQ_0 = 0 } IRQn_Type;
 // Opt out of ARM MSR basepri assembly in src/main/build/atomic.h
 #define PLATFORM_CUSTOM_BASEPRI_NB
 
+#ifdef UNIT_TEST
+__attribute__((always_inline)) static inline void __disable_irq(void)
+{
+    thejas32_host_mstatus &= ~8U;
+    THEJAS32_MEMORY_FENCE();
+}
+
+__attribute__((always_inline)) static inline void __enable_irq(void)
+{
+    thejas32_host_mie |= 0x800U;
+    thejas32_host_mstatus |= 8U;
+    THEJAS32_MEMORY_FENCE();
+}
+
+__attribute__((always_inline)) static inline uint32_t thejas32_atomic_enter(void)
+{
+    uint32_t prev = thejas32_host_mstatus;
+    thejas32_host_mstatus &= ~8U;
+    THEJAS32_MEMORY_FENCE();
+    return prev;
+}
+
+__attribute__((always_inline)) static inline void thejas32_atomic_exit(uint32_t prev_mstatus)
+{
+    if (prev_mstatus & 8U) {
+        thejas32_host_mstatus |= 8U;
+        THEJAS32_MEMORY_FENCE();
+    }
+}
+#else
 __attribute__((always_inline)) static inline uint8_t __get_BASEPRI(void)
 {
     uint32_t mstatus_val;
@@ -128,6 +175,7 @@ __attribute__((always_inline)) static inline void thejas32_atomic_exit(uint32_t 
         __asm__ volatile ("csrs mstatus, 8" : : : "memory");
     }
 }
+#endif
 
 // Memory section decorators for In-SRAM Execution (All code and data share uniform SRAM latency)
 #define FAST_CODE
@@ -213,6 +261,10 @@ void thejas32_uart_poll_tx(void);
 
 // Periodic / polled receive FIFO drain hook for background tasks and scheduler (Phase 10)
 void thejas32_uart_poll_rx(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 // Early Hardware UART0 Diagnostic Telemetry (115200 baud, polled)
 void thejas32_early_uart_init(void);

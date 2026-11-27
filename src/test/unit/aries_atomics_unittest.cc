@@ -21,6 +21,23 @@
 #include "unittest_macros.h"
 #include "gtest/gtest.h"
 
+extern "C" {
+#include "aries_host_mmio.h"
+unsigned int aries_test___atomic_fetch_add_4(volatile void *ptr, unsigned int val, int memorder);
+unsigned int aries_test___atomic_fetch_sub_4(volatile void *ptr, unsigned int val, int memorder);
+unsigned int aries_test___atomic_fetch_and_4(volatile void *ptr, unsigned int val, int memorder);
+unsigned int aries_test___atomic_fetch_or_4(volatile void *ptr, unsigned int val, int memorder);
+unsigned int aries_test___atomic_exchange_4(volatile void *ptr, unsigned int val, int memorder);
+bool aries_test___atomic_compare_exchange_4(volatile void *ptr, void *expected, unsigned int desired,
+                                            bool weak, int success_memorder, int failure_memorder);
+unsigned int aries_test___atomic_load_4(const volatile void *ptr, int memorder);
+void aries_test___atomic_store_4(volatile void *ptr, unsigned int val, int memorder);
+void persistentObjectInit(void);
+uint32_t persistentObjectRead(int id);
+void persistentObjectWrite(int id, uint32_t value);
+uint16_t adcGetValue(int source);
+}
+
 namespace {
 
 // Simulated RISC-V Machine Status (mstatus) CSR Register
@@ -338,4 +355,53 @@ TEST(AriesAtomicsTest, Test_Atomic_CompareExchange32_Shim) {
     EXPECT_FALSE(success);
     EXPECT_EQ(lock_word, 1U);
     EXPECT_EQ(expected, 1U) << "Failed compare_exchange must update expected with actual value";
+}
+
+// =============================================================================
+// Test 8: Real stub_drivers.c Execution (Atomics, 'Bef1' Magic & ADC=0 Guard)
+// =============================================================================
+TEST(AriesAtomicsTest, Test_RealStubDriversC_AtomicsPersistentMagicAndAdcZero) {
+    thejas32_host_reset_all();
+    thejas32_host_mstatus = 0x8U; // MIE enabled
+
+    volatile uint32_t word = 10U;
+    EXPECT_EQ(aries_test___atomic_fetch_add_4(&word, 5U, 5), 10U);
+    EXPECT_EQ(word, 15U);
+    EXPECT_EQ(aries_test___atomic_fetch_sub_4(&word, 3U, 5), 15U);
+    EXPECT_EQ(aries_test___atomic_fetch_or_4(&word, 0x100U, 5), 12U);
+    EXPECT_EQ(aries_test___atomic_fetch_and_4(&word, 0x0FFU, 5), 0x10CU);
+    EXPECT_EQ(aries_test___atomic_exchange_4(&word, 0x42U, 5), 12U);
+    EXPECT_EQ(aries_test___atomic_load_4(&word, 5), 0x42U);
+
+    unsigned int exp = 0x42U;
+    EXPECT_TRUE(aries_test___atomic_compare_exchange_4(&word, &exp, 0x99U, false, 5, 5));
+    EXPECT_EQ(word, 0x99U);
+    EXPECT_FALSE(aries_test___atomic_compare_exchange_4(&word, &exp, 0x11U, false, 5, 5));
+    EXPECT_EQ(exp, 0x99U);
+    aries_test___atomic_store_4(&word, 77U, 5);
+    EXPECT_EQ(word, 77U);
+    EXPECT_EQ(thejas32_host_mstatus, 0x8U) << "MIE must be restored after unlocked calls";
+
+    // Nested ISR context: MIE=0 must stay 0 across real C atomic calls
+    thejas32_host_mstatus = 0U;
+    EXPECT_EQ(aries_test___atomic_fetch_add_4(&word, 3U, 5), 77U);
+    EXPECT_EQ(word, 80U);
+    EXPECT_EQ(thejas32_host_mstatus, 0U);
+
+    // Finding 13: Cold boot corrupt magic in .noinit clears all slots and sets 'Bef1'
+    persistentObjectWrite(0, 0xDEAD0001U);
+    persistentObjectWrite(1, 0xCAFEBABEU);
+    persistentObjectInit();
+    EXPECT_EQ(persistentObjectRead(0), 0x42656631U);
+    EXPECT_EQ(persistentObjectRead(1), 0U);
+
+    // Warm reboot: intact 'Bef1' magic preserves slot 1
+    persistentObjectWrite(1, 420000U);
+    persistentObjectInit();
+    EXPECT_EQ(persistentObjectRead(1), 420000U);
+
+    // Finding 11: adcGetValue safe zero stub when USE_ADC is disabled
+    EXPECT_EQ(adcGetValue(0), 0U);
+    EXPECT_EQ(adcGetValue(1), 0U);
+    EXPECT_EQ(adcGetValue(2), 0U);
 }

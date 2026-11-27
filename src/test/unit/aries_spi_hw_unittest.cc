@@ -41,22 +41,18 @@
 #include "unittest_macros.h"
 #include "gtest/gtest.h"
 
+extern "C" {
+#include "../main/platform.h"
 #include "drivers/bus.h"
 #include "drivers/bus_spi_types.h"
 #include "drivers/bus_spi.h"
-#include "drivers/io_types.h"
-#include "platform/ARIES/include/platform/bsp_thejas32.h"
-
-// Forward declare ioRec_t matching Betaflight drivers/io_impl.h
-typedef struct ioRec_s {
-    void *gpio;
-    uint16_t pin;
-    uint8_t owner;
-    uint8_t index;
-} ioRec_t;
-
-static inline ioRec_t *IO_Rec(IO_t io) { return (ioRec_t *)io; }
-static inline uint16_t IO_Pin(IO_t io) { return io ? IO_Rec(io)->pin : 0; }
+#include "drivers/bus_spi_impl.h"
+#include "drivers/io.h"
+#include "drivers/io_impl.h"
+#include "pg/bus_spi.h"
+#include "platform/ARIES/io_def_generated.h"
+#include "aries_host_mmio.h"
+}
 
 // -----------------------------------------------------------------------------
 // Mock Platform State & Emulation Primitives (THEJAS32 / VEGA ET1031)
@@ -126,7 +122,7 @@ uint32_t mock_interrupt_mask = 0;
 ioRec_t mock_spi_pins[32];
 IO_t mock_get_spi_io(uint8_t pin) {
     if (pin >= 32) return NULL;
-    mock_spi_pins[pin].gpio = (void *)((uintptr_t)((pin < 16) ? 0x10080000 : 0x10180000));
+    mock_spi_pins[pin].gpio = (gpioResource_t *)(uintptr_t)((pin < 16) ? 0x10080000UL : 0x10180000UL);
     mock_spi_pins[pin].pin = pin;
     return &mock_spi_pins[pin];
 }
@@ -851,4 +847,36 @@ TEST_F(AriesSpiHwTest, Test_24_SPI_MemoryFootprint_SRAMBudget)
     };
 
     EXPECT_LE(sizeof(SpiDriverDescriptor), 128U);
+}
+
+TEST_F(AriesSpiHwTest, Test_25_RealBusSpiAriesC_12_5MHzClampAndTimeoutRecovery)
+{
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    spiPinConfig_t spiCfg[SPIDEV_COUNT] = {};
+    spiCfg[0].ioTagSck  = DEFIO_TAG_E__PA5;
+    spiCfg[0].ioTagMiso = DEFIO_TAG_E__PA6;
+    spiCfg[0].ioTagMosi = DEFIO_TAG_E__PA7;
+    spiPinConfigure(spiCfg);
+    spiInitDevice(SPIDEV_1);
+
+    // Ground Truth 7: Attempted 25 MHz clock divider (0/1) MUST clamp >= 12.5 MHz (Baudrate >= 1<<4)
+    EXPECT_GE(THEJAS32_SPI(0).Baudrate, (1UL << 4));
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_SPI0), 0U);
+
+    busDevice_t realBus = {};
+    realBus.busType = BUS_TYPE_SPI;
+    realBus.busType_u.spi.instance = (spiResource_t *)THEJAS32_SPI_0_1_BASE;
+    extDevice_t realDev = {};
+    realDev.bus = &realBus;
+    spiSetClkDivisor(&realDev, 1U); // 25 MHz request must clamp to safe 12.5 MHz
+    EXPECT_GE(THEJAS32_SPI(0).Baudrate, (1UL << 4));
+
+    // Polled transfer on unpopulated bus triggers bounded timeout without hanging
+    uint8_t tx[2] = { 0x75U, 0x00U };
+    uint8_t rx[2] = { 0U, 0U };
+    THEJAS32_SPI(0).Status = 0U; // Simulate stalled peripheral (RX_COMPLETE never rises)
+    EXPECT_FALSE(spiInternalReadWriteBufPolled((spiResource_t *)THEJAS32_SPI_0_1_BASE, tx, rx, 2));
+    EXPECT_GT(spiDevice[SPIDEV_1].errorCount, 0U);
 }

@@ -38,24 +38,15 @@
 
 #include "unittest_macros.h"
 #include "gtest/gtest.h"
-
+extern "C" {
+#include "../main/platform.h"
 #include "common/utils.h"
-#include "drivers/io_types.h"
+#include "drivers/io.h"
+#include "drivers/io_impl.h"
 #include "drivers/exti.h"
-#include "platform/ARIES/include/platform/platform.h"
-#include "platform/ARIES/include/platform/bsp_thejas32.h"
 #include "platform/ARIES/io_def_generated.h"
-
-// Forward declare ioRec_t matching Betaflight drivers/io_impl.h
-typedef struct ioRec_s {
-    void *gpio;
-    uint16_t pin;
-    uint8_t owner;
-    uint8_t index;
-} ioRec_t;
-
-static inline ioRec_t *IO_Rec(IO_t io) { return (ioRec_t *)io; }
-static inline uint16_t IO_Pin(IO_t io) { return io ? IO_Rec(io)->pin : 0; }
+#include "aries_host_mmio.h"
+}
 
 // -----------------------------------------------------------------------------
 // Mock Platform State & Emulation Primitives
@@ -96,7 +87,7 @@ ioRec_t mock_ioRecs[32];
 ioRec_t *mock_get_ioRec(uint8_t pin)
 {
     if (pin >= 32) return NULL;
-    mock_ioRecs[pin].gpio = (void *)((pin < 16) ? 0x10080000 : 0x10180000);
+    mock_ioRecs[pin].gpio = (gpioResource_t *)(uintptr_t)((pin < 16) ? 0x10080000UL : 0x10180000UL);
     mock_ioRecs[pin].pin = pin;
     return &mock_ioRecs[pin];
 }
@@ -363,34 +354,35 @@ TEST_F(AriesExtiTest, Test_EXTI_FastPath_CTZ_SingleChannel_GyroDRDY_ZeroOverhead
 
 TEST_F(AriesExtiTest, Test_EXTI_FastPath_CTZ_MultipleChannels_ArbitraryDispatch)
 {
-    // Arrange: Configure 3 pins concurrently in Bank 0: PA0, PA4, PA15
-    IO_t p0 = mock_get_ioRec(0);
-    IO_t p4 = mock_get_ioRec(4);
-    IO_t p15 = mock_get_ioRec(15);
+    // Arrange: Configure 3 pins concurrently in Bank 1 (PA16, PA20, PA31).
+    // (Bank 0 allows at most 1 active pin per Erratum 6.)
+    IO_t p16 = mock_get_ioRec(16);
+    IO_t p20 = mock_get_ioRec(20);
+    IO_t p31 = mock_get_ioRec(31);
 
-    extiCallbackRec_t cb0, cb4, cb15;
-    cb0.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(0); };
-    cb4.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(4); };
-    cb15.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(15); };
+    extiCallbackRec_t cb16, cb20, cb31;
+    cb16.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(16); };
+    cb20.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(20); };
+    cb31.fn = [](extiCallbackRec_t *) { callback_invocation_log.push_back(31); };
 
-    test_EXTIConfig(p0, &cb0, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
-    test_EXTIConfig(p4, &cb4, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
-    test_EXTIConfig(p15, &cb15, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p16, &cb16, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p20, &cb20, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p31, &cb31, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
 
-    test_EXTIEnable(p0);
-    test_EXTIEnable(p4);
-    test_EXTIEnable(p15);
+    test_EXTIEnable(p16);
+    test_EXTIEnable(p20);
+    test_EXTIEnable(p31);
 
-    EXPECT_EQ(test_bank0_active_mask, (1U << 0) | (1U << 4) | (1U << 15));
+    EXPECT_EQ(test_bank1_active_mask, (1U << 0) | (1U << 4) | (1U << 15));
 
-    // Act: Trigger Bank 0 ISR
-    sim_gpio0_isr();
+    // Act: Trigger Bank 1 ISR
+    sim_gpio1_isr();
 
-    // Assert: CTZ processes channels in ascending bit order: 0, 4, 15
+    // Assert: CTZ processes channels in ascending bit order: 16, 20, 31
     ASSERT_EQ(callback_invocation_log.size(), 3U);
-    EXPECT_EQ(callback_invocation_log[0], 0);
-    EXPECT_EQ(callback_invocation_log[1], 4);
-    EXPECT_EQ(callback_invocation_log[2], 15);
+    EXPECT_EQ(callback_invocation_log[0], 16);
+    EXPECT_EQ(callback_invocation_log[1], 20);
+    EXPECT_EQ(callback_invocation_log[2], 31);
 }
 
 TEST_F(AriesExtiTest, Test_EXTI_FastPath_Bank1_CTZ_PinOffset_Calculation)
@@ -449,29 +441,29 @@ TEST_F(AriesExtiTest, Test_EXTI_Enable_Disable_ActiveMask_Transitions)
 
 TEST_F(AriesExtiTest, Test_EXTI_Disable_AllChannels_DisablesControllerIRQ)
 {
-    // Arrange: Configure two channels in Bank 0
-    IO_t p0 = mock_get_ioRec(0);
-    IO_t p1 = mock_get_ioRec(1);
+    // Arrange: Configure two channels in Bank 1 (PA16, PA17)
+    IO_t p16 = mock_get_ioRec(16);
+    IO_t p17 = mock_get_ioRec(17);
     extiCallbackRec_t cb;
     cb.fn = [](extiCallbackRec_t *) {};
 
-    test_EXTIConfig(p0, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
-    test_EXTIConfig(p1, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
-    EXPECT_FALSE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0));
+    test_EXTIConfig(p16, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    test_EXTIConfig(p17, &cb, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXPECT_FALSE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO1));
 
-    test_EXTIEnable(p0);
-    test_EXTIEnable(p1);
-    EXPECT_TRUE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0));
+    test_EXTIEnable(p16);
+    test_EXTIEnable(p17);
+    EXPECT_TRUE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO1));
 
     // Act 1: Disable first pin
-    test_EXTIDisable(p0);
-    // Controller IRQ must remain enabled because p1 is still active
-    EXPECT_TRUE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0));
+    test_EXTIDisable(p16);
+    // Controller IRQ must remain enabled because p17 is still active
+    EXPECT_TRUE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO1));
 
     // Act 2: Disable second pin (all channels now disabled)
-    test_EXTIDisable(p1);
+    test_EXTIDisable(p17);
     // Controller IRQ must be fully disabled to prevent spurious wakeups
-    EXPECT_FALSE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO0));
+    EXPECT_FALSE(mock_intr_en & (1UL << THEJAS32_IRQ_GPIO1));
 }
 
 TEST_F(AriesExtiTest, Test_EXTI_Release_ClearsHandlerAndDisables)
@@ -518,7 +510,7 @@ TEST_F(AriesExtiTest, Test_EXTI_NullAndOutOfRange_DefensiveGuards)
     // Arrange: Mock out-of-range pin (pin 35 >= 32)
     ioRec_t bad_io;
     bad_io.pin = 35;
-    bad_io.gpio = (void *)0x10180000;
+    bad_io.gpio = (gpioResource_t *)(uintptr_t)0x10180000UL;
     extiCallbackRec_t cb;
     cb.fn = [](extiCallbackRec_t *) {};
 
@@ -696,4 +688,69 @@ TEST_F(AriesExtiTest, Test_EXTI_Bank0_SingleActivePin_Erratum6_Constraint)
 
     test_EXTIDisable(pa0);
     EXPECT_EQ(test_bank0_active_mask, 0U);
+}
+
+extern "C" {
+void thejas32_gpio0_isr(void);
+void thejas32_gpio1_isr(void);
+uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp);
+}
+
+TEST_F(AriesExtiTest, Test_RealExtiAriesC_Bank0SinglePinGuard_And_Bank1MultiPinDispatch)
+{
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    EXTIInit();
+
+    IO_t pa0  = IOGetByTag((uint8_t)(64U + 0U));
+    IO_t pa1  = IOGetByTag((uint8_t)(64U + 1U));
+    IO_t pa16 = IOGetByTag((uint8_t)(64U + 16U));
+    IO_t pa22 = IOGetByTag((uint8_t)(64U + 22U));
+    ASSERT_NE(pa0, nullptr);
+    ASSERT_NE(pa1, nullptr);
+    ASSERT_NE(pa16, nullptr);
+    ASSERT_NE(pa22, nullptr);
+
+    extiCallbackRec_t cb0, cb1, cb16, cb22;
+    EXTIHandlerInit(&cb0,  [](extiCallbackRec_t *) { callback_invocation_log.push_back(0); });
+    EXTIHandlerInit(&cb1,  [](extiCallbackRec_t *) { callback_invocation_log.push_back(1); });
+    EXTIHandlerInit(&cb16, [](extiCallbackRec_t *) { callback_invocation_log.push_back(16); });
+    EXTIHandlerInit(&cb22, [](extiCallbackRec_t *) { callback_invocation_log.push_back(22); });
+
+    EXTIConfig(pa0, &cb0, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXTIConfig(pa1, &cb1, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXTIEnable(pa0);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO0), 0U);
+
+    // Finding 10: Second Bank 0 pin (PA1) must be rejected while PA0 is active
+    EXTIEnable(pa1);
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_GPIO0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    ASSERT_EQ(callback_invocation_log.size(), 1U);
+    EXPECT_EQ(callback_invocation_log[0], 0);
+
+    EXTIDisable(pa0);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO0), 0U);
+    EXTIEnable(pa1);
+    callback_invocation_log.clear();
+    thejas32_gpio0_isr();
+    ASSERT_EQ(callback_invocation_log.size(), 1U);
+    EXPECT_EQ(callback_invocation_log[0], 1);
+    EXTIRelease(pa1);
+
+    // Bank 1 permits multiple concurrent active pins with CTZ dispatch order
+    callback_invocation_log.clear();
+    EXTIConfig(pa22, &cb22, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXTIConfig(pa16, &cb16, 0, IOCFG_IPD, BETAFLIGHT_EXTI_TRIGGER_RISING);
+    EXTIEnable(pa22);
+    EXTIEnable(pa16);
+    thejas32_gpio1_isr();
+    ASSERT_EQ(callback_invocation_log.size(), 2U);
+    EXPECT_EQ(callback_invocation_log[0], 16);
+    EXPECT_EQ(callback_invocation_log[1], 22);
+
+    EXTIDisable(pa16);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO1), 0U);
+    EXTIDisable(pa22);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_GPIO1), 0U);
 }

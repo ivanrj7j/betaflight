@@ -1,13 +1,13 @@
 # Betaflight Porting Knowledge Graph: ARIES v3.0 (THEJAS32 / VEGA ET1031)
 
-This document synthesizes findings across all 25 hardware inspection logs, **14 retrospective logs from the previous porting attempt**, and **15 deep codebase evaluation nodes** into a unified, component-by-component architectural blueprint for porting Betaflight to the **ARIES v3.0** board powered by the **THEJAS32 SoC (VEGA ET1031 RISC-V RV32IM)**.
+This document synthesizes findings across all 25 hardware inspection logs, **14 retrospective logs from the previous porting attempt**, and **17 deep codebase evaluation nodes** into a unified, component-by-component architectural blueprint for porting Betaflight to the **ARIES v3.0** board powered by the **THEJAS32 SoC (VEGA ET1031 RISC-V RV32IM)**.
 
 It directly rectifies the historical planning and practical implementation mistakes documented in:
 * [PLANNING_MISTAKES_ANALYSIS.md](PLANNING_MISTAKES_ANALYSIS.md)
 * [HISTORICAL_PLANNING_MISTAKES_GRAPH.md](HISTORICAL_PLANNING_MISTAKES_GRAPH.md)
 * [HISTORICAL_RETROSPECTIVE_GRAPH.md](HISTORICAL_RETROSPECTIVE_GRAPH.md)
 * [Retrospective Logs 01–14 Catalog](retrospective_logs)
-* [Codebase Evaluations 01–15 Catalog](codebase_evaluations)
+* [Codebase Evaluations 01–17 Catalog](codebase_evaluations)
 * [Code Audit Catalog](code_audit)
 * [Integration Testing Reports Catalog](integration_testing)
 * [Critical Knowledge Gaps & Assumptions Register](CRITICAL_KNOWLEDGE_GAPS_AND_ASSUMPTIONS.md)
@@ -228,6 +228,8 @@ graph TD
   * [`logs/dev/phase_11_bounded_tx_burst_drain.md`](../logs/dev/phase_11_bounded_tx_burst_drain.md): **PASS (Hardware Verified)**: 14/14 TDD tests; synchronous TX drain clamped to 16 bytes (measured 73 cycles / 0.73 us MMIO latency on hardware); permanent THRE interrupt suppression (`IER = 0x01`); 100 Hz background evacuation via `thejas32_uart_poll_tx()`; verified on physical silicon (`phase11.txt`).
   * [`logs/dev/phase_12_msp_handshake.md`](../logs/dev/phase_12_msp_handshake.md): **PASS (Hardware Verified)**: 16/16 TDD tests; minimal 7-step Configurator handshake engine (API 1.45, BTFL, 4.5.0, ARV3/ARIESV3, build info, 12B UID, status cycleTime=1000 us); zero heap allocations; CRC8-DVB polynomial 0xD5 engine check; verified on physical silicon (`phase12.txt`).
   * [`logs/dev/phase_13_cli_entry.md`](../logs/dev/phase_13_cli_entry.md): **PASS (Hardware Verified & Audit Hardened)**: 17/17 TDD tests; cumulative 146/146 tests across 13 suites; immediate Enter (`\r`/`\n`) and `#` serial CLI entry (0 ms guard delay); incoming `$` Configurator frame priority; `Ctrl+C`/`Ctrl+D` instant exit signals; 1-byte register mode (`FCR = 0x00`, official VEGA SDK standard eliminating FIFO errata & scrambled keystrokes); 256-byte line buffer; exit newline drain & 1000ms cooldown resolving exit bounce; dynamic LCR parity/stop-bit framing (SBUS 8E2 & 8N1); unhandled IRQ trap storm protection; soft reset interrupt cleanup; monotonic delay; 10/10 Silicon Audit pass; 20,716 B binary; strictly 0 RVC opcodes; staged to `tempfiles/betaflight_bootstrap.bin`.
+* **Verification Status (Phase 19)**:
+  * [`logs/dev/phase_19_crsf_rx_battery.md`](../logs/dev/phase_19_crsf_rx_battery.md): **PASS (Hardware Verified)**: `UART1` (`PA16`/`PA17`) @ 420,000 baud (Divisor 15, $-0.79\%$ err), `#undef USE_ADC` + `aries_adc_raw` safe battery fallback (`2048 -> 1815 cV`), `1,335/1,335` runnable host tests PASS across 97 targets (`78` non-ARIES + `19` ARIES), verified on physical silicon (`phase19.1.txt`, `21/21` PASS).
 * **Consulted Logs**:
   * [05_STM32_SERIAL_UART_HW.md](../logs/hardware_inspection/05_STM32_SERIAL_UART_HW.md)
   * [06_STM32_SERIAL_UART_DRIVER.md](../logs/hardware_inspection/06_STM32_SERIAL_UART_DRIVER.md)
@@ -332,6 +334,8 @@ graph TD
     * Battery voltage and current draw update at ~10 Hz (human scale).
     * `TASK_BATTERY` reads cached values from `aries_adc_raw[4]`.
   * For initial MSP handshake, battery monitoring can return static nominal values (e.g. 12.6V), enabling instant Configurator telemetry without waiting for `I2C2` bus bringup.
+* **Verification Status (Phase 19)**:
+  * [`logs/dev/phase_19_crsf_rx_battery.md`](../logs/dev/phase_19_crsf_rx_battery.md): **PASS (Hardware Verified)**: `UART1` (`PA16`/`PA17`) @ 420,000 baud (Divisor 15, $-0.79\%$ err), `#undef USE_ADC` + `aries_adc_raw` safe battery fallback (`2048 -> 1815 cV`), `1,335/1,335` runnable host tests PASS across 97 targets (`78` non-ARIES + `19` ARIES), verified on physical silicon (`phase19.1.txt`, `21/21` PASS).
 * **Consulted Logs**:
   * [11_STM32_ADC_IMPL.md](../logs/hardware_inspection/11_STM32_ADC_IMPL.md)
   * [23_ESP32_ADC.md](../logs/hardware_inspection/23_ESP32_ADC.md)
@@ -411,7 +415,7 @@ graph LR
         R12["12_Run_Simulation (Fallback Falsification)"]
     end
 
-    subgraph EvalNodes ["Ported Codebase Evaluations (01 - 15)"]
+    subgraph EvalNodes ["Ported Codebase Evaluations (01 - 17)"]
         E01["01_Startup_S (Trap x2 Stack & Reset)"]
         E02["02_Linker_Script (0x00202000 248KB Limit)"]
         E03["03_BSP_Header (APB Peripherals & 100MHz)"]
@@ -428,6 +432,7 @@ graph LR
         E14["14_Target_Config (1kHz Clamping & 8KB EEPROM)"]
         E15["15_Core_Diffs (CLI Enter & Repository Isolation)"]
         E16["16_IMU_ICM42688P (14B Burst & 1kHz ODR)"]
+        E17["17_RX_CRSF_ADC (UART1 420k & ADC==0 Guard)"]
     end
 
     subgraph PortingPlan ["Target Architecture: ARIES v3.0 (THEJAS32)"]
@@ -443,12 +448,13 @@ graph LR
         M10["Module 10: <128KB Minimal Modular Stripping"]
     end
 
-    subgraph AuditNodes ["Code Audit & Technical Debt Nodes (01 - 05)"]
+    subgraph AuditNodes ["Code Audit & Technical Debt Nodes (01 - 06)"]
         A01["01_Active_Rebuild_Audit (11 Findings Resolved)"]
         A02["02_Working_Tree_Review (10 Debts Managed)"]
         A03["03_Whole_Repo_Audit (8 Findings Hardened)"]
         A04["04_Phases_14_to_16_Audit (13 Debts Cataloged)"]
         A05["05_Phases_17_to_18_Audit (4 Findings Remediated)"]
+        A06["06_Phase19_Audit_And_Debt (15/15 Remediated, 11 Inline Shortcuts)"]
     end
 
     L01 & L17 & R04 & E05 --> M3
@@ -457,7 +463,8 @@ graph LR
     L08 & L19 & E07 --> M5
     L09 & L22 & R02 & E11 --> M7
     L10 & L21 & R02 & E09 & E16 --> M8
-    L11 & L23 & E12 --> M9
+    L11 & L23 & E12 & E17 --> M9
+    E17 --> M4
     L12 & L13 & L25 & R02 & R10 & E02 & E13 --> M1
     L14 & L16 & L13 & L25 & R02 & R07 & E10 & E14 --> M10
     R02 & R05 & E10 & E14 --> M5
@@ -465,6 +472,7 @@ graph LR
     A01 & A02 & A03 --> M4
     A04 --> M6 & M7
     A05 --> M5 & M7 & M8
+    A06 --> M1 & M2 & M4 & M6 & M9 & M10
 ```
 
 ---
@@ -491,11 +499,13 @@ The following matrix synthesizes the line-by-line technical audits conducted on 
 | **[E14](codebase_evaluations/14_EVAL_TARGET_H_AND_CONFIG.md)** | `target.h`, `config.h` | 5 Scored | Reducing `EEPROM_SIZE` from 8192 to 4096 triggers boot panic because Betaflight PGs exceed 4.8 KB. | Static compile-time assertion guarding `EEPROM_SIZE >= 8192` and `DEFAULT_PID_PROCESS_DENOM >= 8`. | Locked 1.0 kHz flight loop (`DEFAULT_PID_PROCESS_DENOM 8`) leaves $> 65\%$ CPU headroom; 12-pin matrix zero collisions. |
 | **[E15](codebase_evaluations/15_EVAL_CORE_DIFFS_MAIN_CONFIG_PG_MSP.md)** | `src/main/` | 5 Scored | Injected `#ifdef THEJAS32` and `THEJAS_LOG` debug strings directly into 9 core files, violating platform isolation. | Encapsulate target diagnostics in weak platform hooks; gate logs behind `#if defined(THEJAS32_DEBUG_LOG)`. | **Instant CLI activation:** Pressing Enter (`\r`) or `#` eliminates the 100ms guard-time barrier for serial monitors. |
 | **[E16](codebase_evaluations/16_EVAL_ACCGYRO_SPI_ICM42688P.md)** | `accgyro_spi_icm42688p.c`, `bootstrap_diag.c` | 9 Scored | Overclocking sensor to 25 MHz on APB bus; infinite hangs on unattached slave; silkscreen orientation assumptions. | Clamp SPI0 to 12.5 MHz (Divisor 1); add bounded timeout recovery with unattached fallback; runtime orientation matrix. | **Contiguous 14-byte burst read pipeline:** Reads Temp, Accel, and Gyro in $18\,\mu\text{s}$ total on silicon ($< 1.8\%$ loop CPU); zero DMA descriptors; hardware AAF 258 Hz filter; verified on silicon (`phase 18.txt`). |
+| **[E17](codebase_evaluations/17_EVAL_RX_CRSF_AND_ADC_ARIES.md)** | `serial_uart_aries.c`, `crsf.c`, `stub_drivers.c` | 6 Scored | `IIR` vs `FCR` readback (`phase19.txt`); `LSR` double-read in `poll_rx()`, IRQ before `rxCallback`, `uartGetIndex(NULL)` aliasing, spoofed `aries_adc_raw[]`, `crsfRxInit()` stale `serialPort`, and blocking-TX deadlock under suppressed TX IRQ. | Assert `(IIR & 0xC0) == 0`; single-read `LSR`; defer `UART_IE` to `uartReconfigure()`; `int8_t` `-1` NULL guard; `uartPollTx()` in blocking waits; `adcGetValue()==0` under `#undef USE_ADC`; reset `serialPort = NULL`. | **Non-Inverted CRSF & Dual Silicon Verified**: `UART1` @ 420k baud (Divisor 15, $-0.79\%$ error) + `adcGetValue()==0` (`NOGYRO BOOTGRACE CLI`, zero false battery lockout); `1,347/1,347` host tests + physical `phase19.4.txt` (`21/21`) & `phase19.5.txt` (`ARIESV3` live). |
 | **[A01](code_audit/01_ACTIVE_REBUILD_BRANCH_AUDIT.md)** | `src/platform/ARIES/` | 8 Scored | Background transmit hook `thejas32_uart_poll_tx` uncalled; mutable VTable in `.bss`; 921.6k baud clock divisor error (3.12%). | Call `thejas32_uart_poll_tx` from serial task; move VTable to `const` in `.rodata`; clamp logging baud rates. | **Quality Audit Complete**: All 11 findings resolved (pins, 32-bit memory copy, CTZ, parity, VTable in `.rodata`, poll hook, baud docs, Makefile fallback); 72/72 tests passing. |
 | **[A02](code_audit/02_WORKING_TREE_REVIEW_AND_TECHNICAL_DEBT.md)** | Working Tree Integration & Debt Ledger | 7 Scored | Non-atomic `uartIrqHandler` call in generic `serial_uart.c` races with hardware ISR; unneeded `IIR` read in polled reception. | Wrap in `ATOMIC_BLOCK`; actively clamp 921.6k baud; map `persistentObjects` to `.noinit` section. | **All 7 Findings & 3 Rot-Risk Debts Resolved**: Wrapped `uartIrqHandler` in `ATOMIC_BLOCK(NVIC_PRIO_MAX)`; purged redundant `IIR` read; clamped baud rates $> 460.8\text{k}$ to $420\text{k}$; mapped `persistentObjects` to `.noinit` (NOLOAD); unified `__ctzsi2` in `system.c`; 10/10 debts managed; 138/138 tests pass across 13 suites. |
 | **[A03](code_audit/03_WHOLE_REPO_SENIOR_DEV_AUDIT.md)** | Whole-Repository Quality Audit & Architecture Hardening | 7 Scored | Hardcoded 8N1 in `serial_uart_aries.c` ignores `options` parameter; unhandled IRQs in `handle_trap` risk infinite trap storms. | Dynamically configure LCR parity/stop bits; mask unhandled IRQs with `INTR_EN &= ~(1UL << i)`; add 1000ms CLI exit cooldown. | **Senior Developer Audit Complete**: 8 actionable findings cataloged; single-heartbeat bounce resolved on hardware (`phase13.5.txt`); 139/139 unit tests pass across 13 suites. |
 | **[A04](code_audit/04_PHASES_14_TO_16_AUDIT_AND_DEBT.md)** | Actuator Control, EXTI & Atomic GPIO (Phases 14–16) | 7 Scored | Missing MMIO memory fence in Timer 1 register reload (`TD-13`); Bank-wide EXTI ISR loops all active pins (`TD-12`); direct `#ifdef THEJAS32` hook in upstream `serial_uart.c`. | Insert `__asm__ volatile ("fence" : : : "memory")` after `LoadCount`; enforce 1 active pin limit on Bank 0; extract weak platform hook `uartPlatformPollRx()`. | **Ascending Deadline Soft-PWM Innovation**: Non-blocking Timer 1 IRQ 8 event scheduling (< 3.0 µs CPU overhead, > 99.7% idle headroom); single-instruction address-decoded atomic GPIO stores (< 10 ns); single-cycle $O(1)$ `__builtin_ctz` EXTI dispatch; safe non-null `motorVTable_t` passthrough; 192/192 tests pass across 16 suites. |
 | **[A05](code_audit/05_PHASES_17_TO_18_AUDIT_AND_DEBT.md)** | Actuator Control, Direction RMW, Timer 1 Latch, SPI Timeout & Error Isolation (Phases 17–18) | 8 Scored | Direction register RMW race condition in `io_aries.c`; missing Timer 1 EOI clear causing 0 µs pulse termination; 50,000-cycle SPI timeout overrunning loop; hardcoded `SPIDEV_1` error count. | Wrap open-drain direction register in `thejas32_atomic_enter/exit`; clear EOI latch in `ariesPwmMotorUpdateComplete`; clamp SPI timeout to 1,000 cycles (10 µs); isolate error counts via `thejas32_spi_device_from_hw(hw)`. | **Cross-Module Integration Hardened**: Real-time bounded timeout (< 140 µs worst-case 14B burst failure, < 14% loop budget); race-free open-drain direction toggling; 0-dropout motor PWM; 248/248 unit and integration tests pass across 18 suites. |
+| **[A06](code_audit/06_PHASE_19_AUDIT_AND_DEBT.md)** | Phase 19 Whole-Repo Audit & Technical Debt Ledger (`config.h`, `ARIES.mk`, `serial_uart_aries.c`, `system.c`, `bootstrap_diag.c`, `build_verify.sh`, `src/test/Makefile`) | 7 Scored (`4.6 -> 9.9 / 10`) | `USE_CONFIG` + `config.h` early `target.h` include cancelled `#undef`s; `MCU_EXCLUDES =` wiped `target.mk` + `olc.c` post-filter; `poll_rx` wiped `LSR`; RX IRQ before `rxCallback`; `uartGetIndex(NULL)` aliased `UART0`; `0/19` ARIES tests linked `.c` drivers; `build_verify.sh` skipped `trap_entry`/`.stack`; unconditional `ALL 21 PASSED`; Bank 0 EXTI fan-out; fake `18.15 V` ADC; cold `.noinit`; silicon `phase19.2/.3` caught Test 18 UART/Timer1 race, missing `__enable_irq()`, and blocking-TX deadlock. | Fixed `config.h` include order, `ENABLE_OSD_CUSTOM_TEXT 0`, `MCU_EXCLUDES +=`, `HSE_VALUE := 100000000`, `clockMicrosToCycles()`, `__ctzsi2`, `_Min_Stack_Size = 0x2000`; fixed UART/EXTI/ADC/`.noinit`/`__enable_irq()`/polled-TX guards; checked `trap_entry` & `_end`; linked `10` real ARIES `.c` suites; fixed Test 18 `LoadCount` race; added `11` inline `// shortcut:` markers. | **All 15 Audit Findings & Silicon Verification Complete**: Full `TARGET=ARIESV3` (`222,208 B` SRAM, `191,224 B` `.bin`, `0` RVC) verified in `phase19.5.txt` (`MSP API: 1.49`, CLI + warm reboot) + `bootstrap` (`45,132 B`) `21/21` in `phase19.4.txt`; `1,347/1,347` runnable host tests pass. |
 
 ---
 

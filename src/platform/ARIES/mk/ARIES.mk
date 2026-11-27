@@ -55,12 +55,13 @@ INCLUDE_DIRS := \
 # 2. Architecture & Silicon Boundary Flags
 # ------------------------------------------------------------------------------
 # The core does NOT implement compressed ('C') or hardware float ('F'/'D') extensions.
+HSE_VALUE    := 100000000
 ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany
 
 # Memory builtins disabled to prevent compiler from emitting calls to compressed libc helpers
 DEVICE_FLAGS = -DARIES -DTHEJAS32 -DUSE_CONFIG \
                -Wno-type-limits -Wno-sign-compare -Wno-unused-parameter \
-               -Wno-incompatible-pointer-types -ffast-math -fno-math-errno \
+               -ffast-math -fno-math-errno \
                -fno-builtin-memset -fno-builtin-memcpy -fno-builtin-memmove \
                -DARIES_DEV_LOGGING=1
 
@@ -73,13 +74,13 @@ LD_SCRIPT    = $(LINKER_DIR)/aries_v3.ld
 # compressed opcodes (rv32imafc). We query the cross-compiler with pure RV32I flags to
 # guarantee linking strictly against pure uncompressed archives (rv32i_zicsr_zifencei/ilp32).
 
-TOOLCHAIN_RV32I_LIB := $(shell $(ARM_SDK_PREFIX)gcc -march=rv32i_zicsr_zifencei -mabi=ilp32 -print-file-name=libc.a 2>/dev/null | xargs dirname)
-TOOLCHAIN_RV32I_LIBGCC := $(shell $(ARM_SDK_PREFIX)gcc -march=rv32i_zicsr_zifencei -mabi=ilp32 -print-file-name=libgcc.a 2>/dev/null | xargs dirname)
+TOOLCHAIN_RV32I_LIB    := $(patsubst %/,%,$(dir $(wildcard $(firstword $(shell $(ARM_SDK_PREFIX)gcc -march=rv32i_zicsr_zifencei -mabi=ilp32 -print-file-name=libc.a 2>/dev/null)))))
+TOOLCHAIN_RV32I_LIBGCC := $(patsubst %/,%,$(dir $(wildcard $(firstword $(shell $(ARM_SDK_PREFIX)gcc -march=rv32i_zicsr_zifencei -mabi=ilp32 -print-file-name=libgcc.a 2>/dev/null)))))
 
 ifeq ($(wildcard $(TOOLCHAIN_RV32I_LIB)/libc.a),)
   # Fallback for toolchains without the zifencei multilib name
-  TOOLCHAIN_RV32I_LIB    := $(shell $(ARM_SDK_PREFIX)gcc -march=rv32i_zicsr -mabi=ilp32 -print-file-name=libc.a 2>/dev/null | xargs dirname)
-  TOOLCHAIN_RV32I_LIBGCC := $(shell $(ARM_SDK_PREFIX)gcc -march=rv32i_zicsr -mabi=ilp32 -print-file-name=libgcc.a 2>/dev/null | xargs dirname)
+  TOOLCHAIN_RV32I_LIB    := $(patsubst %/,%,$(dir $(wildcard $(firstword $(shell $(ARM_SDK_PREFIX)gcc -march=rv32i_zicsr -mabi=ilp32 -print-file-name=libc.a 2>/dev/null)))))
+  TOOLCHAIN_RV32I_LIBGCC := $(patsubst %/,%,$(dir $(wildcard $(firstword $(shell $(ARM_SDK_PREFIX)gcc -march=rv32i_zicsr -mabi=ilp32 -print-file-name=libgcc.a 2>/dev/null)))))
 endif
 
 # ------------------------------------------------------------------------------
@@ -103,8 +104,8 @@ MCU_COMMON_SRC := \
     # Future Phase Drivers (uncomment as phases are implemented):
     # ARIES/config_flash_aries.c (Phase 18)
 
-# Surgical exclusion of unused upstream peripherals to fit within 248 KB SRAM budget
-MCU_EXCLUDES = \
+# Surgical exclusion of unused upstream peripherals to fit within 248 KB SRAM budget (preserving target.mk)
+MCU_EXCLUDES += \
     drivers/rx/rx_xn297.c \
     drivers/display_ug2864hsweg01.c \
     io/displayport_oled.c \
@@ -233,8 +234,8 @@ TARGET_MAP   = $(OBJECT_DIR)/$(FORKNAME)_$(TARGET).map
 LIBS         = -lm -lc -lgcc
 
 LD_FLAGS    := \
-    -L$(TOOLCHAIN_RV32I_LIB) \
-    -L$(TOOLCHAIN_RV32I_LIBGCC) \
+    $(if $(TOOLCHAIN_RV32I_LIB),-L$(TOOLCHAIN_RV32I_LIB)) \
+    $(if $(TOOLCHAIN_RV32I_LIBGCC),-L$(TOOLCHAIN_RV32I_LIBGCC)) \
     $(LIBS) -nostartfiles \
     $(ARCH_FLAGS) \
     $(LTO_FLAGS) \

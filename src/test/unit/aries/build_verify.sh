@@ -100,17 +100,17 @@ fi
 
 # 7. Trap Vector Alignment Audit
 echo -n "[Audit 7/10] Trap Vector Address Alignment: "
-TRAP_VEC=$($CROSS_READELF -s "$ELF_FILE" | awk '/_trap_vector/ {print $2}' | head -n 1)
+TRAP_VEC=$($CROSS_READELF -s "$ELF_FILE" | awk '$8 == "trap_entry" {print $2}' | head -n 1)
 if [ -n "$TRAP_VEC" ]; then
     TRAP_INT=$((16#$TRAP_VEC))
     ALIGN_REM=$((TRAP_INT % 64))
     if [ "$ALIGN_REM" -ne 0 ]; then
-        echo "FAIL (_trap_vector at 0x$TRAP_VEC is not 64-byte aligned, rem=$ALIGN_REM)"
+        echo "FAIL (trap_entry at 0x$TRAP_VEC is not 64-byte aligned, rem=$ALIGN_REM)"
         exit 1
     fi
     echo "PASS (0x$TRAP_VEC is 64-byte aligned)"
 else
-    echo "SKIP (_trap_vector symbol not present in early bootstrap build)"
+    echo "SKIP (trap_entry symbol not present)"
 fi
 
 # 8. Parameter Group Storage Bounds Audit
@@ -124,19 +124,19 @@ else
     echo "SKIP (PG registry symbols not linked in early bootstrap build)"
 fi
 
-# 9. Top-of-SRAM Upper Ceiling Audit (<= 0x0023FFFF)
+# 9. Top-of-SRAM Upper Ceiling Audit (<= 0x0023FFFF including .noinit + 8 KB .stack)
 echo -n "[Audit 9/10] SRAM Upper Bound Ceiling Audit: "
-BSS_END=$($CROSS_READELF -s "$ELF_FILE" | awk '/_ebss/ {print $2}' | head -n 1)
-if [ -n "$BSS_END" ]; then
-    BSS_INT=$((16#$BSS_END))
+SRAM_END=$($CROSS_READELF -s "$ELF_FILE" | awk '$8 == "_end" {print $2}' | head -n 1)
+if [ -n "$SRAM_END" ]; then
+    SRAM_END_INT=$((16#$SRAM_END))
     MAX_SRAM_INT=$((16#0023FFFF))
-    if [ "$BSS_INT" -gt "$MAX_SRAM_INT" ]; then
-        echo "FAIL (_ebss at 0x$BSS_END exceeds physical SRAM ceiling 0x0023FFFF)"
+    if [ "$SRAM_END_INT" -gt "$MAX_SRAM_INT" ]; then
+        echo "FAIL (_end at 0x$SRAM_END exceeds physical SRAM ceiling 0x0023FFFF)"
         exit 1
     fi
-    echo "PASS (_ebss 0x$BSS_END <= 0x0023FFFF)"
+    echo "PASS (_end 0x$SRAM_END <= 0x0023FFFF)"
 else
-    echo "SKIP (_ebss not exported)"
+    echo "SKIP (_end symbol not exported)"
 fi
 
 # 10. Binary Image Artifact Generation Check

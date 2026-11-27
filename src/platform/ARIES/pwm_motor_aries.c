@@ -30,7 +30,7 @@
 #include "drivers/pwm_output.h"
 #include "pg/motor.h"
 #include "platform/bsp_thejas32.h"
-#include "target/ARIESV3/target.h"
+#include "target.h"
 
 // -----------------------------------------------------------------------------
 // Motor Configuration & Hardware Mapping
@@ -78,7 +78,7 @@ FAST_IRQ_HANDLER void thejas32_pwm_timer1_isr(void)
 
     if (aries_current_deadline_idx >= aries_motor_count) {
         THEJAS32_TIMER(1).Control = 0;
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
         thejas32_interrupt_disable(THEJAS32_IRQ_TIMER1);
         return;
     }
@@ -106,15 +106,15 @@ FAST_IRQ_HANDLER void thejas32_pwm_timer1_isr(void)
         uint32_t delta = aries_sorted_deadlines[aries_current_deadline_idx].cycles -
                          aries_sorted_deadlines[aries_current_deadline_idx - 1].cycles;
         THEJAS32_TIMER(1).Control = 0;
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
         THEJAS32_TIMER(1).LoadCount = delta;
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
         THEJAS32_TIMER(1).Control = 0x03; // Enable + User-defined reload mode
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
     } else {
         // All motor pulses complete: disable Timer 1 until next flight cycle
         THEJAS32_TIMER(1).Control = 0;
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
         thejas32_interrupt_disable(THEJAS32_IRQ_TIMER1);
     }
 }
@@ -123,7 +123,12 @@ FAST_IRQ_HANDLER void thejas32_pwm_timer1_isr(void)
 // Betaflight Motor Driver VTable Functions
 // -----------------------------------------------------------------------------
 
-static void ariesPwmMotorPostInit(void) { }
+static void ariesPwmMotorPostInit(void)
+{
+#if !defined(UNIT_TEST) && defined(ARIES_DEV_LOGGING) && (ARIES_DEV_LOGGING == 1)
+    THEJAS_LOG("[ARIES v3] Boot Complete: Entering Scheduler (Press '#' or Enter for CLI)\r\n");
+#endif
+}
 
 /*
  * Standard PWM works in microseconds, mapping external (1000-2000us) throttle values directly.
@@ -156,7 +161,7 @@ static void ariesPwmMotorDisable(void)
     THEJAS32_TIMER(1).Control = 0;
     volatile uint32_t clear_latch = THEJAS32_TIMER(1).EOI;
     (void)clear_latch;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
     thejas32_interrupt_disable(THEJAS32_IRQ_TIMER1);
 
     for (uint8_t i = 0; i < aries_motor_count; i++) {
@@ -204,7 +209,7 @@ static void ariesPwmMotorUpdateComplete(void)
     THEJAS32_TIMER(1).Control = 0;
     volatile uint32_t clear_latch = THEJAS32_TIMER(1).EOI;
     (void)clear_latch;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
     // STEP 2: Ascending deadline sorting (Insertion sort for N=4, < 30 cycles)
     for (uint8_t i = 0; i < aries_motor_count; i++) {
@@ -233,9 +238,9 @@ static void ariesPwmMotorUpdateComplete(void)
     aries_current_deadline_idx = 0;
     uint32_t first_cycles = aries_sorted_deadlines[0].cycles;
     THEJAS32_TIMER(1).LoadCount = first_cycles;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
     THEJAS32_TIMER(1).Control = 0x03; // Enable (bit 0) + User-defined reload mode (bit 1)
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
     thejas32_interrupt_enable(THEJAS32_IRQ_TIMER1);
 }
 
@@ -335,7 +340,7 @@ bool motorPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorDevConf
     THEJAS32_TIMER(1).LoadCount = 0;
     volatile uint32_t clear_latch = THEJAS32_TIMER(1).EOI;
     (void)clear_latch;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
     // Register Timer 1 interrupt service routine
     thejas32_interrupt_register(THEJAS32_IRQ_TIMER1, thejas32_pwm_timer1_isr);

@@ -633,7 +633,12 @@ bool serialIsPortAvailable(serialPortIdentifier_e identifier)
 void waitForSerialPortToFinishTransmitting(serialPort_t *serialPort)
 {
     while (!isSerialTransmitBufferEmpty(serialPort)) {
+#ifdef USE_UART_POLLED_DRAIN
+        uartPollTx();
+        delay(1);
+#else
         delay(10);
+#endif
     };
 }
 

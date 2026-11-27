@@ -29,7 +29,6 @@
 
 typedef struct {
     extiCallbackRec_t *handler;
-    uint8_t trigger;
     bool enabled;
 } extiChannelRec_t;
 
@@ -121,6 +120,7 @@ void EXTIHandlerInit(extiCallbackRec_t *cb, extiHandlerCallback *fn)
 void EXTIConfig(IO_t io, extiCallbackRec_t *cb, int irqPriority, ioConfig_t config, extiTrigger_t trigger)
 {
     UNUSED(irqPriority);
+    UNUSED(trigger);
     if (!io) {
         return;
     }
@@ -136,7 +136,6 @@ void EXTIConfig(IO_t io, extiCallbackRec_t *cb, int irqPriority, ioConfig_t conf
     uint32_t prev_mstatus = thejas32_atomic_enter();
 
     extiChannels[pin].handler = cb;
-    extiChannels[pin].trigger = (uint8_t)trigger;
     extiChannels[pin].enabled = false; // Strictly disabled until EXTIEnable()
 
     thejas32_atomic_exit(prev_mstatus);
@@ -155,11 +154,17 @@ void EXTIEnable(IO_t io)
 
     uint32_t prev_mstatus = thejas32_atomic_enter();
 
-    extiChannels[pin].enabled = true;
     if (pin < 16) {
+        // shortcut: Bank 0 EXTI limited to 1 active pin (no per-pin HW pending status reg), upgrade if pending status added
+        if ((exti_bank0_active_mask & ~(1U << pin)) != 0U) {
+            thejas32_atomic_exit(prev_mstatus);
+            return;
+        }
+        extiChannels[pin].enabled = true;
         exti_bank0_active_mask |= (1U << pin);
         thejas32_interrupt_enable(THEJAS32_IRQ_GPIO0);
     } else {
+        extiChannels[pin].enabled = true;
         exti_bank1_active_mask |= (1U << (pin - 16));
         thejas32_interrupt_enable(THEJAS32_IRQ_GPIO1);
     }

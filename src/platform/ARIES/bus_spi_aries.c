@@ -45,6 +45,7 @@
 #define THEJAS32_SPI_BAUD_DIV_32      3 // 3.125 MHz (Slow Safe Boot / JEDEC ID)
 #define THEJAS32_SPI_BAUD_DIV_64      4 // 1.5625 MHz
 
+// shortcut: 1000-cycle (~10 us) SPI poll timeout (< 140 us/14B burst), upgrade to DMA if controller supports it
 #define THEJAS32_SPI_TIMEOUT_CYCLES   1000
 
 const spiHardware_t spiHardware[SPIDEV_COUNT] = {
@@ -59,16 +60,13 @@ const spiHardware_t spiHardware[SPIDEV_COUNT] = {
 
 static inline thejas32_spi_reg_t *thejas32_spi_get_hw(const spiResource_t *instance)
 {
-    if (instance == NULL) {
-        return (thejas32_spi_reg_t *)THEJAS32_SPI_0_1_BASE;
-    }
-    return (thejas32_spi_reg_t *)instance;
+    return thejas32_spi_from_instance(instance);
 }
 
 static inline spiDevice_e thejas32_spi_device_from_hw(const thejas32_spi_reg_t *hw)
 {
     for (size_t i = 0; i < ARRAYLEN(spiHardware); i++) {
-        if ((thejas32_spi_reg_t *)spiHardware[i].reg == hw) {
+        if (thejas32_spi_from_instance(spiHardware[i].reg) == hw) {
             return spiHardware[i].device;
         }
     }
@@ -84,9 +82,9 @@ static void thejas32_spi_reset_controller(thejas32_spi_reg_t *hw)
     // Toggle SPI controller control word to clear any stuck internal state
     uint32_t current_ctrl = hw->Control;
     hw->Control = 0;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
     hw->Control = current_ctrl;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
     dummy = hw->RxData;
     (void)dummy;
@@ -154,7 +152,7 @@ void spiInitDevice(spiDevice_e device)
     hw->Baudrate = (THEJAS32_SPI_BAUD_DIV_8 << 4);
     hw->Control = 0; // Mode 0 (CPOL=0, CPHA=0), MSB first, fixed periph 0
 
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
     // Dummy read to clear RX pipeline
     volatile uint32_t dummy = hw->RxData;
@@ -201,7 +199,7 @@ static uint8_t thejas32_spi_transfer_byte(thejas32_spi_reg_t *hw, uint8_t out)
     }
 
     hw->TxData = out;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
     // 2. Wait until RX complete flag asserts
     timeout = THEJAS32_SPI_TIMEOUT_CYCLES;
@@ -257,7 +255,7 @@ void spiSequenceStart(const extDevice_t *dev)
             divider = THEJAS32_SPI_BAUD_DIV_8; // Strictly clamp to 12.5 MHz
         }
         hw->Baudrate = ((uint32_t)divider << 4);
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
         bus->busType_u.spi.speed = dev->busType_u.spi.speed;
     }
 
@@ -270,7 +268,7 @@ void spiSequenceStart(const extDevice_t *dev)
             ctrl |= (THEJAS32_SPI_CTRL_MODE_3 << THEJAS32_SPI_CTRL_MODE_SHIFT);
         }
         hw->Control = ctrl;
-        __asm__ volatile ("fence" : : : "memory");
+        THEJAS32_MEMORY_FENCE();
         bus->busType_u.spi.leadingEdge = dev->busType_u.spi.leadingEdge;
     }
 

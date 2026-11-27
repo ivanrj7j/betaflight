@@ -66,16 +66,14 @@ void IOConfigGPIO(IO_t io, ioConfig_t cfg)
         return;
     }
 
-    uint32_t base = (pin < 16) ? THEJAS32_GPIO_0_BASE : THEJAS32_GPIO_1_BASE;
-    uint8_t pin_in_bank = (pin < 16) ? pin : (pin - 16);
-    volatile uint16_t *dir = (volatile uint16_t *)(base + 0x40000);
+    uint8_t pin_in_bank = (uint8_t)(pin & 0x0FU);
+    volatile uint16_t *dir = thejas32_gpio_dir_ptr(pin);
 
     uint8_t mode = cfg & 0x03;
     uint32_t prev = thejas32_atomic_enter();
     if (mode == THEJAS32_GPIO_MODE_OUTPUT_OD) {
-        // Track open-drain emulation bitmask
+        // shortcut: emulate open-drain via DIR RMW under MIE guard; switch if HW open-drain pad ctrl added
         open_drain_mask |= (1UL << pin);
-        // Initially configure as input (floating/high-Z)
         *dir &= ~(1U << pin_in_bank);
     } else if (mode == THEJAS32_GPIO_MODE_OUTPUT) {
         open_drain_mask &= ~(1UL << pin);
@@ -86,7 +84,7 @@ void IOConfigGPIO(IO_t io, ioConfig_t cfg)
     }
     thejas32_atomic_exit(prev);
 
-    __asm__ __volatile__("fence" ::: "memory");
+    THEJAS32_MEMORY_FENCE();
 }
 
 FAST_CODE void IOHi(IO_t io)
@@ -100,23 +98,21 @@ FAST_CODE void IOHi(IO_t io)
         return;
     }
 
-    uint32_t base = (pin < 16) ? THEJAS32_GPIO_0_BASE : THEJAS32_GPIO_1_BASE;
-    uint8_t pin_in_bank = (pin < 16) ? pin : (pin - 16);
+    uint8_t pin_in_bank = (uint8_t)(pin & 0x0FU);
 
     if (open_drain_mask & (1UL << pin)) {
         // Open-Drain HIGH: Release the line (Direction = Input / High-Z)
-        // External pull-up resistor pulls the bus up to 3.3V without contention
-        volatile uint16_t *dir = (volatile uint16_t *)(base + 0x40000);
+        volatile uint16_t *dir = thejas32_gpio_dir_ptr(pin);
         uint32_t prev = thejas32_atomic_enter();
         *dir &= ~(1U << pin_in_bank);
         thejas32_atomic_exit(prev);
     } else {
         // Push-Pull HIGH: Single-instruction atomic address-decoded store
-        volatile uint16_t *reg = (volatile uint16_t *)(base + ((1U << pin_in_bank) << 2));
+        volatile uint16_t *reg = thejas32_gpio_data_ptr(pin);
         *reg = (1U << pin_in_bank);
     }
 
-    __asm__ __volatile__("fence" ::: "memory");
+    THEJAS32_MEMORY_FENCE();
 }
 
 FAST_CODE void IOLo(IO_t io)
@@ -130,24 +126,23 @@ FAST_CODE void IOLo(IO_t io)
         return;
     }
 
-    uint32_t base = (pin < 16) ? THEJAS32_GPIO_0_BASE : THEJAS32_GPIO_1_BASE;
-    uint8_t pin_in_bank = (pin < 16) ? pin : (pin - 16);
+    uint8_t pin_in_bank = (uint8_t)(pin & 0x0FU);
 
     if (open_drain_mask & (1UL << pin)) {
         // Open-Drain LOW: Actively drive down (Direction = Output, Data = 0)
-        volatile uint16_t *dir = (volatile uint16_t *)(base + 0x40000);
-        volatile uint16_t *reg = (volatile uint16_t *)(base + ((1U << pin_in_bank) << 2));
+        volatile uint16_t *dir = thejas32_gpio_dir_ptr(pin);
+        volatile uint16_t *reg = thejas32_gpio_data_ptr(pin);
         uint32_t prev = thejas32_atomic_enter();
         *dir |= (1U << pin_in_bank);
         *reg = 0;
         thejas32_atomic_exit(prev);
     } else {
         // Push-Pull LOW: Single-instruction atomic address-decoded store
-        volatile uint16_t *reg = (volatile uint16_t *)(base + ((1U << pin_in_bank) << 2));
+        volatile uint16_t *reg = thejas32_gpio_data_ptr(pin);
         *reg = 0;
     }
 
-    __asm__ __volatile__("fence" ::: "memory");
+    THEJAS32_MEMORY_FENCE();
 }
 
 void IOToggle(IO_t io)
@@ -174,12 +169,10 @@ bool IORead(IO_t io)
         return false;
     }
 
-    uint32_t base = (pin < 16) ? THEJAS32_GPIO_0_BASE : THEJAS32_GPIO_1_BASE;
-    uint8_t pin_in_bank = (pin < 16) ? pin : (pin - 16);
-    volatile uint16_t *reg = (volatile uint16_t *)(base + ((1U << pin_in_bank) << 2));
+    volatile uint16_t *reg = thejas32_gpio_data_ptr(pin);
 
     uint16_t val = *reg;
-    __asm__ __volatile__("fence" ::: "memory");
+    THEJAS32_MEMORY_FENCE();
 
     return (val != 0);
 }

@@ -46,8 +46,15 @@
 #include "gtest/gtest.h"
 
 // Platform definitions and hardware headers
-#include "platform/ARIES/target/ARIESV3/target.h"
-#include "platform/ARIES/include/platform/bsp_thejas32.h"
+extern "C" {
+#include "../main/platform.h"
+#include "drivers/io.h"
+#include "io/serial.h"
+#include "drivers/serial_uart.h"
+#include "drivers/serial_uart_impl.h"
+#include "aries_host_mmio.h"
+uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp);
+}
 
 namespace {
 
@@ -904,6 +911,43 @@ TEST_F(AriesUartRxTest, Test_UARTRX_OverrunRecovery_ContinuousStreamReturnsToCle
     // Flight Consequence:
     // Robust overrun recovery ensures temporary CPU latency spikes do not require a flight
     // controller reboot.
+}
+
+// =============================================================================
+// TEST 19: Real serial_uart_aries.c Ring Buffer, FE/PE Filtering & OE Recovery
+// =============================================================================
+TEST_F(AriesUartRxTest, Test_RealUartRxAriesC_RingBufferAndErrorRecovery) {
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+
+    // Inject '$', 'M', framing-errored byte (FE dropped), parity-errored byte (PE dropped), and overrun+clean '<'
+    const struct { uint8_t dr; uint8_t lsr; } wire[] = {
+        { 0x24U, 0x61U }, // '$'
+        { 0x4DU, 0x61U }, // 'M'
+        { 0xFFU, 0x69U }, // FE -> drop
+        { 0xEEU, 0x65U }, // PE -> drop
+        { 0x3CU, 0x63U }, // '<' with OE -> cleared on LSR read, byte accepted
+    };
+    for (const auto &pkt : wire) {
+        THEJAS32_UART(0).UART_DR = pkt.dr;
+        THEJAS32_UART(0).UART_LSR = pkt.lsr;
+        THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_UART0);
+        handle_trap(0x8000000BUL, 0U, nullptr);
+    }
+
+    EXPECT_EQ(sp0->vTable->serialTotalRxWaiting(sp0), 3U);
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), 0x24U);
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), 0x4DU);
+    EXPECT_EQ(sp0->vTable->serialRead(sp0), 0x3CU);
+    EXPECT_EQ(sp0->vTable->serialTotalRxWaiting(sp0), 0U);
 }
 
 } // namespace

@@ -19,8 +19,14 @@
 #include <vector>
 #include <chrono>
 
-#include "platform/ARIES/target/ARIESV3/target.h"
-#include "platform/ARIES/include/platform/bsp_thejas32.h"
+extern "C" {
+#include "../main/platform.h"
+#include "drivers/io.h"
+#include "io/serial.h"
+#include "drivers/serial_uart.h"
+#include "drivers/serial_uart_impl.h"
+#include "aries_host_mmio.h"
+}
 
 // -----------------------------------------------------------------------------
 // 16550 APB UART Emulation Harness for Unit Testing
@@ -503,4 +509,38 @@ TEST_F(AriesUartTxDrainTest, Test_UARTTX_LineStatusRegister_ReadPerformance_Sing
     EXPECT_EQ(uart0Hw.hwTxFifo.size(), 16u);
 
     // Consequence: Each write is pipelined with memory fence; no unneeded delay loops
+}
+
+// =============================================================================
+// 15. Test_RealUartTxDrainAriesC_Bounded16BytePollTx
+// =============================================================================
+TEST_F(AriesUartTxDrainTest, Test_RealUartTxDrainAriesC_Bounded16BytePollTx) {
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, nullptr, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+
+    uint8_t payload[24];
+    for (int i = 0; i < 24; i++) {
+        payload[i] = (uint8_t)(0x41 + i);
+    }
+    sp0->vTable->writeBuf(sp0, payload, 24);
+    EXPECT_EQ(sp0->txBufferSize - 1U - sp0->vTable->serialTotalTxFree(sp0), 24U);
+
+    // First uartPollTx drains strictly <= 16 bytes even when THRE remains asserted
+    THEJAS32_UART(0).UART_LSR = 0x60U;
+    uartPollTx();
+    EXPECT_EQ(THEJAS32_UART(0).UART_DR & 0xFFU, (uint32_t)(0x41 + 15));
+    EXPECT_EQ(sp0->txBufferSize - 1U - sp0->vTable->serialTotalTxFree(sp0), 8U);
+
+    // Second uartPollTx finishes remaining 8 bytes
+    uartPollTx();
+    EXPECT_EQ(THEJAS32_UART(0).UART_DR & 0xFFU, (uint32_t)(0x41 + 23));
+    EXPECT_TRUE(sp0->vTable->isSerialTransmitBufferEmpty(sp0));
 }

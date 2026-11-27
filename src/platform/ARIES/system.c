@@ -27,6 +27,10 @@ uint32_t SystemCoreClock = 100000000U; // 100 MHz
  */
 static inline void getCycleCounterWords(uint32_t *hi_out, uint32_t *lo_out)
 {
+#ifdef UNIT_TEST
+    extern void thejas32_host_mcycle_read(uint32_t *hi_out, uint32_t *lo_out);
+    thejas32_host_mcycle_read(hi_out, lo_out);
+#else
     uint32_t hi, lo, hi2;
     do {
         __asm__ volatile ("csrr %0, mcycleh" : "=r"(hi));
@@ -35,6 +39,7 @@ static inline void getCycleCounterWords(uint32_t *hi_out, uint32_t *lo_out)
     } while (hi != hi2);
     *hi_out = hi;
     *lo_out = lo;
+#endif
 }
 
 FAST_CODE uint64_t getCycleCounter64(void)
@@ -46,9 +51,15 @@ FAST_CODE uint64_t getCycleCounter64(void)
 
 FAST_CODE uint32_t getCycleCounter(void)
 {
+#ifdef UNIT_TEST
+    uint32_t hi, lo;
+    getCycleCounterWords(&hi, &lo);
+    return lo;
+#else
     uint32_t val;
     __asm__ volatile ("csrr %0, mcycle" : "=r"(val));
     return val;
+#endif
 }
 
 void cycleCounterInit(void)
@@ -81,18 +92,18 @@ void thejas32_timer_init(void)
 
     // 2. Disable Timer 0 before loading configuration
     THEJAS32_TIMER(0).Control = 0x0;
-    __asm__ volatile ("fence");
+    THEJAS32_MEMORY_FENCE();
 
     // 3. Set reload count to 0xFFFFFFFF
     THEJAS32_TIMER(0).LoadCount = THEJAS32_TIMER0_LOAD_VALUE;
-    __asm__ volatile ("fence");
+    THEJAS32_MEMORY_FENCE();
 
     // 4. Enable timer in user-defined periodic reload mode with interrupt unmasked:
     //    Bit 0 = 1 (Timer enable)
     //    Bit 1 = 1 (User-defined reload mode)
     //    Bit 2 = 0 (Interrupt unmasked)
     THEJAS32_TIMER(0).Control = 0x03;
-    __asm__ volatile ("fence");
+    THEJAS32_MEMORY_FENCE();
 }
 
 uint32_t timer0GetCurrentValue(void)
@@ -144,6 +155,11 @@ FAST_CODE timeUs_t microsISR(void)
     return micros();
 }
 
+FAST_CODE uint32_t clockMicrosToCycles(uint32_t us)
+{
+    return us * (SystemCoreClock / 1000000U);
+}
+
 void delayMicroseconds(uint32_t us)
 {
     timeUs_t start = micros();
@@ -170,17 +186,17 @@ void thejas32_early_uart_init(void)
 {
     // DLAB = 1 to set baud rate divisor
     THEJAS32_UART(0).UART_LCR = 0x83;
-    __asm__ volatile ("fence");
+    THEJAS32_MEMORY_FENCE();
     THEJAS32_UART(0).UART_DR = 54;    // DLL: Divisor 54 for 115200 baud @ 100 MHz (+0.47% error)
     THEJAS32_UART(0).UART_IE = 0;     // DLM
-    __asm__ volatile ("fence");
+    THEJAS32_MEMORY_FENCE();
     // Clear DLAB: 8 data bits, 1 stop bit, no parity (8N1)
     THEJAS32_UART(0).UART_LCR = 0x03;
-    __asm__ volatile ("fence");
+    THEJAS32_MEMORY_FENCE();
     THEJAS32_UART(0).UART_IE = 0x00;  // Explicitly disable interrupts in early/polled mode
-    __asm__ volatile ("fence");
+    THEJAS32_MEMORY_FENCE();
     THEJAS32_UART(0).UART_IIR_FCR = 0x00; // Disable hardware FIFOs matching official C-DAC VEGA SDK & BSP
-    __asm__ volatile ("fence");
+    THEJAS32_MEMORY_FENCE();
 }
 
 void thejas32_early_uart_putc(char c)
@@ -191,7 +207,7 @@ void thejas32_early_uart_putc(char c)
         __NOP();
     }
     THEJAS32_UART(0).UART_DR = (uint8_t)c;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 }
 
 void thejas32_early_uart_puts(const char *s)
@@ -232,11 +248,16 @@ static void handle_trap_panic(uint32_t mcause, uint32_t mepc, uint32_t *sp)
     thejas32_early_uart_puts(" mepc=0x");
     thejas32_early_uart_print_hex(mepc);
     thejas32_early_uart_puts(" sp=0x");
-    thejas32_early_uart_print_hex((uint32_t)sp);
+    thejas32_early_uart_print_hex((uint32_t)(uintptr_t)sp);
     thejas32_early_uart_puts("\r\n");
+#ifdef UNIT_TEST
+    extern uint32_t thejas32_host_panic_count;
+    thejas32_host_panic_count++;
+#else
     while (1) {
         __WFI();
     }
+#endif
 }
 
 // Peripheral interrupt registration table (32 entries for THEJAS32)
@@ -266,7 +287,7 @@ void thejas32_interrupt_disable(uint8_t irq_number)
 /*
  * Software Count-Trailing-Zeros (__ctzsi2) Helper for RV32IM (no Bitmanip extension)
  */
-int __ctzsi2(int val)
+__attribute__((used)) int __ctzsi2(int val)
 {
     if (val == 0) return 32;
     int n = 0;
@@ -310,7 +331,11 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
             thejas32_early_uart_puts("\r\n[TRAP INTR] Unexpected interrupt mcause=0x");
             thejas32_early_uart_print_hex(mcause);
             thejas32_early_uart_puts("\r\n");
+#ifdef UNIT_TEST
+            thejas32_host_mie &= ~(1UL << cause_num);
+#else
             __asm__ volatile ("csrc mie, %0" : : "r"(1UL << cause_num));
+#endif
         }
         return mepc;
     } else {
@@ -322,7 +347,9 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
 
 void targetPreInit(void)
 {
-    thejas32_early_uart_puts("[ARIES v3] EEPROM & Config Initialized Successfully!\r\n");
+    // RV32IM boots with mstatus.MIE=0 and mie.MEIE=0 (unlike ARM PRIMASK=0); arm CPU IRQs before peripheral init
+    __enable_irq();
+    thejas32_early_uart_puts("[ARIES v3] EEPROM & Config Initialized Successfully! (IRQ Enabled)\r\n");
 }
 
 void systemInit(void)
@@ -346,8 +373,12 @@ void systemReset(void)
     // Finding 3: Disable all peripheral interrupt lines in THEJAS32 interrupt controller
     // so no stale interrupt fires during startup before BSS and tables are initialized.
     THEJAS32_INTR_CTRL.INTR_EN = 0U;
-    __asm__ volatile ("fence" : : : "memory");
+    THEJAS32_MEMORY_FENCE();
 
+#ifdef UNIT_TEST
+    extern uint32_t thejas32_host_reset_count;
+    thejas32_host_reset_count++;
+#else
     extern uint32_t _estack;
     extern void _start(void);
     (void)_estack;
@@ -358,6 +389,7 @@ void systemReset(void)
         "jr t0\n"
     );
     while (1);
+#endif
 }
 
 void systemResetToBootloader(bootloaderRequestType_e requestType)
@@ -380,6 +412,8 @@ void failureMode(failureMode_e mode)
     while (1);
 }
 
+#ifndef UNIT_TEST
+// shortcut: bare-metal non-RVC memory primitives are active on RV32 targets only; host tests use glibc
 /*
  * -----------------------------------------------------------------------------
  * 6. Bare-Metal Non-RVC Memory Primitives (memset, memcpy, memmove)
@@ -513,3 +547,4 @@ void *memmove(void *dest, const void *src, size_t n)
     }
     return dest;
 }
+#endif // !UNIT_TEST

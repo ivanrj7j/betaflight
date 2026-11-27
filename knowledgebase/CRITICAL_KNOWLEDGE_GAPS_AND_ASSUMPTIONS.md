@@ -148,6 +148,7 @@ The following architectural guardrails and silicon quirks were confirmed through
 ### Erratum 1: Synopsys DW_apb_uart 16550 Hardware FIFO Errata (`FCR = 0x00` Mandatory)
 * **The Hardware Reality**: The DW_apb_uart 16550 IP on THEJAS32 (VEGA ET1031) silicon has hardware FIFO pointer and clock-crossing errata. Writing `UART_IIR_FCR = 0x07` or `0x01` causes incoming keystrokes to arrive scrambled/out-of-order, duplicates characters, and eventually freezes the hardware FIFO pointer.
 * **The Official Precedent**: Every official C-DAC driver ([`lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c:104`](../lib/vega-sdk/vega-sdk/bsp/drivers/uart/uart.c), [`lib/vega-bsp/cores/arduino/HardwareSerial.cpp:114`](../lib/vega-bsp/cores/arduino/HardwareSerial.cpp), [`lib/vega-bsp/cores/arduino/UARTClass.cpp:101`](../lib/vega-bsp/cores/arduino/UARTClass.cpp)) strictly disables hardware FIFOs by writing `UART_IIR_FCR = 0x00`.
+* **Register Readback Quirk (Verified on Silicon, Phase 19)**: Offset `0x08` (`UART_IIR_FCR`) is write-only `FCR` and read-only `IIR`. On idle UART1 silicon ([`tempfiles/phase19.1.txt`](../tempfiles/phase19.1.txt)), reading `UART_IIR_FCR` returns `0x00000001` (`Bit 0 = 1` = no IRQ pending; `Bits [7:6] = 00` = FIFOs disabled). Diagnostics must verify `(iir & 0xC0U) == 0U`, not `Bit 0 == 0`.
 * **Guardrail Rule**: Always operate in 1-byte register mode (`UART_IIR_FCR = 0x00`). Never enable hardware FIFOs in runtime code.
 
 ### Erratum 2: 921,600 Baud Timing Error Exceeds Asynchronous Tolerance (-3.12%)

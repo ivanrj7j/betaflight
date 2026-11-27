@@ -54,3 +54,7 @@ typedef struct uartPort_s {
 
 void uartPinConfigure(const serialPinConfig_t *pSerialPinConfig);
 serialPort_t *uartOpen(serialPortIdentifier_e identifier, serialReceiveCallbackPtr rxCallback, void *rxCallbackData, uint32_t baudRate, portMode_e mode, portOptions_e options);
+#ifdef USE_UART_POLLED_DRAIN
+void uartPollRx(void);
+void uartPollTx(void);
+#endif

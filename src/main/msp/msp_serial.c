@@ -507,8 +507,8 @@ static void mspProcessPendingRequest(mspPort_t * mspPort)
         return;
     }
 
-#if defined(USE_IMMEDIATE_CLI) || defined(THEJAS32) || defined(ARIES)
-    // High-Usability Immediate CLI Activation (Phase 13 / ARIES v3.0):
+#if defined(USE_IMMEDIATE_CLI)
+    // High-Usability Immediate CLI Activation:
     // Enter ('\r' / '\n') or '#' activates CLI immediately without requiring 100ms guard delay
     if (mspPort->pendingRequest != MSP_PENDING_CLI && (cmp32(millis(), mspPort->lastActivityMs) < 100)) {
         return;
@@ -634,7 +634,7 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
                 if (c == serialConfig()->reboot_character) {
                     mspPort->pendingRequest = MSP_PENDING_BOOTLOADER_ROM;
 #ifdef USE_CLI
-#if defined(USE_IMMEDIATE_CLI) || defined(THEJAS32) || defined(ARIES)
+#if defined(USE_IMMEDIATE_CLI)
                 } else if (c == '#' || c == '\r' || c == '\n') {
                     mspPort->pendingRequest = MSP_PENDING_CLI;
 #else

@@ -10,11 +10,8 @@
  *   - PLAN/02_BUILD_SYSTEM_AND_MEMORY_OPTIMIZATION.md (Microcomponent 02_C)
  */
 
-#pragma once
-
-#ifndef TARGET_BOARD_IDENTIFIER
-#include "target.h"
-#endif
+#if defined(TARGET_BOARD_IDENTIFIER) && !defined(ARIESV3_CONFIG_ASSERTED)
+#define ARIESV3_CONFIG_ASSERTED
 
 /*
  * Static Assertion Guards for C-DAC ARIES v3.0 / THEJAS32 Silicon Reality:
@@ -52,3 +49,5 @@
 #if (EEPROM_SIZE < 8192)
 #error "EEPROM_SIZE must be >= 8192 bytes for active Parameter Groups! Lower sizes panic with FAILURE_CONFIG_STORE_FAILURE."
 #endif
+
+#endif // TARGET_BOARD_IDENTIFIER && !ARIESV3_CONFIG_ASSERTED

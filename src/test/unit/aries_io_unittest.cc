@@ -37,6 +37,7 @@
 
 #include "unittest_macros.h"
 #include "gtest/gtest.h"
+#include "aries_host_mmio.h"
 
 // Include target configuration and board definitions
 #include "common/utils.h"
@@ -79,6 +80,17 @@ typedef struct ioRec_s {
     resourceOwner_e owner;
     uint8_t index;
 } ioRec_t;
+
+extern "C" {
+void IOInitGlobal(void);
+IO_t IOGetByTag(ioTag_t tag);
+void IOConfigGPIO(IO_t io, uint32_t cfg);
+void IOHi(IO_t io);
+void IOLo(IO_t io);
+void IOToggle(IO_t io);
+bool IORead(IO_t io);
+void IOWrite(IO_t io, bool hi);
+}
 
 namespace {
 
@@ -476,6 +488,44 @@ TEST_F(AriesIoTest, Test_GPIO_StatusLED0_PA22_AddressDecodedBinding) {
 
     // Direction register: 0x10180000 + 0x40000 = 0x101C0000
     EXPECT_EQ(THEJAS32_GPIO1_DIR, 0x101C0000UL);
+}
+
+// =============================================================================
+// TEST 16: Real io_aries.c Execution (Dual-Bank MMIO Dir/Data + Open Drain)
+// =============================================================================
+TEST_F(AriesIoTest, Test_RealIoAriesC_Bank0Bank1MMIOAndOpenDrain) {
+    thejas32_host_reset_all();
+    IOInitGlobal();
+
+    // Bank 1 LED0 = PA22 (pin 22 -> bank 1, pin_in_bank 6)
+    IO_t led0 = IOGetByTag(DEFIO_TAG_MAKE(0, 22));
+    ASSERT_NE(led0, nullptr);
+    IOConfigGPIO(led0, IOCFG_OUT_PP);
+    EXPECT_NE(thejas32_host_gpio_dir[1] & (1U << 6), 0U);
+
+    IOHi(led0);
+    EXPECT_EQ(thejas32_host_gpio_data[1][6], (1U << 6));
+    IOLo(led0);
+    EXPECT_EQ(thejas32_host_gpio_data[1][6], 0U);
+    IOToggle(led0);
+    EXPECT_EQ(thejas32_host_gpio_data[1][6], (1U << 6));
+    EXPECT_TRUE(IORead(led0));
+
+    // Bank 0 PA1 open-drain: LO sets output low, HI releases direction bit
+    IO_t pa1 = IOGetByTag(DEFIO_TAG_MAKE(0, 1));
+    ASSERT_NE(pa1, nullptr);
+    IOConfigGPIO(pa1, IOCFG_OUT_OD);
+    IOLo(pa1);
+    EXPECT_NE(thejas32_host_gpio_dir[0] & (1U << 1), 0U);
+    EXPECT_EQ(thejas32_host_gpio_data[0][1], 0U);
+    IOWrite(pa1, true);
+    EXPECT_EQ(thejas32_host_gpio_dir[0] & (1U << 1), 0U);
+    EXPECT_GT(thejas32_host_fence_count, 0U);
+
+    // NULL safety
+    IOHi(nullptr);
+    IOLo(nullptr);
+    EXPECT_FALSE(IORead(nullptr));
 }
 
 } // namespace

@@ -24,13 +24,24 @@
 #include "unittest_macros.h"
 #include "gtest/gtest.h"
 
+extern "C" {
+#include "aries_host_mmio.h"
+uint64_t getCycleCounter64(void);
+uint32_t micros(void);
+uint32_t millis(void);
+void thejas32_interrupt_register(uint8_t irq_number, thejas32_irq_handler_t handler);
+void thejas32_interrupt_enable(uint8_t irq_number);
+uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp);
+void systemReset(void);
+void targetPreInit(void);
+}
+
 namespace {
 
 // Hardware Constants for C-DAC THEJAS32 @ 100 MHz
 constexpr uint32_t SYSTEM_CORE_CLOCK_HZ    = 100000000U; // 100 MHz
 constexpr uint32_t CYCLES_PER_MICROSECOND  = 100U;       // 100 cycles = 1 us
 constexpr uint32_t CYCLES_PER_MILLISECOND  = 100000U;    // 100,000 cycles = 1 ms
-constexpr uint32_t THEJAS32_SRAM_ORIGIN    = 0x00202000U;
 
 // Fast Modular Reciprocal Conversion: Cycles -> Microseconds
 // Eliminates 150-cycle GCC __udivdi3 software division on RV32IM
@@ -495,4 +506,56 @@ TEST(AriesSystemTimeTest, Test_SystemReset_DisablesPeripheralInterruptsBeforeJum
     // Real-world flight consequence:
     // If INTR_EN remains active across soft reset, a pending Timer or UART interrupt fires
     // before the C runtime clears BSS and populates interrupt_table, crashing boot.
+}
+
+namespace {
+uint32_t g_real_timer0_irq_hits = 0U;
+void real_test_timer0_isr(void) { g_real_timer0_irq_hits++; }
+} // namespace
+
+// =============================================================================
+// Test 13: Real system.c Execution (mcycle->micros/millis, Trap CTZ & Reset)
+// =============================================================================
+TEST(AriesSystemTimeTest, Test_RealSystemC_TimebaseTrapDispatchAndReset) {
+    thejas32_host_reset_all();
+    g_real_timer0_irq_hits = 0U;
+
+    // 1. Cross-32-bit cycle counter math against 64-bit integer division
+    const uint64_t test_cycles = 0x0000000100001000ULL;
+    thejas32_host_mcycle_set(test_cycles);
+    EXPECT_EQ(getCycleCounter64(), test_cycles);
+    EXPECT_EQ(micros(), (uint32_t)(test_cycles / 100ULL));
+    EXPECT_EQ(millis(), (uint32_t)(test_cycles / 100000ULL));
+
+    // 2. O(1) CTZ external interrupt dispatch + unhandled IRQ auto-masking
+    thejas32_interrupt_register(THEJAS32_IRQ_TIMER0, real_test_timer0_isr);
+    thejas32_interrupt_enable(THEJAS32_IRQ_TIMER0);
+    thejas32_interrupt_register(15U, nullptr);
+    thejas32_interrupt_enable(15U);
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER0) | (1UL << 15U);
+
+    EXPECT_EQ(handle_trap(0x8000000BUL, 0x00202010U, nullptr), 0x00202010U);
+    EXPECT_EQ(g_real_timer0_irq_hits, 1U);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER0), 0U);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << 15U), 0U)
+        << "Unhandled external IRQ must be masked in INTR_EN";
+
+    // 3. Synchronous trap panic increments panic counter (does not hang host test)
+    EXPECT_EQ(handle_trap(2U, 0x00202100U, nullptr), 0x00202104U);
+    EXPECT_EQ(thejas32_host_panic_count, 1U);
+
+    // 4. systemReset zeroes INTR_EN and clears MIE before jumping
+    thejas32_host_mstatus = 0x8U;
+    systemReset();
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN, 0U);
+    EXPECT_EQ(thejas32_host_mstatus & 0x8U, 0U);
+    EXPECT_EQ(thejas32_host_reset_count, 1U);
+
+    // 5. targetPreInit globally enables machine external interrupts (MEIE + MIE)
+    thejas32_host_mie = 0U;
+    thejas32_host_mstatus = 0U;
+    THEJAS32_UART(0).UART_LSR = 0x60U;
+    targetPreInit();
+    EXPECT_NE(thejas32_host_mie & 0x800U, 0U);
+    EXPECT_NE(thejas32_host_mstatus & 0x8U, 0U);
 }

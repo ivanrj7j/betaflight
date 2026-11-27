@@ -40,6 +40,9 @@
 #include "drivers/compass/compass.h"
 #include "drivers/sensor.h"
 #include "drivers/serial.h"
+#ifdef USE_UART_POLLED_DRAIN
+#include "drivers/serial_uart.h"
+#endif
 #include "drivers/serial_usb_vcp.h"
 #include "drivers/stack_check.h"
 #include "drivers/transponder_ir.h"
@@ -156,15 +159,15 @@ static void taskHandleSerial(timeUs_t currentTimeUs)
     DEBUG_SET(DEBUG_USB, 1, usbVcpIsConnected());   //!< USB VCP Connected
 #endif
 
-#if defined(THEJAS32)
-    thejas32_uart_poll_rx();
+#if defined(USE_UART_POLLED_DRAIN)
+    uartPollRx();
 #endif
 
     bool evaluateMspData = ARMING_FLAG(ARMED) ? MSP_SKIP_NON_MSP_DATA : MSP_EVALUATE_NON_MSP_DATA;
     mspSerialProcess(evaluateMspData, mspFcProcessCommand, mspFcProcessReply);
 
-#if defined(THEJAS32)
-    thejas32_uart_poll_tx();
+#if defined(USE_UART_POLLED_DRAIN)
+    uartPollTx();
 #endif
 }
 

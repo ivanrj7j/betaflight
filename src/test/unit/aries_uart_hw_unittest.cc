@@ -34,8 +34,14 @@
 #include "gtest/gtest.h"
 
 // Include target configuration and board definitions
-#include "platform/ARIES/target/ARIESV3/target.h"
-#include "platform/ARIES/include/platform/bsp_thejas32.h"
+extern "C" {
+#include "../main/platform.h"
+#include "drivers/io.h"
+#include "io/serial.h"
+#include "drivers/serial_uart.h"
+#include "drivers/serial_uart_impl.h"
+#include "aries_host_mmio.h"
+}
 
 namespace {
 
@@ -611,6 +617,79 @@ TEST_F(AriesUartHwTest, Test_BootstrapDiag_NumberFormatting_DecimalAndHex) {
     EXPECT_EQ(format_hex(0x00202000U), "00202000"); // ARIES SRAM entry origin
     EXPECT_EQ(format_hex(0x12345678U), "12345678");
     EXPECT_EQ(format_hex(0xFFFFFFFFU), "FFFFFFFF");
+}
+
+namespace {
+uint32_t g_real_uart_rx_count = 0U;
+uint16_t g_real_uart_last_byte = 0U;
+void real_uart_rx_cb(uint16_t ch, void *data) {
+    (void)data;
+    g_real_uart_rx_count++;
+    g_real_uart_last_byte = ch;
+}
+} // namespace
+
+// =============================================================================
+// TEST 17: Real serial_uart_aries.c Execution (Findings 4, 5 & 6 Regressions)
+// =============================================================================
+TEST_F(AriesUartHwTest, Test_RealSerialUartAriesC_InitOrderNullGuardsAndPollRxErrors) {
+    thejas32_host_reset_all();
+    IOInitGlobal();
+    g_real_uart_rx_count = 0U;
+    g_real_uart_last_byte = 0U;
+
+    serialPinConfig_t pinCfg = {};
+    pinCfg.ioTagTx[0] = DEFIO_TAG_E__PA30;
+    pinCfg.ioTagRx[0] = DEFIO_TAG_E__PA31;
+    uartPinConfigure(&pinCfg);
+
+    uartDevice_t *u0dev = uartDeviceFromIdentifier(SERIAL_PORT_UART0);
+    ASSERT_NE(u0dev, nullptr);
+
+    // Finding 5: serialUART alone MUST leave UART_IE=0 and controller IRQ disabled until uartReconfigure
+    THEJAS32_UART(0).UART_IE = 0xFFU;
+    THEJAS32_INTR_CTRL.INTR_EN |= (1UL << THEJAS32_IRQ_UART0);
+    uartPort_t *p0 = serialUART(u0dev, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(p0, nullptr);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x00U);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_UART0), 0U);
+
+    // Reconfigure enables RX-only interrupt & controller IRQ after pointers are ready
+    serialPort_t *sp0 = uartOpen(SERIAL_PORT_UART0, real_uart_rx_cb, nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED);
+    ASSERT_NE(sp0, nullptr);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x01U);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_UART0), 0U);
+
+    // Finding 4: uartPollRx must NOT strip FE/PE before uartIrqHandler inspects LSR
+    THEJAS32_UART(0).UART_DR = 0xAAU;
+    THEJAS32_UART(0).UART_LSR = 0x69U; // DR(0x01) | FE(0x08) | THRE | TEMT
+    uartPollRx();
+    EXPECT_EQ(g_real_uart_rx_count, 0U) << "Framing-errored byte must be discarded, not forwarded";
+
+    // Clean byte following FE is delivered once per polled pass (1-byte RBR read clears LSR.DR)
+    THEJAS32_UART(0).UART_DR = 0x5CU;
+    THEJAS32_UART(0).UART_LSR = 0x61U; // DR | THRE | TEMT
+    uartPollRx();
+    EXPECT_EQ(g_real_uart_rx_count, 1U);
+    EXPECT_EQ(g_real_uart_last_byte, 0x5CU);
+
+    // TX-only mode masks UART_IE and controller IRQ
+    p0->port.mode = MODE_TX;
+    uartReconfigure(p0);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x00U);
+    EXPECT_EQ(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_UART0), 0U);
+
+    // Finding 6: NULL / invalid USARTx never aliases to UART0 registers
+    THEJAS32_UART(0).UART_LCR = 0x1BU;
+    THEJAS32_UART(0).UART_IE = 0x5AU;
+    uartPort_t orphan = {};
+    uartReconfigure(nullptr);
+    uartReconfigure(&orphan);
+    uartIrqHandler(nullptr);
+    uartEnableTxInterrupt(nullptr);
+    EXPECT_EQ(THEJAS32_UART(0).UART_LCR, 0x1BU);
+    EXPECT_EQ(THEJAS32_UART(0).UART_IE, 0x5AU);
+    EXPECT_EQ(serialUART(nullptr, 115200U, MODE_RXTX, SERIAL_NOT_INVERTED), nullptr);
 }
 
 } // namespace

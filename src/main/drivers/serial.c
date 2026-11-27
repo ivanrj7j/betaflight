@@ -26,6 +26,9 @@
 #include "io/serial.h"
 #include "scheduler/scheduler.h"
 #include "serial.h"
+#ifdef USE_UART_POLLED_DRAIN
+#include "serial_uart.h"
+#endif
 
 void serialPrint(serialPort_t *instance, const char *str)
 {
@@ -133,6 +136,10 @@ void serialWriteBuf(serialPort_t *instance, const uint8_t *data, int count)
 void serialWriteBufBlocking(serialPort_t *instance, const uint8_t *data, int count)
 {
     while (serialTxBytesFree(instance) < (uint32_t)count) {
+#ifdef USE_UART_POLLED_DRAIN
+        // Poll TX shift register while blocking (UART TX interrupt is suppressed for THRE erratum)
+        uartPollTx();
+#endif
         // Waiting on TX backpressure is not task execution time.
         schedulerIgnoreTaskExecTime();
     }

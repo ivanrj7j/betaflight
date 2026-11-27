@@ -588,14 +588,7 @@ SRC += $(wildcard $(DSP_LIB)/Source/*/*.S)
 
 endif
 
-SRC += $(FLASH_SRC) $(MSC_SRC) $(SDCARD_SRC) $(COMMON_SRC)
-
-#excludes
-SRC                := $(filter-out $(MCU_EXCLUDES), $(SRC))
-SPEED_OPTIMISED_SRC := $(filter-out $(MCU_EXCLUDES), $(SPEED_OPTIMISED_SRC))
-SIZE_OPTIMISED_SRC  := $(filter-out $(MCU_EXCLUDES), $(SIZE_OPTIMISED_SRC))
-
-SRC += $(VCP_SRC)
+SRC += $(FLASH_SRC) $(MSC_SRC) $(SDCARD_SRC) $(COMMON_SRC) $(VCP_SRC)
 
 # end target specific make file checks
 
@@ -607,6 +600,11 @@ INCLUDE_DIRS += $(LIB_MAIN_DIR)/$(OLC_DIR)
 SRC += $(OLC_DIR)/olc.c
 SIZE_OPTIMISED_SRC += $(OLC_DIR)/olc.c
 endif
+
+#excludes (applied after all source groups including google/olc are added)
+SRC                := $(filter-out $(MCU_EXCLUDES), $(SRC))
+SPEED_OPTIMISED_SRC := $(filter-out $(MCU_EXCLUDES), $(SPEED_OPTIMISED_SRC))
+SIZE_OPTIMISED_SRC  := $(filter-out $(MCU_EXCLUDES), $(SIZE_OPTIMISED_SRC))
 
 # libcanard (DroneCAN transport) and the Betaflight-side glue live in the
 # per-MCU makefiles: they're only wired into the build for families whose

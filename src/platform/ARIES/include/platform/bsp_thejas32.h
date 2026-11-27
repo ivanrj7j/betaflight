@@ -16,6 +16,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Memory Map Boundaries (Silicon Ground Truth 2: In-SRAM Execution)
  * Total Internal SRAM: 256 KB (0x00200000 - 0x0023FFFF)
@@ -117,7 +121,101 @@ typedef struct {
     volatile uint32_t RxData;       // 0x10: Receive data
 } thejas32_spi_reg_t;
 
+#ifdef UNIT_TEST
+extern thejas32_intr_ctrl_t thejas32_host_intr_ctrl;
+extern thejas32_uart_reg_t  thejas32_host_uart[3];
+extern thejas32_timer_reg_t thejas32_host_timer[3];
+extern thejas32_spi_reg_t   thejas32_host_spi[4];
+extern uint16_t            thejas32_host_gpio_dir[2];
+extern uint16_t            thejas32_host_gpio_data[2][16];
+extern uint32_t            thejas32_host_fence_count;
+
+#undef THEJAS32_INTR_CTRL
+#undef THEJAS32_UART
+#undef THEJAS32_TIMER
+#define THEJAS32_INTR_CTRL (thejas32_host_intr_ctrl)
+#define THEJAS32_UART(n)   (thejas32_host_uart[(n)])
+#define THEJAS32_TIMER(n)  (thejas32_host_timer[(n)])
+#define THEJAS32_SPI(n)    (thejas32_host_spi[(n)])
+
+#define THEJAS32_MEMORY_FENCE() do { thejas32_host_fence_count++; __atomic_thread_fence(__ATOMIC_SEQ_CST); } while (0)
+
+static inline volatile uint16_t *thejas32_gpio_dir_ptr(uint16_t pin)
+{
+    return (volatile uint16_t *)&thejas32_host_gpio_dir[(pin < 16U) ? 0U : 1U];
+}
+
+static inline volatile uint16_t *thejas32_gpio_data_ptr(uint16_t pin)
+{
+    return (volatile uint16_t *)&thejas32_host_gpio_data[(pin < 16U) ? 0U : 1U][pin & 0x0FU];
+}
+
+static inline thejas32_spi_reg_t *thejas32_spi_from_instance(const void *instance)
+{
+    uintptr_t addr = (uintptr_t)instance;
+    if (addr == THEJAS32_SPI_0_1_BASE || addr == 0U) {
+        return &thejas32_host_spi[0];
+    }
+    if (addr == (THEJAS32_SPI_0_1_BASE + 0x100U)) {
+        return &thejas32_host_spi[1];
+    }
+    if (addr == THEJAS32_SPI_2_3_BASE) {
+        return &thejas32_host_spi[2];
+    }
+    if (addr == (THEJAS32_SPI_2_3_BASE + 0x100U)) {
+        return &thejas32_host_spi[3];
+    }
+    return &thejas32_host_spi[0];
+}
+
+#define SPI1 ((thejas32_spi_reg_t *)&thejas32_host_spi[0])
+#else
 #define THEJAS32_SPI(n) (*((thejas32_spi_reg_t *)(((n) < 2 ? THEJAS32_SPI_0_1_BASE : THEJAS32_SPI_2_3_BASE) + (((n) % 2) * 0x100))))
 
 // Standard Betaflight SPI peripheral instance definition for Header J1 SPI0
 #define SPI1 ((thejas32_spi_reg_t *)THEJAS32_SPI_0_1_BASE)
+
+#define THEJAS32_MEMORY_FENCE() __asm__ volatile ("fence" : : : "memory")
+
+__attribute__((always_inline)) static inline volatile uint16_t *thejas32_gpio_dir_ptr(uint16_t pin)
+{
+    uint32_t base = (pin < 16U) ? THEJAS32_GPIO_0_BASE : THEJAS32_GPIO_1_BASE;
+    return (volatile uint16_t *)(base + 0x40000UL);
+}
+
+__attribute__((always_inline)) static inline volatile uint16_t *thejas32_gpio_data_ptr(uint16_t pin)
+{
+    uint32_t base = (pin < 16U) ? THEJAS32_GPIO_0_BASE : THEJAS32_GPIO_1_BASE;
+    uint8_t pin_in_bank = (uint8_t)(pin & 0x0FU);
+    return (volatile uint16_t *)(base + ((1U << pin_in_bank) << 2));
+}
+
+__attribute__((always_inline)) static inline thejas32_spi_reg_t *thejas32_spi_from_instance(const void *instance)
+{
+    return (instance == NULL) ? (thejas32_spi_reg_t *)THEJAS32_SPI_0_1_BASE : (thejas32_spi_reg_t *)instance;
+}
+#endif
+
+__attribute__((always_inline)) static inline uint32_t thejas32_uart_read_lsr(uint8_t ch)
+{
+    uint32_t lsr = THEJAS32_UART(ch).UART_LSR;
+#ifdef UNIT_TEST
+    // 16550 reading LSR clears latched OE/PE/FE/BI error flags (bits 4:1)
+    THEJAS32_UART(ch).UART_LSR = lsr & ~0x1EUL;
+#endif
+    return lsr;
+}
+
+__attribute__((always_inline)) static inline uint8_t thejas32_uart_read_rx(uint8_t ch)
+{
+    uint8_t dr = (uint8_t)(THEJAS32_UART(ch).UART_DR & 0xFFU);
+#ifdef UNIT_TEST
+    // 16550 non-FIFO 1-byte mode clears Data Ready (bit 0) upon reading RBR
+    THEJAS32_UART(ch).UART_LSR &= ~0x01UL;
+#endif
+    return dr;
+}
+
+#ifdef __cplusplus
+}
+#endif

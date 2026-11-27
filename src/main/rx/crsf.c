@@ -668,6 +668,7 @@ bool crsfRxInit(const rxConfig_t *rxConfig, rxRuntimeState_t *rxRuntimeState)
 
     const serialPortIdentifier_e port = rxConfig->rx_uart;
     if (port == SERIAL_PORT_NONE) {
+        serialPort = NULL;
         return false;
     }
 
