@@ -139,12 +139,13 @@ The SoC provides 3 I2C interfaces:
   * `GPIO0` - `GPIO10`: Header `J2` (`J2_11`, `J2_9`, `J2_7`, `J2_16`, `J2_14`, `J2_12`, `J2_10`, `J2_8`, `J2_6`, `J2_4`, `J2_2`)
   * `GPIO11` - `GPIO15`: Header `J3` (`J3_8`, `J3_7`, `J3_6`, `J3_5`, `J3_4`)
   * `GPIO16` - `GPIO21`: Header `J10` (`J10_11`, `J10_9`, `J10_7`, `J10_5`, `J10_3`, `J10_1`)
-  * `GPIO22`: Connected to **RGB LED Green** (`LD1_4`)
-  * `GPIO23`: Connected to **RGB LED Blue** (`LD1_3`)
-  * `GPIO24`: Connected to **RGB LED Red** (`LD1_2`)
+  * `GPIO22`: Connected to **RGB LED Green** (`LD1_4`) — **Active-LOW** (`0` = ON, `1` = OFF)
+  * `GPIO23`: Connected to **RGB LED Blue** (`LD1_3`) — **Active-LOW** (`0` = ON, `1` = OFF)
+  * `GPIO24`: Connected to **RGB LED Red** (`LD1_2`) — **Active-LOW** (`0` = ON, `1` = OFF)
+    * *Electrical Note ([`LED_Series.ino`](../lib/vega-bsp/libraries/GPIO/examples/LED_Series/LED_Series.ino#L11-L58), [`DIP_Switch.ino`](../lib/vega-bsp/libraries/GPIO/examples/DIP_Switch/DIP_Switch.ino#L12-L76)):* `LD1` is common-anode (`0` turns LED ON, `1` turns OFF). Driving `GPIO22=HIGH` (Green OFF), `GPIO23=LOW` (Blue ON), `GPIO24=LOW` (Red ON) produces **Purple** (`Blue + Red`).
   * `GPIO25` - `GPIO31`: Header `J9` (`J9_7`, `J9_6`, `J9_5`, `J9_4`, `J9_3`, `J9_2`, `J9_1`)
 * **Dedicated Hardware Status Signals**:
-  * `PROC_HB` (Pin 16): Heartbeat LED (`LD4_1`)
+  * `PROC_HB` / `PROC_HEART_BEAT` (Pin 16): Heartbeat LED (`LD4_1`) — **dedicated processor signal**, separate from `GPIO22` (`LD1_4` Green).
   * `PUSH_RESETN` (Pin 43): Active-low reset button / reset IC `U8`
   * `BOOT_SEL` (Pin 15): Boot selector switch on Header `J12_1`
 

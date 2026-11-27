@@ -110,8 +110,8 @@ graph TD
 * **Current Knowledge Base Reality:**
   - The external SPI flash is **NOT memory-mapped** for CPU read/write caching.
   - Attempting to dereference `0x20000000` triggers a fatal Store Access Fault (`mcause = 7`).
-  - Active configuration uses `#define CONFIG_IN_RAM` (`EEPROM_SIZE 8192`), storing Parameter Groups in internal SRAM (`.bss`).
-  - **The Trade-off:** Configuration survives warm soft-reboots (`_start`), but is lost on complete power disconnect.
+  - Active configuration uses `#define CONFIG_IN_RAM` (`EEPROM_SIZE 8192`). Because `PERSISTENT` is currently undefined in `src/platform/ARIES/include/platform/platform.h`, [`config_streamer.c`](../src/main/config/config_streamer.c#L32-L38) allocates `eepromData[8192]` in `.bss`.
+  - **Current Reality (Audit 07 Verified):** [`startup.S`](../src/platform/ARIES/startup.S#L96-L104) zeroes `.bss` on every reboot (`systemReset()`), so saved configuration is **erased on warm soft-reboots as well as cold power-off** (`CONFIG: UNCONFIGURED` in [`tempfiles/phase19.5.txt`](../tempfiles/phase19.5.txt#L16)) until `PERSISTENT` (`.noinit`) and `MDP_SPI_3` storage are wired.
 * **The Proven Solution from C-DAC SDK:**
   - C-DAC's reference example [`lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c`](../lib/vega-sdk/vega-sdk/examples/spi/spi_write_read_pgm/main.c) proves how to access persistent storage safely:
     - Target controller: `MDP_SPI_3` (`0x10200100`).
@@ -162,20 +162,36 @@ The following architectural guardrails and silicon quirks were confirmed through
 * **The Concurrency Risk**: In thread mode, these calls execute without atomic masking. If the hardware external interrupt (`thejas32_uart0_isr`) fires concurrently, both thread and ISR mutate `rxBufferHead` and read `UART_DR` simultaneously, corrupting ring buffers.
 * **Guardrail Rule**: Any thread-mode invocation of `uartIrqHandler` must be enclosed in an `ATOMIC_BLOCK(NVIC_PRIO_SERIALUART)`.
 
-### Erratum 4: Linker Script Section Missing for Persistent Objects (`.noinit`)
-* **The Vulnerability**: `persistentObjects[16]` in `stub_drivers.c` is placed in `.bss`, which `startup.S` zeroes on every CPU reset.
-* **The Consequence**: Warm soft-reboot reason codes, crash flags, and bootloader jump tokens are erased during reset.
-* **Guardrail Rule**: When implementing Phase 18 persistent storage, add `.noinit (NOLOAD) : { *(.noinit .noinit.*) } > RAM` to `aries_v3.ld` and annotate persistent data structures accordingly.
+### Erratum 4: `.noinit` Section (`PERSISTENT` & `USE_PERSISTENT_OBJECTS` — Resolved in Pre-Phase 20)
+* **Resolved Behavior**: [`platform.h`](../src/platform/ARIES/include/platform/platform.h) now defines `#define PERSISTENT __attribute__((section(".noinit")))` and `#define USE_PERSISTENT_OBJECTS`, and [`stub_drivers.c`](../src/platform/ARIES/stub_drivers.c) annotates `persistentObjects[16]` with `PERSISTENT`. [`betaflight_ARIESV3.map`](../obj/main/betaflight_ARIESV3.map#L1149-L1155) confirms `.noinit = 0x2000` (`8,192 B` `eepromData`), isolated from `startup.S` `.bss` zeroing; warm-reset Configurator retention remains to be exercised on physical silicon.
 
 ### Erratum 5: Missing Memory Barrier Fences Across Timer 1 MMIO Writes (RVWMO)
-* **The Mechanism**: In `src/platform/ARIES/pwm_motor_aries.c`, writing `LoadCount = delta;` is immediately followed by `Control = 0x03;` without an intervening memory fence instruction (`__asm__ volatile ("fence" : : : "memory");`).
-* **The Concurrency Risk**: Under the RISC-V memory-mapped I/O ordering model (RVWMO), the APB peripheral bus or processor write buffer can commit the timer enable write before the count reload completes, causing Timer 1 to fire with the previous period.
-* **Guardrail Rule**: Always insert `__asm__ volatile ("fence" : : : "memory");` after writing `LoadCount` before writing `Control = 0x03` on Synopsys DW APB timers.
+* **Guardrail Rule**: Always insert `__asm__ volatile ("fence" : : : "memory");` after writing `LoadCount` before writing `Control = 0x03` on Synopsys DW APB timers so APB write buffering cannot reorder timer enable ahead of reload.
 
 ### Erratum 6: Bank-Wide EXTI Interrupt Fan-Out
-* **The Mechanism**: In `src/platform/ARIES/exti_aries.c`, central interrupt lines IRQ 10 (`THEJAS32_IRQ_GPIO0`) and IRQ 11 (`THEJAS32_IRQ_GPIO1`) dispatch to all enabled pins in `exti_bank0/1_active_mask` without reading a hardware pin-level pending register.
-* **The Concurrency Risk**: If more than one pin in Bank 0 is registered with EXTI, a pulse on one pin invokes the callbacks for all registered pins in that bank.
-* **Guardrail Rule**: Strictly enforce a limit of 1 active interrupt pin per bank (currently PA0 is the sole interrupt pin on Header J1 for ICM-42688P Gyro DRDY) until hardware pin-level pending status masking is confirmed.
+* **Guardrail Rule**: IRQ 10 (`THEJAS32_IRQ_GPIO0`) and IRQ 11 (`THEJAS32_IRQ_GPIO1`) have no per-pin HW pending status register; strictly enforce at most 1 active interrupt pin on Bank 0 (`PA0` ICM-42688P Gyro DRDY).
+
+### Erratum 7–9 Summary (Pre-Phase 20 Software Fixes Applied; Hardware Pending)
+* **UART0 TX & Quiet Boot (`Erratum 7`)**: Fixed via `UART_TX_BUFFER_SIZE = 512`, atomic `uartEnableTxInterrupt()`, `ARIES_DEV_LOGGING ?= 0`, and disabling `USE_IMMEDIATE_CLI` (restoring the 100 ms CLI guard).
+* **Motor Safety & PWM Gating (`Erratum 8`)**: Fixed via `ariesPwmEmergencyStop()` in trap/reset/failure/shutdown paths plus active-pulse and `motorPwmRate` gating in `ariesPwmMotorUpdateComplete()`.
+* **242 KB Linker Ceiling, SPI0 Mode 3 & Alignment (`Erratum 9`)**: Clamped `aries_v3.ld` & `build_verify.sh` to `242K` (`0x0023E7FF`) with `_stack_size >= 0x2000` assertion, initialized SPI0 to Mode 3 (`0x30`), added `-mstrict-align` + `DMA_DATA`, implemented `unusedPinsInit()`, and set `BOOTLOADER_REQUEST_ROM` to safe halt pending verified ROM vector (`0x00010000`).
+
+### Erratum 10: CRSF `23.8 us` UART1 Deadline, Untested `PA0` IRQ 10 & Phase 20 SPI3 Erase Stall (Audit 08 — Physical Verification Pending)
+* **The Mechanisms**:
+  1. Because `Erratum 1` keeps `UART1` in 1-byte mode (`FCR = 0x00`), `420,000` baud CRSF allows at most **`23.8 us`** per byte before `ORE` drops RC frames—any `thejas32_atomic_enter()` lock or ISR longer than `~20 us` threatens RC link integrity.
+  2. `mpuIntExtiInit()` expects floating rising-edge `PA0`, while THEJAS32 lacks SW pull/trigger regs and `thejas32_gpio0_isr()` clears no edge latch—real silicon `IRQ 10` edge vs. level sensitivity and live `1 kHz` soft-float `pidController`/`imuMahonyAHRSupdate` WCET (`GYRO: None` so far) remain unverified until bench testing with live ICM-42688P + CRSF hardware.
+  3. VEGA SDK's reference SPI write/erase (`spi_write_read_pgm/main.c:119-121`) spins on `while (bStatus & 0x01)` during multi-ms `4 KB` sector erases (`0x20`)—deferred to Phase 20 (`MDP_SPI_3`).
+
+### Erratum 11: Active-LOW `LD1` RGB LED (`PA22`–`PA24`), `unusedPinsInit()` Purple Trap & Silent Boot Masking (`2026-11-27`)
+* **Hardware Reality ([`ARIESv3 0_Datasheet_14-10-24.pdf`](../oldfiles/logs/ARIESv3%200_Datasheet_14-10-24.pdf) pp. 5, 15 & [`LED_Series.ino`](../lib/vega-bsp/libraries/GPIO/examples/LED_Series/LED_Series.ino#L11-L58)):**
+  * Onboard RGB LED `LD1` is **active-LOW** (`0` = ON, `1` = OFF): `GPIO22` (`LD1_4` Green), `GPIO23` (`LD1_3` Blue), `GPIO24` (`LD1_2` Red). Dedicated `LD4` (`LD4_1`) is wired to SoC pin `PROC_HB` (Pin 16), not `GPIO22`.
+  * Bootloaders (`flasher_min.bin`, `flasher_arduino.bin`) contain zero writes to `0x10180000` (Bank 1 GPIO).
+* **Silicon Regression Mechanism ([`phase_19b_post_audit_remediation.md`](../logs/dev/phase_19b_post_audit_remediation.md), [`code_audit/09_PHASE_19B_SILICON_PURPLE_LED_REGRESSION.md`](code_audit/09_PHASE_19B_SILICON_PURPLE_LED_REGRESSION.md)):**
+  1. Implementing [`unusedPinsInit()`](../src/platform/ARIES/stub_drivers.c#L164-L173) as `IOLo(io); IOConfigGPIO(io, IOCFG_OUT_PP);` drives all unowned Bank 1 pins `LOW`, turning `PA23` (Blue) + `PA24` (Red) **ON** while [`LED0_OFF`](../src/main/fc/init.c#L792) / [`light_led.c`](../src/main/drivers/light_led.c#L88) holds `PA22` (Green) `HIGH` (`OFF`) $\rightarrow$ **Purple `LD1`** upon reaching `initPhase3()` line `1080`.
+  2. [`serial_uart_aries.c`](../src/platform/ARIES/serial_uart_aries.c) omits `IOInit()` on `PA16`/`PA17`/`PA30`/`PA31`, leaving them `OWNER_FREE` so `unusedPinsInit()` drives header pins `GPIO16..17` (`J10`) and `GPIO30..31` (`J9`) LOW.
+  3. Switching [`ARIES_DEV_LOGGING ?= 0`](../src/platform/ARIES/mk/ARIES.mk#L59) + removing `USE_IMMEDIATE_CLI` suppresses all boot UART output; solid purple without `PA22` 500 ms [`warningLedFlash()`](../src/main/fc/core.c#L564-L570) toggles also requires re-checking post-`initPhase3()` scheduler/TX IRQ flow (including `UART_IE |= 0x02U` added at [`serial_uart_aries.c:246`](../src/platform/ARIES/serial_uart_aries.c#L246) vs `H22`).
+* **Guardrail Rule:**
+  > **NEVER** force `OWNER_FREE` GPIO lines push-pull `LOW` in `unusedPinsInit()` on ARIES v3.0 (use `IOCFG_IN_FLOATING` like high-Z reset state, or claim/park `PA23`/`PA24` `HIGH` / `OFF`). Never test `UART_IE |= 0x02` (`ETBEI`) or silent `ARIES_DEV_LOGGING=0` simultaneously with unverified GPIO shutdowns without checking serial `#`/MSP response.
 
 ---
 

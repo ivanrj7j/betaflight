@@ -248,9 +248,9 @@ graph TD
   * Default compiled Parameter Groups exceed 4,096 bytes. Sizing `EEPROM_SIZE` at 4 KB causes `resetEEPROM()` to corrupt headers and invoke `failureMode(FAILURE_CONFIG_STORE_FAILURE)`.
 * **The Solution**:
   * Enable `#define CONFIG_IN_RAM`.
-  * Size `#define EEPROM_SIZE 8192` (8 KiB allocated in `.bss` at `0x0023B640`).
-  * Undefine `USE_MSP_DISPLAYPORT` to reduce UART TX ring buffers from 1280 to 256 bytes, saving 2 KB RAM.
-  * Allows full Parameter Group serialization and CLI `save` / `get` persistence across soft reboots without bus faults.
+  * Size `#define EEPROM_SIZE 8192` (8 KiB in SRAM; currently `.bss` because `PERSISTENT` is undefined in `platform.h`).
+  * Undefining `USE_MSP_DISPLAYPORT` shrinks `UART_TX_BUFFER_SIZE` to 256 bytes, which wraps `>= 256 B` MSP frames (`MSP_PORT_OUTBUF_SIZE` = 512 B); raise `UART_TX_BUFFER_SIZE` to 512 for Configurator safety.
+  * Avoids bus faults during Parameter Group writes, though `startup.S` zeroes `.bss` on warm resets (`systemReset()`) until `PERSISTENT` (`.noinit`) and `MDP_SPI_3` persistence are wired.
 
 
 ---
@@ -448,13 +448,16 @@ graph LR
         M10["Module 10: <128KB Minimal Modular Stripping"]
     end
 
-    subgraph AuditNodes ["Code Audit & Technical Debt Nodes (01 - 06)"]
+    subgraph AuditNodes ["Code Audit & Technical Debt Nodes (01 - 09)"]
         A01["01_Active_Rebuild_Audit (11 Findings Resolved)"]
         A02["02_Working_Tree_Review (10 Debts Managed)"]
         A03["03_Whole_Repo_Audit (8 Findings Hardened)"]
         A04["04_Phases_14_to_16_Audit (13 Debts Cataloged)"]
         A05["05_Phases_17_to_18_Audit (4 Findings Remediated)"]
         A06["06_Phase19_Audit_And_Debt (15/15 Remediated, 11 Inline Shortcuts)"]
+        A07["07_Post_Phase19_Deep_Audit (13 Open Findings, Composite 4.2/10)"]
+        A08["08_Width_Depth_Post_Phase19 (18 Open Findings, Erratum 1 Reconciled, 3.6/10)"]
+        A09["09_Phase19B_Silicon_Purple_LED (Erratum 11: LD1 Active-LOW & Silent Boot, 3.0/10)"]
     end
 
     L01 & L17 & R04 & E05 --> M3
@@ -473,6 +476,9 @@ graph LR
     A04 --> M6 & M7
     A05 --> M5 & M7 & M8
     A06 --> M1 & M2 & M4 & M6 & M9 & M10
+    A07 --> M1 & M2 & M3 & M4 & M5 & M7 & M8
+    A08 --> M1 & M2 & M4 & M5 & M6 & M7 & M8 & M9 & M10
+    A09 --> M2 & M4 & M5 & M10
 ```
 
 ---
@@ -506,6 +512,9 @@ The following matrix synthesizes the line-by-line technical audits conducted on 
 | **[A04](code_audit/04_PHASES_14_TO_16_AUDIT_AND_DEBT.md)** | Actuator Control, EXTI & Atomic GPIO (Phases 14–16) | 7 Scored | Missing MMIO memory fence in Timer 1 register reload (`TD-13`); Bank-wide EXTI ISR loops all active pins (`TD-12`); direct `#ifdef THEJAS32` hook in upstream `serial_uart.c`. | Insert `__asm__ volatile ("fence" : : : "memory")` after `LoadCount`; enforce 1 active pin limit on Bank 0; extract weak platform hook `uartPlatformPollRx()`. | **Ascending Deadline Soft-PWM Innovation**: Non-blocking Timer 1 IRQ 8 event scheduling (< 3.0 µs CPU overhead, > 99.7% idle headroom); single-instruction address-decoded atomic GPIO stores (< 10 ns); single-cycle $O(1)$ `__builtin_ctz` EXTI dispatch; safe non-null `motorVTable_t` passthrough; 192/192 tests pass across 16 suites. |
 | **[A05](code_audit/05_PHASES_17_TO_18_AUDIT_AND_DEBT.md)** | Actuator Control, Direction RMW, Timer 1 Latch, SPI Timeout & Error Isolation (Phases 17–18) | 8 Scored | Direction register RMW race condition in `io_aries.c`; missing Timer 1 EOI clear causing 0 µs pulse termination; 50,000-cycle SPI timeout overrunning loop; hardcoded `SPIDEV_1` error count. | Wrap open-drain direction register in `thejas32_atomic_enter/exit`; clear EOI latch in `ariesPwmMotorUpdateComplete`; clamp SPI timeout to 1,000 cycles (10 µs); isolate error counts via `thejas32_spi_device_from_hw(hw)`. | **Cross-Module Integration Hardened**: Real-time bounded timeout (< 140 µs worst-case 14B burst failure, < 14% loop budget); race-free open-drain direction toggling; 0-dropout motor PWM; 248/248 unit and integration tests pass across 18 suites. |
 | **[A06](code_audit/06_PHASE_19_AUDIT_AND_DEBT.md)** | Phase 19 Whole-Repo Audit & Technical Debt Ledger (`config.h`, `ARIES.mk`, `serial_uart_aries.c`, `system.c`, `bootstrap_diag.c`, `build_verify.sh`, `src/test/Makefile`) | 7 Scored (`4.6 -> 9.9 / 10`) | `USE_CONFIG` + `config.h` early `target.h` include cancelled `#undef`s; `MCU_EXCLUDES =` wiped `target.mk` + `olc.c` post-filter; `poll_rx` wiped `LSR`; RX IRQ before `rxCallback`; `uartGetIndex(NULL)` aliased `UART0`; `0/19` ARIES tests linked `.c` drivers; `build_verify.sh` skipped `trap_entry`/`.stack`; unconditional `ALL 21 PASSED`; Bank 0 EXTI fan-out; fake `18.15 V` ADC; cold `.noinit`; silicon `phase19.2/.3` caught Test 18 UART/Timer1 race, missing `__enable_irq()`, and blocking-TX deadlock. | Fixed `config.h` include order, `ENABLE_OSD_CUSTOM_TEXT 0`, `MCU_EXCLUDES +=`, `HSE_VALUE := 100000000`, `clockMicrosToCycles()`, `__ctzsi2`, `_Min_Stack_Size = 0x2000`; fixed UART/EXTI/ADC/`.noinit`/`__enable_irq()`/polled-TX guards; checked `trap_entry` & `_end`; linked `10` real ARIES `.c` suites; fixed Test 18 `LoadCount` race; added `11` inline `// shortcut:` markers. | **All 15 Audit Findings & Silicon Verification Complete**: Full `TARGET=ARIESV3` (`222,208 B` SRAM, `191,224 B` `.bin`, `0` RVC) verified in `phase19.5.txt` (`MSP API: 1.49`, CLI + warm reboot) + `bootstrap` (`45,132 B`) `21/21` in `phase19.4.txt`; `1,347/1,347` runnable host tests pass. |
+| **[A07](code_audit/07_POST_PHASE_19_DEEP_AUDIT_AND_DEBT.md)** | Post-Phase 19 Deep Audit (Configurator MSP Handshake, Boot, Memory, PWM, SPI0, Timebase & Tests) | 6 Scored (`4.2 / 10`) | **13 Open Bugs/Gaps**: `FCR=0x00` + `100 Hz` `uartPollTx()` chokes UART0 TX (`~100 B/s`); `UART_TX_BUFFER_SIZE=256` wraps `>=256 B` MSP replies; `uartEnableTxInterrupt()` thread/ISR race; boot banners + `-DARIES_DEV_LOGGING=1` + `USE_IMMEDIATE_CLI` hijack COM handshake; missing `PERSISTENT`/`USE_PERSISTENT_OBJECTS` puts `eepromData` in `.bss` (`0 B` `.noinit`, wiped on warm reboot); `useContinuousUpdate=true` runs `400 Hz` PWM at `1 kHz` (latching `>1,000 us` HIGH); traps/resets omit motor shutdown; SPI0 locks in Mode 0; `248K` linker overshoots `0x0023E800`; missing `-mstrict-align`; `millis()` 31.7d wrap; mocked MSP/`millis()` host tests (`1` `no-trigger` debt at `system.c:416`). | Raise `UART_TX_BUFFER_SIZE` to 512, check free TX space when empty, lock `uartEnableTxInterrupt()`, poll TX at 1 kHz; remove `-DARIES_DEV_LOGGING=1` & boot ASCII pollution; define `PERSISTENT` + `USE_PERSISTENT_OBJECTS` + `SPI3` flash; rate-gate Timer 1 PWM + kill motors in traps/resets; sync SPI0 initial Mode 3/0 state; add `-mstrict-align`; test real `msp.c` + `system.c`. | Upstream diffs tiny (`9` files, `+65/-10`); full `ARIESV3` fits SRAM (`191,224 B` `.bin`, `_end=0x00238400`); `19/19` ARIES host suites (`285/285`) pass fast with MMIO mocks (`aries_host_mmio.c`). |
+| **[A08](code_audit/08_WIDTH_AND_DEPTH_AUDIT_POST_PHASE_19.md)** | Width + Depth Post-Phase 19 Audit (`msp.c`, `crsf.c`, `exti_aries.c`, `pid.c`, `imu.c`, `battery.c`, `bootstrap_diag.c`, `spi_write_read_pgm`) | 8 Scored (`3.6 / 10 -> Remediated Pre-Phase 20`) | **Pre-Phase 20 Software Items Remediated (Host 326/326 PASS); Bench Hardware & Phase 20 Open**: Fixed `ariesPwmEmergencyStop()` on trap/reset/failure, `400 Hz` PWM active/period gate, `UART_TX_BUFFER_SIZE=512` (`MSP_ADJUSTMENT_RANGES`), atomic `uartEnableTxInterrupt()` + `ETBEI` disarm, `ARIES_DEV_LOGGING ?= 0` + removed `USE_IMMEDIATE_CLI`, `PERSISTENT` (`.noinit = 8,192 B`) + safe `BOOTLOADER_REQUEST_ROM` halt, SPI0 Mode 3 (`0x30`), real `unusedPinsInit()`, `-mstrict-align` + `DMA_DATA`, `242K` (`0x0023E7FF`) ceiling + stack assert, and `bootstrap_diag.c` truthfulness; **Pending silicon flash**: live `PA0` IRQ 10 + ICM-42688P 1 kHz WCET (`#8`, `#13`); **Deferred to Phase 20**: `MDP_SPI_3` non-blocking flash erase (`#17`). | Build & test verification complete (`ARIESV3` `191,364 B`, `bootstrap` `44,788 B`, `0` RVC, `10/10` audit). | Clean, minimal fixes kept `ARIESV3` binary footprint (`222,864 B` SRAM) well inside the tightened `242K` bootloader-safe ceiling with `24,944 B` headroom. |
+| **[A09](code_audit/09_PHASE_19B_SILICON_PURPLE_LED_REGRESSION.md)** | Phase 19B Silicon Bench Purple-LED & Silent-Boot Regression (`stub_drivers.c`, `light_led.c`, `serial_uart_aries.c`, `ARIES.mk`, `target.h`, `audit19.1.txt`) | 5 Scored (`3.0 / 10` — Erratum 11 Open) | **`betaflight_ARIESV3.bin` (`191,364 B`) Solid Purple `LD1` + 0 UART Output on Hardware**: `unusedPinsInit()` drove unowned active-LOW `PA23` (Blue) + `PA24` (Red) `LOW` push-pull (`ON`) while `LED0_OFF` kept `PA22` (Green) `HIGH` (`OFF`) $\rightarrow$ Purple; `ARIES_DEV_LOGGING ?= 0` + removed `USE_IMMEDIATE_CLI` hid boot progression past `"flashing..."`; `serial_uart_aries.c` omitted `IOInit()`; `UART_IE |= 0x02U` (`H22`) + solid `PA22` unverified; `audit19.1.txt` used older `11:18:41` bootstrap copy. | Change `unusedPinsInit()` to high-Z `IOCFG_IN_FLOATING` (or park `PA23`/`PA24` `HIGH`), add UART `IOInit()`, test `#`/MSP reply and `ETBEI` vs `H22` on silicon. | Combining `ARIESv3 0_Datasheet_14-10-24.pdf`, `LED_Series.ino`, and bootloader disassembly (`0` `0x10180` stores) proved boot reached `initPhase3()` line `1080` (`0x203670`) without prior traps. |
 
 ---
 
