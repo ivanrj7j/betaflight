@@ -171,10 +171,10 @@ The following architectural guardrails and silicon quirks were confirmed through
 ### Erratum 6: Bank-Wide EXTI Interrupt Fan-Out
 * **Guardrail Rule**: IRQ 10 (`THEJAS32_IRQ_GPIO0`) and IRQ 11 (`THEJAS32_IRQ_GPIO1`) have no per-pin HW pending status register; strictly enforce at most 1 active interrupt pin on Bank 0 (`PA0` ICM-42688P Gyro DRDY).
 
-### Erratum 7–9 Summary (Pre-Phase 20 Software Fixes Applied; Hardware Pending)
-* **UART0 TX & Quiet Boot (`Erratum 7`)**: Fixed via `UART_TX_BUFFER_SIZE = 512`, atomic `uartEnableTxInterrupt()`, `ARIES_DEV_LOGGING ?= 0`, and disabling `USE_IMMEDIATE_CLI` (restoring the 100 ms CLI guard).
+### Erratum 7–9 Summary (Remediation Applied on `rebuild`; Bench Re-Flash Pending)
+* **UART0 `H18`+`H22` TX & Configurator Hook (`Erratum 7`)**: Fixed via `UART_TX_BUFFER_SIZE = 512`, `UART_IIR_FCR` IRQ ack, suppressed `ETBEI` (`UART_IE = 0x01`) + atomic `uartEnableTxInterrupt()`, `1 kHz` `taskMain()` `uartPollTx()`, and parameterized `ARIES_DEV_LOGGING ?= 1` gating `USE_IMMEDIATE_CLI` (`make ARIES_DEV_LOGGING=0` yields quiet Configurator builds with 100 ms CLI guard).
 * **Motor Safety & PWM Gating (`Erratum 8`)**: Fixed via `ariesPwmEmergencyStop()` in trap/reset/failure/shutdown paths plus active-pulse and `motorPwmRate` gating in `ariesPwmMotorUpdateComplete()`.
-* **242 KB Linker Ceiling, SPI0 Mode 3 & Alignment (`Erratum 9`)**: Clamped `aries_v3.ld` & `build_verify.sh` to `242K` (`0x0023E7FF`) with `_stack_size >= 0x2000` assertion, initialized SPI0 to Mode 3 (`0x30`), added `-mstrict-align` + `DMA_DATA`, implemented `unusedPinsInit()`, and set `BOOTLOADER_REQUEST_ROM` to safe halt pending verified ROM vector (`0x00010000`).
+* **242 KB Linker Ceiling, `.noinit` Cold Init, SPI0 Mode 3 & Alignment (`Erratum 9`)**: Clamped `aries_v3.ld` & `build_verify.sh` to `242K` (`0x0023E7FF`) with `_stack_size >= 0x2000` assertion, enabled `PERSISTENT` (`.noinit`) + `persistentObjectInit()` in `systemInit()`, initialized SPI0 to Mode 3 (`0x30`), added `-mstrict-align` + `DMA_DATA`, implemented High-Z `unusedPinsInit()` + UART `IOInit()`, and set `BOOTLOADER_REQUEST_ROM` to safe `__WFI()` halt pending verified ROM vector (`0x00010000`).
 
 ### Erratum 10: CRSF `23.8 us` UART1 Deadline, Untested `PA0` IRQ 10 & Phase 20 SPI3 Erase Stall (Audit 08 — Physical Verification Pending)
 * **The Mechanisms**:
@@ -190,6 +190,7 @@ The following architectural guardrails and silicon quirks were confirmed through
   1. Implementing [`unusedPinsInit()`](../src/platform/ARIES/stub_drivers.c#L164-L173) as `IOLo(io); IOConfigGPIO(io, IOCFG_OUT_PP);` drives all unowned Bank 1 pins `LOW`, turning `PA23` (Blue) + `PA24` (Red) **ON** while [`LED0_OFF`](../src/main/fc/init.c#L792) / [`light_led.c`](../src/main/drivers/light_led.c#L88) holds `PA22` (Green) `HIGH` (`OFF`) $\rightarrow$ **Purple `LD1`** upon reaching `initPhase3()` line `1080`.
   2. [`serial_uart_aries.c`](../src/platform/ARIES/serial_uart_aries.c) omits `IOInit()` on `PA16`/`PA17`/`PA30`/`PA31`, leaving them `OWNER_FREE` so `unusedPinsInit()` drives header pins `GPIO16..17` (`J10`) and `GPIO30..31` (`J9`) LOW.
   3. Switching [`ARIES_DEV_LOGGING ?= 0`](../src/platform/ARIES/mk/ARIES.mk#L59) + removing `USE_IMMEDIATE_CLI` suppresses all boot UART output; solid purple without `PA22` 500 ms [`warningLedFlash()`](../src/main/fc/core.c#L564-L570) toggles also requires re-checking post-`initPhase3()` scheduler/TX IRQ flow (including `UART_IE |= 0x02U` added at [`serial_uart_aries.c:246`](../src/platform/ARIES/serial_uart_aries.c#L246) vs `H22`).
+* **Remediation Applied (`rebuild`, Pending Silicon Re-Flash):** `unusedPinsInit()` uses `IOCFG_IN_FLOATING` (`DIR=0`), `uartPinConfigure()` claims `OWNER_SERIAL_TX`/`RX` via `IOInit()`, `ETBEI` (`0x02`) stays `0` with `UART_IIR_FCR` read-ack + `1 kHz` `uartPollTx()`, and `ARIES_DEV_LOGGING ?= 1` keeps bench banners & Enter CLI active until `ARIES_DEV_LOGGING=0` release builds.
 * **Guardrail Rule:**
   > **NEVER** force `OWNER_FREE` GPIO lines push-pull `LOW` in `unusedPinsInit()` on ARIES v3.0 (use `IOCFG_IN_FLOATING` like high-Z reset state, or claim/park `PA23`/`PA24` `HIGH` / `OFF`). Never test `UART_IE |= 0x02` (`ETBEI`) or silent `ARIES_DEV_LOGGING=0` simultaneously with unverified GPIO shutdowns without checking serial `#`/MSP response.
 

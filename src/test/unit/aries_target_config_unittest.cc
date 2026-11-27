@@ -401,17 +401,25 @@ TEST_F(AriesTargetConfigTest, Test_TargetConfig_ProductionBufferPersistenceLoggi
     useImmediateCli = true;
 #endif
     EXPECT_FALSE(useImmediateCli)
-        << "USE_IMMEDIATE_CLI must be disabled in production target.h so boot chatter preserves 100 ms CLI guard!";
+        << "USE_IMMEDIATE_CLI must stay disabled when ARIES_DEV_LOGGING is unset/0 for Configurator quiet guard!";
 
     int devLog = 0;
 #ifdef ARIES_DEV_LOGGING
     devLog = ARIES_DEV_LOGGING;
 #endif
-    EXPECT_EQ(devLog, 0)
-        << "ARIES_DEV_LOGGING must default to 0 in production builds!";
+    EXPECT_EQ(devLog, 0);
+
+    static char thBuf[32768];
+    ASSERT_TRUE(tcfg_read_repo_file("src/platform/ARIES/target/ARIESV3/target.h", thBuf, sizeof(thBuf)));
+    const char *immGate = strstr(thBuf, "USE_IMMEDIATE_CLI");
+    ASSERT_NE(immGate, nullptr);
+    const char *logGate = strstr(thBuf, "ARIES_DEV_LOGGING");
+    EXPECT_TRUE(logGate != nullptr && logGate < immGate)
+        << "USE_IMMEDIATE_CLI in target.h must be gated behind ARIES_DEV_LOGGING > 0!";
 
     // Real-world flight consequence:
-    // Enforces all 5 production configuration invariants atomically at build & test time.
+    // Keeps bench Enter/'#' CLI telemetry ergonomic when ARIES_DEV_LOGGING=1 while ARIES_DEV_LOGGING=0
+    // automatically yields a Configurator-safe quiet-guard build alongside 512B TX buffers and !USE_ADC.
 }
 
 #define TCFG_STR_HELPER(x) #x

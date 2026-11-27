@@ -26,8 +26,8 @@
 #define DMA_RAM_R
 #define DMA_RAM_W
 #define DMA_RAM_RW
-#define DMA_DATA_ZERO_INIT
-#define DMA_DATA
+#define DMA_DATA_ZERO_INIT      __attribute__((aligned(4)))
+#define DMA_DATA                __attribute__((aligned(4)))
 #define STATIC_DMA_DATA_AUTO    static
 
 // Prune memory-heavy and unsupported subsystems to guarantee <= 248 KB SRAM binary footprint
@@ -204,7 +204,7 @@
  * Onboard Dedicated:
  *   - PA16: UART1 TX (CRSF / ELRS Receiver)
  *   - PA17: UART1 RX (CRSF / ELRS Receiver)
- *   - PA22: LED0 (Status Blue LED)
+ *   - PA22: LED0 (LD1_4 Green LED, active-LOW; PA23 Blue & PA24 Red unowned High-Z)
  *   - PA30: UART0 TX (CP2102N USB Bridge)
  *   - PA31: UART0 RX (CP2102N USB Bridge)
  * -----------------------------------------------------------------------------
@@ -214,9 +214,12 @@
 #define LED0_PIN                PA22
 #define BEEPER_PIN              NONE
 
-// High-Usability Immediate CLI Activation & Generic Polled UART Drain Hook
+// Immediate Enter/'#' CLI during bench bring-up; ARIES_DEV_LOGGING=0 enforces 100 ms Configurator guard
+#if defined(ARIES_DEV_LOGGING) && (ARIES_DEV_LOGGING > 0)
 #define USE_IMMEDIATE_CLI
+#endif
 #define USE_UART_POLLED_DRAIN
+#define UART_TX_BUFFER_SIZE     512
 
 // Onboard USB-UART Bridge (CP2102N)
 #define USE_UART0

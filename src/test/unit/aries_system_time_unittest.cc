@@ -26,6 +26,7 @@
 
 extern "C" {
 #include "aries_host_mmio.h"
+#include "drivers/persistent.h"
 uint64_t getCycleCounter64(void);
 uint32_t micros(void);
 uint32_t millis(void);
@@ -589,21 +590,52 @@ static bool systime_read_repo_file(const char *relPath, char *buf, size_t bufSiz
     return false;
 }
 
-// C1: ARIES.mk defaults ARIES_DEV_LOGGING=0 for production builds
-TEST(AriesSystemTimeTest, Test_QuietBoot_AriesMkDefaultsDevLoggingToZero)
+// C1: ARIES.mk exposes overridable ARIES_DEV_LOGGING instead of forcing un-overridable -DARIES_DEV_LOGGING=1
+TEST(AriesSystemTimeTest, Test_BenchAndQuietBoot_AriesMkAllowsDevLoggingOverride)
 {
     // Arrange
     static char mkBuf[32768];
     ASSERT_TRUE(systime_read_repo_file("src/platform/ARIES/mk/ARIES.mk", mkBuf, sizeof(mkBuf)));
 
-    // Act & Assert: Default production build flags MUST NOT hard-enable ARIES_DEV_LOGGING=1
+    // Act & Assert: DEVICE_FLAGS must allow ARIES_DEV_LOGGING=0 override (no hardcoded -DARIES_DEV_LOGGING=1)
     EXPECT_EQ(strstr(mkBuf, "-DARIES_DEV_LOGGING=1"), nullptr)
-        << "ARIES.mk must default ARIES_DEV_LOGGING=0 so boot banners do not jam MSP/CLI!";
-    EXPECT_NE(strstr(mkBuf, "ARIES_DEV_LOGGING"), nullptr);
+        << "ARIES.mk must parameterize -DARIES_DEV_LOGGING=$(ARIES_DEV_LOGGING) rather than hardcoding =1!";
+    EXPECT_NE(strstr(mkBuf, "ARIES_DEV_LOGGING ?="), nullptr);
+    EXPECT_NE(strstr(mkBuf, "-DARIES_DEV_LOGGING=$(ARIES_DEV_LOGGING)"), nullptr);
 
     // Real-world flight consequence:
-    // Emitting diagnostic ASCII banners on UART0 during boot breaks MSP frame synchronization
-    // and fills flash/SRAM with dead telemetry strings.
+    // Allows bench bring-up diagnostics while ARIES_DEV_LOGGING=0 cleanly silences UART0 for Configurator.
+}
+
+// D9: systemInit() initializes cold .noinit persistentObjects[] to zero/magic without wiping warm resets
+TEST(AriesSystemTimeTest, Test_Persistence_SystemInitInitializesColdObjectsWithoutClobberingWarmMagic)
+{
+    // Arrange 1: Cold-boot uninitialized .noinit SRAM garbage
+    thejas32_host_reset_all();
+    persistentObjectWrite(PERSISTENT_OBJECT_MAGIC, 0xDEADBEEFU);
+    persistentObjectWrite(PERSISTENT_OBJECT_SERIALRX_BAUD, 0x12345678U);
+    persistentObjectWrite(PERSISTENT_OBJECT_RESET_REASON, 99U);
+
+    // Act 1: Cold boot initialization
+    systemInit();
+
+    // Assert 1: Magic armed and stale uninitialized slots cleared
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_MAGIC), 0x42656631U)
+        << "systemInit() must call persistentObjectInit() so cold .noinit SRAM never holds garbage!";
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_SERIALRX_BAUD), 0U);
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_RESET_REASON), 0U);
+
+    // Arrange 2 & Act 2: Warm reset keeps saved persistent values intact when magic matches
+    persistentObjectWrite(PERSISTENT_OBJECT_SERIALRX_BAUD, 420000U);
+    persistentObjectWrite(PERSISTENT_OBJECT_RESET_REASON, RESET_BOOTLOADER_POST);
+    systemInit();
+
+    // Assert 2: Warm-reboot persistent fields preserved
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_SERIALRX_BAUD), 420000U);
+    EXPECT_EQ(persistentObjectRead(PERSISTENT_OBJECT_RESET_REASON), (uint32_t)RESET_BOOTLOADER_POST);
+
+    // Real-world flight consequence:
+    // Leaving persistentObjectInit() uncalled on startup reads cold SRAM garbage as cached CRSF baud/reset reason.
 }
 
 // C2: targetPreInit() & systemInit() emit zero UART0 TX chars when ARIES_DEV_LOGGING==0

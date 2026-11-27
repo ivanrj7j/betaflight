@@ -70,6 +70,9 @@ aries_atomics_unittest_INCLUDE_DIRS := \
 
 aries_system_time_unittest_SRC := \
 		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/io_aries.c \
+		$(USER_DIR)/drivers/io.c \
+		$(ARIES_DIR)/stub_drivers.c \
 		$(ARIES_DIR)/system.c
 
 aries_system_time_unittest_DEFINES := \
@@ -177,6 +180,7 @@ aries_cli_entry_unittest_SRC := \
 
 aries_cli_entry_unittest_DEFINES := \
 		USE_CLI= \
+		USE_IMMEDIATE_CLI= \
 		USE_MSP_DISPLAYPORT=
 
 aries_cli_entry_unittest_INCLUDE_DIRS := \

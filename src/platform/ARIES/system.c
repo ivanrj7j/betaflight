@@ -15,6 +15,7 @@
 #include "platform/bsp_thejas32.h"
 #include "drivers/time.h"
 #include "drivers/system.h"
+#include "drivers/persistent.h"
 
 uint32_t SystemCoreClock = 100000000U; // 100 MHz
 
@@ -240,8 +241,22 @@ void thejas32_early_uart_print_hex(uint32_t val)
  * 5. Privileged Exception Trap Handler & Fast O(1) Interrupt Dispatch
  * -----------------------------------------------------------------------------
  */
+__attribute__((weak)) void persistentObjectInit(void) { }
+
+__attribute__((weak)) void ariesPwmEmergencyStop(void)
+{
+    THEJAS32_TIMER(1).Control = 0U;
+    (void)THEJAS32_TIMER(1).EOI;
+    thejas32_interrupt_disable(THEJAS32_IRQ_TIMER1);
+    for (uint16_t pin = 1U; pin <= 4U; pin++) {
+        *thejas32_gpio_data_ptr(pin) = 0U;
+    }
+    THEJAS32_MEMORY_FENCE();
+}
+
 static void handle_trap_panic(uint32_t mcause, uint32_t mepc, uint32_t *sp)
 {
+    ariesPwmEmergencyStop();
     thejas32_early_uart_puts("\r\n\r\n[FATAL TRAP PANIC]\r\n");
     thejas32_early_uart_puts("mcause=0x");
     thejas32_early_uart_print_hex(mcause);
@@ -349,18 +364,25 @@ void targetPreInit(void)
 {
     // RV32IM boots with mstatus.MIE=0 and mie.MEIE=0 (unlike ARM PRIMASK=0); arm CPU IRQs before peripheral init
     __enable_irq();
+#if defined(ARIES_DEV_LOGGING) && (ARIES_DEV_LOGGING > 0)
     thejas32_early_uart_puts("[ARIES v3] EEPROM & Config Initialized Successfully! (IRQ Enabled)\r\n");
+#endif
 }
 
 void systemInit(void)
 {
     thejas32_early_uart_init();
+#if defined(ARIES_DEV_LOGGING) && (ARIES_DEV_LOGGING > 0)
     thejas32_early_uart_puts("\r\n\r\n========================================\r\n");
     thejas32_early_uart_puts("[ARIES v3] Betaflight 4.5 Booting...\r\n");
+#endif
     cycleCounterInit();
     thejas32_timer_init();
+    persistentObjectInit();
+#if defined(ARIES_DEV_LOGGING) && (ARIES_DEV_LOGGING > 0)
     thejas32_early_uart_puts("[ARIES v3] Clocks & Timer0 Initialized\r\n");
     thejas32_early_uart_puts("========================================\r\n\r\n");
+#endif
 }
 
 /*
@@ -368,6 +390,7 @@ void systemInit(void)
  */
 void systemReset(void)
 {
+    ariesPwmEmergencyStop();
     __disable_irq();
 
     // Finding 3: Disable all peripheral interrupt lines in THEJAS32 interrupt controller
@@ -394,7 +417,22 @@ void systemReset(void)
 
 void systemResetToBootloader(bootloaderRequestType_e requestType)
 {
-    (void)requestType;
+    ariesPwmEmergencyStop();
+    __disable_irq();
+    THEJAS32_INTR_CTRL.INTR_EN = 0U;
+    THEJAS32_MEMORY_FENCE();
+
+    if (requestType == BOOTLOADER_REQUEST_ROM) {
+        // ROM XMODEM re-entry vector (0x00010000) is unverified on silicon; halt cleanly with outputs off
+#ifdef UNIT_TEST
+        return;
+#else
+        while (1) {
+            __WFI();
+        }
+#endif
+    }
+
     systemReset();
 }
 
@@ -406,14 +444,21 @@ void indicateFailure(failureMode_e mode, int repeatCount)
 
 void failureMode(failureMode_e mode)
 {
+    ariesPwmEmergencyStop();
+    __disable_irq();
     thejas32_early_uart_puts("\r\n[FAILURE MODE] Code: 0x");
     thejas32_early_uart_print_hex((uint32_t)mode);
     thejas32_early_uart_puts("\r\n");
-    while (1);
+#ifdef UNIT_TEST
+    return;
+#else
+    while (1) {
+        __WFI();
+    }
+#endif
 }
 
 #ifndef UNIT_TEST
-// shortcut: bare-metal non-RVC memory primitives are active on RV32 targets only; host tests use glibc
 /*
  * -----------------------------------------------------------------------------
  * 6. Bare-Metal Non-RVC Memory Primitives (memset, memcpy, memmove)

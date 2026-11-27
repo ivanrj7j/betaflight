@@ -56,14 +56,15 @@ INCLUDE_DIRS := \
 # ------------------------------------------------------------------------------
 # The core does NOT implement compressed ('C') or hardware float ('F'/'D') extensions.
 HSE_VALUE    := 100000000
-ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany
+ARIES_DEV_LOGGING ?= 1
+ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany -mstrict-align
 
 # Memory builtins disabled to prevent compiler from emitting calls to compressed libc helpers
 DEVICE_FLAGS = -DARIES -DTHEJAS32 -DUSE_CONFIG \
                -Wno-type-limits -Wno-sign-compare -Wno-unused-parameter \
                -ffast-math -fno-math-errno \
                -fno-builtin-memset -fno-builtin-memcpy -fno-builtin-memmove \
-               -DARIES_DEV_LOGGING=1
+               -DARIES_DEV_LOGGING=$(ARIES_DEV_LOGGING)
 
 LD_SCRIPT    = $(LINKER_DIR)/aries_v3.ld
 
