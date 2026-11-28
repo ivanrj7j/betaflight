@@ -14,13 +14,14 @@
   - [`src/test/unit/aries_bus_gpio_trap_edge_unittest.cc`](../../src/test/unit/aries_bus_gpio_trap_edge_unittest.cc)
   - [`src/test/unit/aries_elf_invariants_unittest.py`](../../src/test/unit/aries_elf_invariants_unittest.py)
   - [`src/test/unit/platform/test_toolchain_flags.py`](../../src/test/unit/platform/test_toolchain_flags.py)
-- **Source Hardware Captures (Session Telemetry Logs):**
-  - `tempfiles/com9_proxy_20261128_152217.txt` (Try 2 silicon capture: `Boot Silicon Lab` + 2 Configurator runs `MSP_STALL` + `cmd=3` `MIE_LOST`)
-  - `tempfiles/com9_proxy_20261128_152631.txt` (Try 2 silicon capture: `Boot Silicon Lab` + 2 Configurator runs `MSP_STALL`)
-  - `tempfiles/betaflight logs.txt` (Betaflight Configurator `Connection lost` ~5–6s log across Runs 1–5)
+- **Source Hardware Captures:**
+  - [`tempfiles/com9_proxy_20261128_155027.txt`](../../tempfiles/com9_proxy_20261128_155027.txt) (**Verified Pass Capture:** `8m43s` total runtime, `13,328` TX / `9,118` RX MSP frames across Run 1 CLI + `exit` reboot + Run 2 `5m49s` live Configurator session with zero disconnects)
+  - [`tempfiles/betaflight logs.txt`](../../tempfiles/betaflight%20logs.txt) (User bench report confirming `5m` manual hold & configuration edits with zero drops)
+  - `tempfiles/com9_proxy_20261128_152217.txt` (Try 2 failure capture: `Boot Silicon Lab` + 2 Configurator runs `MSP_STALL` + `cmd=3` `MIE_LOST`)
+  - `tempfiles/com9_proxy_20261128_152631.txt` (Try 2 failure capture: `Boot Silicon Lab` + 2 Configurator runs `MSP_STALL`)
 - **Predecessor Audit Node:** [`knowledgebase/code_audit/10_PHASE_19C_UART_CLI_RX_FREEZE.md`](10_PHASE_19C_UART_CLI_RX_FREEZE.md) (`A10`)
 - **Upstream / Reference Drivers:** [`lib/vega-sdk/vega-sdk/bsp/common/crt.S`](../../lib/vega-sdk/vega-sdk/bsp/common/crt.S), [`lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c`](../../lib/vega-sdk/vega-sdk/bsp/drivers/interrupt/interrupt.c#L30-L80), [`lib/vega-sdk/vega-sdk/bsp/include/encoding.h`](../../lib/vega-sdk/vega-sdk/bsp/include/encoding.h#L210-L245)
-- **Domain & Status (`e4096eb07` working tree):** Root cause of the open `A10` physical silicon interrupt death (`MIE` permanently dropping to `0` during live UART0 / CLI / Configurator traffic) isolated into three distinct hardware/probe mechanisms; RV32I + `x5` trap fix verified on silicon (`0/499` drops across 30 Boot Lab tests, Configurator handshakes `ok=16..22`), while the `csrrci`/`csrc mstatus, 8` + `csrs` NOP fix (`194,932 B` `.bin`) is staged in [`tempfiles/betaflight_ARIESV3.bin`](../../tempfiles/betaflight_ARIESV3.bin) awaiting host silicon capture.
+- **Domain & Status (`e4096eb07` working tree):** **VERIFIED ON PHYSICAL SILICON (`5m49s` continuous hold).** All three root causes of `A10` & 5s disconnects (`M`-extension IRQ trap corruption, `csrrci`/`csrc mstatus, 8` `MPIE` wipe on `txIsr=1`, and `cmd=3` probe false alarm) were isolated and fixed; physical ET1031 capture [`com9_proxy_20261128_155027.txt`](../../tempfiles/com9_proxy_20261128_155027.txt) (`ARIES_PROBE_DEBUG=0` production build, `194,932 B` `.bin`) sustained `2,585` TX / `1,987` RX MSP packets + CLI `help`/`get`/`exit` reboot (Run 1) followed by `10,743` TX / `7,115` RX MSP packets over `5m49s` (Run 2) with zero disconnects until manually closed. Note: `H1_DIV_ATOM`/`H5_DIV_ATOM` `4x nop` re-test with `ARIES_PROBE_DEBUG=1` was not run (`155027.txt` booted the default `ARIES_PROBE_DEBUG=0` image).
 
 ---
 
