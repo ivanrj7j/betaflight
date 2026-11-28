@@ -102,6 +102,31 @@ __attribute__((always_inline)) static inline void thejas32_atomic_exit(uint32_t 
     }
 }
 #else
+/*
+ * Machine-mode interrupt masking helpers guarded against ET1031 silicon errata:
+ *   1. Executing csrrci/csrc mstatus, 8 when MIE=0 (e.g. trap context 0x00001880)
+ *      clears MPIE (bit 7 -> 0x00001800), causing mret to exit with MIE=0 permanently.
+ *      Always read mstatus first and skip csrc unless (prev & 8U) != 0U.
+ *   2. Wait past the csrs mstatus, 8 pipeline shadow with NOPs so any pending IRQ traps
+ *      on a side-effect-free instruction rather than corrupting GPR arithmetic/stores.
+ */
+__attribute__((always_inline)) static inline uint32_t thejas32_atomic_enter(void)
+{
+    uint32_t prev_mstatus;
+    __asm__ volatile ("csrr %0, mstatus" : "=r"(prev_mstatus) : : "memory");
+    if (prev_mstatus & 8U) {
+        __asm__ volatile ("csrc mstatus, 8" : : : "memory");
+    }
+    return prev_mstatus;
+}
+
+__attribute__((always_inline)) static inline void thejas32_atomic_exit(uint32_t prev_mstatus)
+{
+    if (prev_mstatus & 8U) {
+        __asm__ volatile ("csrs mstatus, 8\n\tnop\n\tnop\n\tnop\n\tnop" : : : "memory");
+    }
+}
+
 __attribute__((always_inline)) static inline uint8_t __get_BASEPRI(void)
 {
     uint32_t mstatus_val;
@@ -113,42 +138,33 @@ __attribute__((always_inline)) static inline uint8_t __get_BASEPRI(void)
 
 __attribute__((always_inline)) static inline void __set_BASEPRI(uint32_t basePri)
 {
-    // If restoring to 0, re-enable interrupts.
-    // If restoring to non-zero, keep interrupts disabled.
     if (basePri == 0U) {
-        __asm__ volatile ("csrs mstatus, 8" ::: "memory");
+        thejas32_atomic_exit(8U);
     } else {
-        __asm__ volatile ("csrc mstatus, 8" ::: "memory");
+        (void)thejas32_atomic_enter();
     }
 }
 
 __attribute__((always_inline)) static inline void __set_BASEPRI_nb(uint32_t basePri)
 {
-    if (basePri == 0U) {
-        __asm__ volatile ("csrs mstatus, 8");
-    } else {
-        __asm__ volatile ("csrc mstatus, 8");
-    }
+    __set_BASEPRI(basePri);
 }
 
 __attribute__((always_inline)) static inline void __set_BASEPRI_MAX(uint32_t basePri)
 {
     (void)basePri;
-    // Elevate priority (mask interrupts) with memory barrier
-    __asm__ volatile ("csrc mstatus, 8" ::: "memory");
+    (void)thejas32_atomic_enter();
 }
 
 __attribute__((always_inline)) static inline void __set_BASEPRI_MAX_nb(uint32_t basePri)
 {
-    (void)basePri;
-    // Elevate priority (mask interrupts) without memory barrier
-    __asm__ volatile ("csrc mstatus, 8");
+    __set_BASEPRI_MAX(basePri);
 }
 
 /* Global interrupt control for RISC-V M-Mode */
 __attribute__((always_inline)) static inline void __disable_irq(void)
 {
-    __asm__ volatile ("csrc mstatus, 8" ::: "memory");
+    (void)thejas32_atomic_enter();
 }
 
 __attribute__((always_inline)) static inline void __enable_irq(void)
@@ -156,24 +172,7 @@ __attribute__((always_inline)) static inline void __enable_irq(void)
     // Enable MEIE (Machine External Interrupt Enable, bit 11 = 0x800) in mie
     __asm__ volatile ("csrs mie, %0" : : "r"(0x800) : "memory");
     // Enable MIE (Machine Interrupt Enable, bit 3 = 8) in mstatus
-    __asm__ volatile ("csrs mstatus, 8" ::: "memory");
-}
-
-/*
- * Dedicated Fast 1-Instruction Atomic Enter / Conditional Exit Primitives
- */
-__attribute__((always_inline)) static inline uint32_t thejas32_atomic_enter(void)
-{
-    uint32_t prev_mstatus;
-    __asm__ volatile ("csrrci %0, mstatus, 8" : "=r"(prev_mstatus) : : "memory");
-    return prev_mstatus;
-}
-
-__attribute__((always_inline)) static inline void thejas32_atomic_exit(uint32_t prev_mstatus)
-{
-    if (prev_mstatus & 8U) {
-        __asm__ volatile ("csrs mstatus, 8" : : : "memory");
-    }
+    thejas32_atomic_exit(8U);
 }
 #endif
 

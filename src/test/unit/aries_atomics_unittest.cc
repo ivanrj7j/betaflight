@@ -16,6 +16,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "unittest_macros.h"
@@ -404,4 +405,45 @@ TEST(AriesAtomicsTest, Test_RealStubDriversC_AtomicsPersistentMagicAndAdcZero) {
     EXPECT_EQ(adcGetValue(0), 0U);
     EXPECT_EQ(adcGetValue(1), 0U);
     EXPECT_EQ(adcGetValue(2), 0U);
+}
+
+// =============================================================================
+// Test 9: ET1031 Erratum Guard — Never Execute csrc/csrrci mstatus, 8 When MIE=0
+// =============================================================================
+TEST(AriesAtomicsTest, Test_AtomicEnter_PreservesMpieWhenMieAlreadyZero) {
+    // 1. Verify trap-context mstatus (MPP=3, MPIE=1, MIE=0 = 0x1880) survives atomic shims
+    thejas32_host_reset_all();
+    thejas32_host_mstatus = 0x00001880U;
+    volatile uint32_t word = 1U;
+    EXPECT_EQ(aries_test___atomic_fetch_add_4(&word, 2U, 5), 1U);
+    EXPECT_EQ(word, 3U);
+    EXPECT_EQ(thejas32_host_mstatus, 0x00001880U)
+        << "ET1031 erratum: atomic entry inside trap context (MIE=0) must preserve MPIE (0x1880)!";
+
+    // 2. Verify target RISC-V implementation in platform.h guards csrc mstatus, 8 with (prev_mstatus & 8U)
+    static char buf[32768];
+    const char *paths[] = {
+        "src/platform/ARIES/include/platform/platform.h",
+        "../src/platform/ARIES/include/platform/platform.h",
+        "../../src/platform/ARIES/include/platform/platform.h",
+    };
+    FILE *f = nullptr;
+    for (size_t i = 0; i < sizeof(paths) / sizeof(paths[0]) && !f; i++) {
+        f = fopen(paths[i], "rb");
+    }
+    ASSERT_NE(f, nullptr);
+    const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[n] = '\0';
+
+    EXPECT_EQ(strstr(buf, "csrrci %0, mstatus, 8"), nullptr)
+        << "Unconditional csrrci mstatus, 8 wipes MPIE (0x1880 -> 0x1800) inside ET1031 trap handlers!";
+    const char *riscvSec = strstr(buf, "csrr %0, mstatus");
+    ASSERT_NE(riscvSec, nullptr);
+    const char *enterFn = riscvSec;
+    const char *exitFn = strstr(enterFn, "thejas32_atomic_exit(");
+    ASSERT_NE(exitFn, nullptr);
+    const char *guard = strstr(enterFn, "if (prev_mstatus & 8U)");
+    EXPECT_TRUE(guard != nullptr && guard < exitFn)
+        << "thejas32_atomic_enter() must read mstatus first and skip csrc when MIE is already 0!";
 }

@@ -35,9 +35,31 @@ void ariesProbeRecordUart1Event(uint8_t kind); // 0=isr, 1=noise, 2=suppress, 3=
 void ariesProbeRecordTrap(uint32_t mcause, uint32_t mepc, uint32_t mstatusIn, uint32_t mstatusOut);
 void ariesProbeRecordCsr(uint8_t siteTag, uint32_t prevMstatus);
 // [/HARDWARE-DEBUG-PROBE: DBG-02]
-// [HARDWARE-DEBUG-PROBE: DBG-03]
+// [HARDWARE-DEBUG-PROBE: DBG-03 / DBG-05]
 void ariesProbeRunSiliconLab(void);
-// [/HARDWARE-DEBUG-PROBE: DBG-03]
+extern volatile uint8_t  gProbeFastArmed;
+extern volatile uint8_t  gProbeInTrap;
+extern volatile uint8_t  gProbeLastOkSite;
+extern volatile uint32_t gProbeLastOkCaller;
+void ariesProbeOnMieLost(uint8_t siteTag, const void *caller, uint32_t mstatNow);
+void ariesProbeRecordTimeWarp(uint8_t isMs, uint32_t prevVal, uint32_t curVal);
+
+static inline void ariesProbeCheckMieInline(uint8_t siteTag, const void *caller)
+{
+    // Skip inside trap/ISR context where MIE is cleared by hardware
+    if (!gProbeFastArmed || gProbeInTrap != 0U) {
+        return;
+    }
+    uint32_t mstat = 0U;
+    __asm__ volatile ("csrr %0, mstatus" : "=r"(mstat));
+    if (__builtin_expect((mstat & 8U) == 0U, 0)) {
+        ariesProbeOnMieLost(siteTag, caller, mstat);
+    } else {
+        gProbeLastOkSite = siteTag;
+        gProbeLastOkCaller = (uint32_t)(uintptr_t)caller;
+    }
+}
+// [/HARDWARE-DEBUG-PROBE: DBG-03 / DBG-05]
 
 void ariesProbeTickMain(void);
 void ariesProbeTickSerial(const struct serialPort_s *u0Port, const struct mspPort_s *mspPort);
@@ -64,9 +86,11 @@ void ariesProbeDumpReport(const char *reason, uint32_t arg);
 #define ariesProbeRecordTrap(mcause, mepc, mstatusIn, mstatusOut)           ((void)0)
 #define ariesProbeRecordCsr(siteTag, prevMstatus)                           ((void)0)
 // [/HARDWARE-DEBUG-PROBE: DBG-02]
-// [HARDWARE-DEBUG-PROBE: DBG-03]
+// [HARDWARE-DEBUG-PROBE: DBG-03 / DBG-05]
 #define ariesProbeRunSiliconLab()                                           ((void)0)
-// [/HARDWARE-DEBUG-PROBE: DBG-03]
+#define ariesProbeCheckMieInline(siteTag, caller)                           ((void)0)
+#define ariesProbeRecordTimeWarp(isMs, prevVal, curVal)                     ((void)0)
+// [/HARDWARE-DEBUG-PROBE: DBG-03 / DBG-05]
 #define ariesProbeTickMain()                                                ((void)0)
 #define ariesProbeTickSerial(u0Port, mspPort)                               ((void)0)
 #define ariesProbeRecordMspByte(ps, pks, c, off, dsz, cmd, pend)            ((void)0)

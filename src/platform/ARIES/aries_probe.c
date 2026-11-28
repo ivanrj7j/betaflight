@@ -20,8 +20,13 @@
 #include "platform/aries_probe.h"
 #include "platform/bsp_thejas32.h"
 
-// [HARDWARE-DEBUG-PROBE: DBG-04] Referenced from startup.S trap_entry when ARIES_PROBE_DEBUG > 0
-volatile uint8_t probeTrapMode = 0U;
+// [HARDWARE-DEBUG-PROBE: DBG-04 / DBG-05] Referenced from startup.S trap_entry when ARIES_PROBE_DEBUG > 0
+volatile uint8_t  probeTrapMode = 0U;
+volatile uint32_t probeTrapEnterCnt = 0U;
+volatile uint8_t  gProbeFastArmed = 0U;
+volatile uint8_t  gProbeInTrap = 0U;
+volatile uint8_t  gProbeLastOkSite = 0U;
+volatile uint32_t gProbeLastOkCaller = 0U;
 
 #define PROBE_ISR_RING_LEN 24U
 #define PROBE_RX_RING_LEN  48U
@@ -145,17 +150,52 @@ static struct {
     volatile bool     badTrapCaptured;
     volatile bool     mieArmed;
     volatile bool     mieLostDumped;
+    // [HARDWARE-DEBUG-PROBE: DBG-05] Raw hardware CSR snapshot + timewarp telemetry
+    volatile uint32_t trigCaller;
+    volatile uint32_t trigHwMepc;
+    volatile uint32_t trigHwMcause;
+    volatile uint32_t trigHwMtval;
+    volatile uint32_t trigHwStat;
+    volatile uint32_t trigHwRaw;
+    volatile uint32_t warpUsCnt;
+    volatile uint32_t warpUsPrev;
+    volatile uint32_t warpUsCur;
+    volatile uint32_t warpMsCnt;
+    volatile uint32_t warpMsPrev;
+    volatile uint32_t warpMsCur;
+    volatile uint8_t  trigSite;
     // [/HARDWARE-DEBUG-PROBE: DBG-02]
 
     const serialPort_t *lastU0Port;
     const mspPort_t *lastMspPort;
 } gProbe;
 
-// [HARDWARE-DEBUG-PROBE: DBG-02]
+// [HARDWARE-DEBUG-PROBE: DBG-02 / DBG-05]
 static inline uint32_t probeReadMstatus(void)
 {
     uint32_t val = 0U;
     __asm__ volatile ("csrr %0, mstatus" : "=r"(val));
+    return val;
+}
+
+static inline uint32_t probeReadMepc(void)
+{
+    uint32_t val = 0U;
+    __asm__ volatile ("csrr %0, mepc" : "=r"(val));
+    return val;
+}
+
+static inline uint32_t probeReadMcause(void)
+{
+    uint32_t val = 0U;
+    __asm__ volatile ("csrr %0, mcause" : "=r"(val));
+    return val;
+}
+
+static inline uint32_t probeReadMtval(void)
+{
+    uint32_t val = 0U;
+    __asm__ volatile ("csrr %0, mtval" : "=r"(val));
     return val;
 }
 
@@ -398,15 +438,50 @@ void ariesProbeRecordTrap(uint32_t mcause, uint32_t mepc, uint32_t mstatusIn, ui
     }
 }
 
-static void probeCheckMieCommon(uint8_t siteTag, uint32_t mstatNow)
+void ariesProbeRecordTimeWarp(uint8_t isMs, uint32_t prevVal, uint32_t curVal)
+{
+    if (isMs) {
+        if (gProbe.warpMsCnt == 0U) {
+            gProbe.warpMsPrev = prevVal;
+            gProbe.warpMsCur = curVal;
+        }
+        gProbe.warpMsCnt++;
+    } else {
+        if (gProbe.warpUsCnt == 0U) {
+            gProbe.warpUsPrev = prevVal;
+            gProbe.warpUsCur = curVal;
+        }
+        gProbe.warpUsCnt++;
+    }
+}
+
+void ariesProbeOnMieLost(uint8_t siteTag, const void *caller, uint32_t mstatNow)
+{
+    (void)mstatNow;
+    if (gProbe.dumpInProgress || gProbe.mieLostDumped || !gProbe.mieArmed) {
+        return;
+    }
+    gProbeFastArmed = 0U;
+    gProbe.mieLostDumped = true;
+    gProbe.trigSite     = siteTag;
+    gProbe.trigCaller   = (uint32_t)(uintptr_t)caller;
+    gProbe.trigHwMepc   = probeReadMepc();
+    gProbe.trigHwMcause = probeReadMcause();
+    gProbe.trigHwMtval  = probeReadMtval();
+    gProbe.trigHwStat   = THEJAS32_INTR_CTRL.INTR_STATUS;
+    gProbe.trigHwRaw    = THEJAS32_INTR_CTRL.RAW_INTR;
+    ariesProbeDumpReport("MIE_LOST", ((uint32_t)siteTag << 24) | (gProbe.trapHead & 0xFFFFFFU));
+}
+
+static void probeCheckMieCommon(uint8_t siteTag, uint32_t mstatNow, const void *caller)
 {
     if ((mstatNow & 8U) != 0U) {
         gProbe.mieArmed = true;
+        gProbeFastArmed = 1U;
         return;
     }
     if (gProbe.mieArmed && !gProbe.mieLostDumped) {
-        gProbe.mieLostDumped = true;
-        ariesProbeDumpReport("MIE_LOST", ((uint32_t)siteTag << 24) | (gProbe.trapHead & 0xFFFFFFU));
+        ariesProbeOnMieLost(siteTag, caller, mstatNow);
     }
 }
 
@@ -414,13 +489,32 @@ void ariesProbeRecordCsr(uint8_t siteTag, uint32_t prevMstatus)
 {
     uint32_t postMstatus = probeReadMstatus();
     gProbe.lastCsrSite = siteTag;
-    gProbe.lastCsrMs16 = (uint16_t)(millis() & 0xFFFFU);
     gProbe.lastCsrPre = prevMstatus;
     gProbe.lastCsrPost = postMstatus;
 
     if ((prevMstatus & 8U) != 0U && (postMstatus & 8U) == 0U && !gProbe.mieLostDumped) {
+        gProbeFastArmed = 0U;
         gProbe.mieLostDumped = true;
+        gProbe.trigSite     = siteTag;
+        gProbe.trigCaller   = (uint32_t)(uintptr_t)__builtin_return_address(0);
+        gProbe.trigHwMepc   = probeReadMepc();
+        gProbe.trigHwMcause = probeReadMcause();
+        gProbe.trigHwMtval  = probeReadMtval();
+        gProbe.trigHwStat   = THEJAS32_INTR_CTRL.INTR_STATUS;
+        gProbe.trigHwRaw    = THEJAS32_INTR_CTRL.RAW_INTR;
         ariesProbeDumpReport("CSR_MIE_DROP", ((uint32_t)siteTag << 24) | (gProbe.trapHead & 0xFFFFFFU));
+        return;
+    }
+
+    // Nested atomic sections (prevMstatus.MIE == 0, e.g. taskHandleSerial -> uartIrqHandler -> uartEnableTxInterrupt)
+    // intentionally run millis() while outer MIE=0; suppress MIE_LOST alarm until the outer atomic exit.
+    uint8_t savedFast = gProbeFastArmed;
+    if ((prevMstatus & 8U) == 0U) {
+        gProbeFastArmed = 0U;
+    }
+    gProbe.lastCsrMs16 = (uint16_t)(millis() & 0xFFFFU);
+    if ((prevMstatus & 8U) == 0U) {
+        gProbeFastArmed = savedFast;
     }
 }
 // [/HARDWARE-DEBUG-PROBE: DBG-02]
@@ -428,7 +522,7 @@ void ariesProbeRecordCsr(uint8_t siteTag, uint32_t prevMstatus)
 void ariesProbeTickMain(void)
 {
     gProbe.taskMainCnt++;
-    probeCheckMieCommon('M', probeReadMstatus()); // [HARDWARE-DEBUG-PROBE: DBG-02]
+    probeCheckMieCommon('M', probeReadMstatus(), __builtin_return_address(0)); // [HARDWARE-DEBUG-PROBE: DBG-02]
 }
 
 void ariesProbeTickSerial(const serialPort_t *u0Port, const mspPort_t *mspPort)
@@ -443,7 +537,7 @@ void ariesProbeTickSerial(const serialPort_t *u0Port, const mspPort_t *mspPort)
         LED0_TOGGLE;
     }
 
-    probeCheckMieCommon('S', probeReadMstatus()); // [HARDWARE-DEBUG-PROBE: DBG-02]
+    probeCheckMieCommon('S', probeReadMstatus(), __builtin_return_address(0)); // [HARDWARE-DEBUG-PROBE: DBG-02]
 
     if (!gProbe.sawTraffic || gProbe.stallDumped) {
         return;
@@ -623,12 +717,37 @@ void ariesProbeDumpReport(const char *reason, uint32_t arg)
 
     // [HARDWARE-DEBUG-PROBE: DBG-02] Dump trap & CSR telemetry
     thejas32_early_uart_puts("\r\n  TRAP : cnt="); probePrintDec(gProbe.trapHead);
+    thejas32_early_uart_puts(" ent="); probePrintDec(probeTrapEnterCnt);
     thejas32_early_uart_puts(" badMpie="); probePrintDec(gProbe.badMpieTrapCnt);
     thejas32_early_uart_puts(" csr=");
     thejas32_early_uart_putc((gProbe.lastCsrSite >= 32U && gProbe.lastCsrSite < 127U) ? (char)gProbe.lastCsrSite : '?');
     thejas32_early_uart_putc('@'); probePrintDec(gProbe.lastCsrMs16);
     thejas32_early_uart_puts(" 0x"); thejas32_early_uart_print_hex(gProbe.lastCsrPre);
     thejas32_early_uart_puts("->0x"); thejas32_early_uart_print_hex(gProbe.lastCsrPost);
+
+    if (gProbe.trigSite != 0U) {
+        thejas32_early_uart_puts("\r\n  TRIG : site=");
+        thejas32_early_uart_putc((gProbe.trigSite >= 32U && gProbe.trigSite < 127U) ? (char)gProbe.trigSite : '?');
+        thejas32_early_uart_puts(" caller=0x"); thejas32_early_uart_print_hex(gProbe.trigCaller);
+        thejas32_early_uart_puts(" lastOk=");
+        thejas32_early_uart_putc((gProbeLastOkSite >= 32U && gProbeLastOkSite < 127U) ? (char)gProbeLastOkSite : '?');
+        thejas32_early_uart_puts("@0x"); thejas32_early_uart_print_hex(gProbeLastOkCaller);
+        thejas32_early_uart_puts(" hwMepc=0x"); thejas32_early_uart_print_hex(gProbe.trigHwMepc);
+        thejas32_early_uart_puts(" hwMcause=0x"); thejas32_early_uart_print_hex(gProbe.trigHwMcause);
+        thejas32_early_uart_puts(" hwMtval=0x"); thejas32_early_uart_print_hex(gProbe.trigHwMtval);
+        thejas32_early_uart_puts(" hwStat=0x"); thejas32_early_uart_print_hex(gProbe.trigHwStat);
+        thejas32_early_uart_puts(" hwRaw=0x"); thejas32_early_uart_print_hex(gProbe.trigHwRaw);
+    }
+
+    if (gProbe.warpUsCnt > 0U || gProbe.warpMsCnt > 0U) {
+        thejas32_early_uart_puts("\r\n  WARP : u="); probePrintDec(gProbe.warpUsCnt);
+        thejas32_early_uart_puts("(0x"); thejas32_early_uart_print_hex(gProbe.warpUsPrev);
+        thejas32_early_uart_puts("->0x"); thejas32_early_uart_print_hex(gProbe.warpUsCur);
+        thejas32_early_uart_puts(") m="); probePrintDec(gProbe.warpMsCnt);
+        thejas32_early_uart_puts("(0x"); thejas32_early_uart_print_hex(gProbe.warpMsPrev);
+        thejas32_early_uart_puts("->0x"); thejas32_early_uart_print_hex(gProbe.warpMsCur);
+        thejas32_early_uart_putc(')');
+    }
 
     if (gProbe.badTrapCaptured) {
         thejas32_early_uart_puts("\r\n  BAD_T: idx="); probePrintDec(gProbe.badTrapIdx);
@@ -668,18 +787,25 @@ void ariesProbeDumpReport(const char *reason, uint32_t arg)
     gProbe.dumpInProgress = false;
 }
 
-// [HARDWARE-DEBUG-PROBE: DBG-04] Boot-time Silicon Lab: reproduces & isolates MIE=0 / millis / div silicon behavior
+// [HARDWARE-DEBUG-PROBE: DBG-05] Boot-time Silicon Lab: full root-cause isolation matrix
 static volatile uint32_t gLabIrqCnt = 0U;
-static volatile uint8_t  gLabLongIsr = 0U;
 static volatile uint32_t gLabSink = 0U;
 
 enum {
-    LAB_MODE_OLD_MILLIS_WAIT = 0U,
-    LAB_MODE_OLD_DIV_MILLIS  = 1U,
+    LAB_MODE_GPR_CHK         = 1U,
     LAB_MODE_MCYCLE_MILLIS   = 2U,
     LAB_MODE_MCYCLE_DIV_CHK  = 3U,
     LAB_MODE_MCYCLE_NODIV    = 4U,
-    LAB_MODE_MCYCLE_ATOMIC   = 5U,
+    LAB_MODE_MCYCLE_NOP      = 6U,
+    LAB_MODE_MCYCLE_MUL_CHK  = 7U,
+    LAB_MODE_MCYCLE_CSR_READ = 8U,
+    LAB_MODE_MCYCLE_DIV_ATOM = 9U,
+    LAB_MODE_MULHU_TIME      = 10U,
+    LAB_MODE_MMIO_POLL       = 11U,
+    LAB_MODE_DIVU_ONLY       = 12U,
+    LAB_MODE_REMU_ONLY       = 13U,
+    LAB_MODE_SDIV_ONLY       = 14U,
+    LAB_MODE_SREM_ONLY       = 15U,
 };
 
 static inline uint32_t labReadMcycle(void)
@@ -689,23 +815,43 @@ static inline uint32_t labReadMcycle(void)
     return c;
 }
 
+static inline uint64_t labReadMcycle64(void)
+{
+    uint32_t hi, lo, hi2;
+    do {
+        __asm__ volatile ("csrr %0, mcycleh" : "=r"(hi));
+        __asm__ volatile ("csrr %0, mcycle" : "=r"(lo));
+        __asm__ volatile ("csrr %0, mcycleh" : "=r"(hi2));
+    } while (hi != hi2);
+    return ((uint64_t)hi << 32) | (uint64_t)lo;
+}
+
+// Exact lockless mulhu+shift millis() candidate (zero div/divu/rem/remu instructions)
+__attribute__((noinline)) static uint32_t labMulhuMillis(void)
+{
+    uint64_t c = labReadMcycle64();
+    uint32_t hi = (uint32_t)(c >> 32);
+    uint32_t lo = (uint32_t)c;
+    uint32_t q_hi = (uint32_t)(((uint64_t)(hi >> 5) * 0x0A7C5AC5ULL) >> 39);
+    uint32_t r_hi = hi - (q_hi * 100000U);
+    uint64_t rem = (uint64_t)r_hi * 67296ULL + (uint64_t)lo;
+    uint32_t carry = (uint32_t)(rem >> 32);
+    uint32_t lo_sum = (uint32_t)rem;
+    uint32_t rem_adj = carry * 67296U + lo_sum;
+    uint32_t q_lo = (uint32_t)(((uint64_t)(rem_adj >> 5) * 0x0A7C5AC5ULL) >> 39);
+    return (r_hi * 42949U) + (carry * 42949U) + q_lo;
+}
+
 static void labTimer1Isr(void)
 {
     (void)THEJAS32_TIMER(1).EOI;
     gLabIrqCnt++;
-    if (gLabLongIsr) {
-        const uint32_t start = labReadMcycle();
-        while ((uint32_t)(labReadMcycle() - start) < 1500U) {
-            __asm__ volatile ("nop");
-        }
-    }
 }
 
-static void labRunTimer1Case(const char *tag, uint8_t mode, uint8_t trapMode, uint8_t longIsr, uint32_t durationMs)
+static void labRunTimer1Case(const char *tag, uint8_t mode, uint8_t trapMode, uint32_t durationMs)
 {
     probeTrapMode = trapMode;
     gLabIrqCnt = 0U;
-    gLabLongIsr = longIsr;
 
     THEJAS32_TIMER(1).Control = 0U;
     (void)THEJAS32_TIMER(1).EOI;
@@ -713,19 +859,30 @@ static void labRunTimer1Case(const char *tag, uint8_t mode, uint8_t trapMode, ui
     THEJAS32_MEMORY_FENCE();
 
     uint32_t drops = 0U;
+    uint32_t noEntDrops = 0U;
+    uint32_t statPendDrops = 0U;
     uint32_t prevDrops = 0U;
-    uint32_t divErr = 0U;
+    uint32_t arithErr = 0U;
+    uint32_t errKind = 0U;
     uint32_t msJumps = 0U;
+    uint32_t firstIter = 0U;
     uint32_t firstMstat = 0U;
     uint32_t firstIrq = 0U;
-    uint32_t firstMepc = 0U;
-    uint32_t firstIn = 0U;
-    uint32_t firstOut = 0U;
-    uint32_t badDivA = 0U;
-    uint32_t badDivQ = 0U;
-    uint32_t badMsPrev = 0U;
-    uint32_t badMsNow = 0U;
+    uint32_t firstEnt = 0U;
+    uint32_t firstTr = 0U;
+    uint32_t firstHwMepc = 0U;
+    uint32_t firstHwMcause = 0U;
+    uint32_t firstHwMtval = 0U;
+    uint32_t firstStat = 0U;
+    uint32_t firstRaw = 0U;
+    uint32_t badA = 0U, badD = 0U, badQ = 0U, badR = 0U, badSq = 0U;
+    uint32_t badMsPrev = 0U, badMsCur = 0U;
+    uint32_t d2It = 0U, d2Ent = 0U, d2Stat = 0U, d2Mepc = 0U, diffEpcCnt = 0U, diffCauseCnt = 0U;
     uint32_t iter = 0U;
+
+    const uint32_t ent0 = probeTrapEnterCnt;
+    const uint32_t tr0 = gProbe.trapHead;
+    uint32_t lastEntSeen = 0U;
 
     thejas32_interrupt_register(THEJAS32_IRQ_TIMER1, labTimer1Isr);
     thejas32_interrupt_enable(THEJAS32_IRQ_TIMER1);
@@ -735,100 +892,251 @@ static void labRunTimer1Case(const char *tag, uint8_t mode, uint8_t trapMode, ui
 
     const uint32_t targetCyc = durationMs * 100000U;
     const uint32_t c0 = labReadMcycle();
-    const timeMs_t t0 = millis();
-    timeMs_t prevMs = t0;
-    const bool useMillisExit = (mode == LAB_MODE_OLD_MILLIS_WAIT) || (mode == LAB_MODE_OLD_DIV_MILLIS);
+    timeMs_t prevMs = (mode == LAB_MODE_MULHU_TIME) ? labMulhuMillis() : millis();
+    uint64_t prevC64 = 0ULL;
 
-    while (1) {
+    while ((uint32_t)(labReadMcycle() - c0) < targetCyc) {
         iter++;
-        if (useMillisExit) {
-            const timeMs_t curMs = millis();
-            const uint32_t stepMs = (uint32_t)(curMs - prevMs);
-            if (stepMs > 5U && msJumps == 0U) {
-                badMsPrev = prevMs;
-                badMsNow = curMs;
+        if (mode == LAB_MODE_GPR_CHK) {
+            uint32_t gprBad = 0U;
+            __asm__ volatile (
+                "li t0, 0x11111111\n\t"
+                "li t1, 0x22222222\n\t"
+                "li t2, 0x33333333\n\t"
+                "li t3, 0x44444444\n\t"
+                "li t4, 0x55555555\n\t"
+                "li t5, 0x66666666\n\t"
+                "li t6, 0x77777777\n\t"
+                ".rept 24\n\tnop\n\t.endr\n\t"
+                "li %0, 0\n\t"
+                "li a4, 0x11111111\n\t"
+                "beq t0, a4, 1f\n\t"
+                "ori %0, %0, 1\n\t"
+                "1: li a4, 0x22222222\n\t"
+                "beq t1, a4, 2f\n\t"
+                "ori %0, %0, 2\n\t"
+                "2: li a4, 0x33333333\n\t"
+                "beq t2, a4, 3f\n\t"
+                "ori %0, %0, 4\n\t"
+                "3: li a4, 0x44444444\n\t"
+                "beq t3, a4, 4f\n\t"
+                "ori %0, %0, 8\n\t"
+                "4: li a4, 0x55555555\n\t"
+                "beq t4, a4, 5f\n\t"
+                "ori %0, %0, 16\n\t"
+                "5: li a4, 0x66666666\n\t"
+                "beq t5, a4, 6f\n\t"
+                "ori %0, %0, 32\n\t"
+                "6: li a4, 0x77777777\n\t"
+                "beq t6, a4, 7f\n\t"
+                "ori %0, %0, 64\n\t"
+                "7:\n\t"
+                : "=&r"(gprBad)
+                :
+                : "t0", "t1", "t2", "t3", "t4", "t5", "t6", "a4", "memory"
+            );
+            if (gprBad != 0U) {
+                arithErr++;
+                errKind |= gprBad;
             }
+        } else if (mode == LAB_MODE_MCYCLE_MILLIS || mode == LAB_MODE_MULHU_TIME) {
+            const timeMs_t curMs = (mode == LAB_MODE_MULHU_TIME) ? labMulhuMillis() : millis();
+            const uint32_t stepMs = (uint32_t)(curMs - prevMs);
             if (stepMs > 5U) {
+                if (msJumps == 0U) {
+                    badMsPrev = prevMs;
+                    badMsCur = curMs;
+                }
                 msJumps++;
             }
             prevMs = curMs;
-            if ((uint32_t)(curMs - t0) >= durationMs) {
-                break;
+            gLabSink ^= curMs;
+        } else if (mode == LAB_MODE_MCYCLE_DIV_CHK) {
+            uint32_t a = 0x12345670U + (iter & 0xFFU);
+            uint32_t d = 97U + (iter & 7U);
+            __asm__ volatile ("" : "+r"(a), "+r"(d));
+            uint32_t q = a / d;
+            uint32_t r = a % d;
+            int32_t sa = (int32_t)a;
+            int32_t sd = -(int32_t)d;
+            int32_t sq = sa / sd;
+            uint32_t qBad = ((uint32_t)(q * d) > a) ? 1U : 0U;
+            uint32_t rBad = (r >= d || (q * d + r) != a) ? 2U : 0U;
+            uint32_t sqBad = ((uint32_t)(sq * sd) != (a - r)) ? 4U : 0U;
+            uint32_t kMask = qBad | rBad | sqBad;
+            if (kMask != 0U) {
+                if (arithErr == 0U) {
+                    badA = a; badD = d; badQ = q; badR = r; badSq = (uint32_t)sq;
+                }
+                arithErr++;
+                errKind |= kMask;
             }
-            if (mode == LAB_MODE_OLD_DIV_MILLIS) {
-                uint32_t cyc = labReadMcycle();
-                __asm__ volatile ("" : "+r"(cyc));
-                uint32_t q = cyc / 100U;
-                gLabSink ^= q;
+            gLabSink ^= q ^ r ^ (uint32_t)sq;
+        } else if (mode == LAB_MODE_MCYCLE_NODIV) {
+            uint32_t x = iter * 2654435761U;
+            x ^= (x >> 13);
+            gLabSink ^= x;
+        } else if (mode == LAB_MODE_MCYCLE_NOP) {
+            __asm__ volatile (".rept 32\n\tnop\n\t.endr" ::: "memory");
+        } else if (mode == LAB_MODE_MCYCLE_MUL_CHK) {
+            uint32_t a = 0x12345670U + (iter & 0xFFU);
+            uint32_t k = 0x80000001U;
+            __asm__ volatile ("" : "+r"(a), "+r"(k));
+            uint64_t p = (uint64_t)a * (uint64_t)k;
+            uint64_t ref = ((uint64_t)a << 31) + (uint64_t)a;
+            if (p != ref) {
+                if (arithErr == 0U) {
+                    badA = a; badQ = (uint32_t)(p >> 32); badR = (uint32_t)p;
+                }
+                arithErr++;
+                errKind |= 8U;
             }
-        } else {
-            if ((uint32_t)(labReadMcycle() - c0) >= targetCyc) {
-                break;
+            gLabSink ^= (uint32_t)(p ^ (p >> 32));
+        } else if (mode == LAB_MODE_MCYCLE_CSR_READ) {
+            uint64_t c64 = labReadMcycle64();
+            if (prevC64 != 0ULL && c64 < prevC64) {
+                arithErr++;
+                errKind |= 16U;
             }
-            if (mode == LAB_MODE_MCYCLE_MILLIS) {
-                const timeMs_t curMs = millis();
-                const uint32_t stepMs = (uint32_t)(curMs - prevMs);
-                if (stepMs > 5U && msJumps == 0U) {
-                    badMsPrev = prevMs;
-                    badMsNow = curMs;
-                }
-                if (stepMs > 5U) {
-                    msJumps++;
-                }
-                prevMs = curMs;
-                gLabSink ^= curMs;
-            } else if (mode == LAB_MODE_MCYCLE_DIV_CHK) {
-                uint32_t a = 0x12345670U + (iter & 0xFFU);
-                uint32_t d = 97U + (iter & 7U);
-                __asm__ volatile ("" : "+r"(a), "+r"(d));
-                uint32_t q = a / d;
-                uint32_t r = a % d;
-                int32_t sa = (int32_t)a;
-                int32_t sd = -(int32_t)d;
-                int32_t sq = sa / sd;
-                if ((q * d + r) != a || ((uint32_t)(sq * sd) != (a - r))) {
-                    if (divErr == 0U) {
-                        badDivA = a;
-                        badDivQ = q;
-                    }
-                    divErr++;
-                }
-                gLabSink ^= q ^ (uint32_t)sq;
-            } else if (mode == LAB_MODE_MCYCLE_NODIV) {
-                uint32_t x = iter * 2654435761U;
-                x ^= (x >> 13);
-                gLabSink ^= x;
-            } else if (mode == LAB_MODE_MCYCLE_ATOMIC) {
-                uint32_t prev = thejas32_atomic_enter();
-                if ((prev & 8U) == 0U) {
-                    prevDrops++;
-                }
-                for (int k = 0; k < 16; k++) {
-                    __asm__ volatile ("nop");
-                }
-                thejas32_atomic_exit(prev);
+            prevC64 = c64;
+            gLabSink ^= (uint32_t)c64 ^ (uint32_t)(c64 >> 32);
+        } else if (mode == LAB_MODE_MCYCLE_DIV_ATOM) {
+            uint32_t a = 0x12345670U + (iter & 0xFFU);
+            uint32_t d = 97U + (iter & 7U);
+            __asm__ volatile ("" : "+r"(a), "+r"(d));
+            uint32_t prev = thejas32_atomic_enter();
+            if ((prev & 8U) == 0U) {
+                prevDrops++;
             }
+            uint32_t q = a / d;
+            uint32_t r = a % d;
+            int32_t sa = (int32_t)a;
+            int32_t sd = -(int32_t)d;
+            int32_t sq = sa / sd;
+            thejas32_atomic_exit(prev);
+            if ((q * d + r) != a || ((uint32_t)(sq * sd) != (a - r))) {
+                arithErr++;
+                errKind |= 32U;
+            }
+            gLabSink ^= q ^ (uint32_t)sq;
+        } else if (mode == LAB_MODE_MMIO_POLL) {
+            uint32_t t0v = THEJAS32_TIMER(0).CurrentValue;
+            uint32_t u0l = THEJAS32_UART(0).UART_LSR;
+            uint32_t rwi = THEJAS32_INTR_CTRL.RAW_INTR;
+            gLabSink ^= t0v ^ u0l ^ rwi;
+        } else if (mode == LAB_MODE_DIVU_ONLY) {
+            uint32_t a = 0x12345670U + (iter & 0xFFU);
+            uint32_t d = 97U + (iter & 7U);
+            __asm__ volatile ("" : "+r"(a), "+r"(d));
+            uint32_t q = a / d;
+            uint64_t pd = (uint64_t)q * (uint64_t)d;
+            if (pd > a || ((uint64_t)a - pd) >= d) {
+                if (arithErr == 0U) {
+                    badA = a; badD = d; badQ = q;
+                }
+                arithErr++;
+                errKind |= 1U;
+            }
+            gLabSink ^= q;
+        } else if (mode == LAB_MODE_REMU_ONLY) {
+            uint32_t a = 0x12345670U + (iter & 0xFFU);
+            uint32_t d = 100U;
+            __asm__ volatile ("" : "+r"(a), "+r"(d));
+            uint32_t r = a % d;
+            uint32_t qRef = (uint32_t)(((uint64_t)a * 0x51EB851FULL) >> 37);
+            if (r >= 100U || (qRef * 100U + r) != a) {
+                if (arithErr == 0U) {
+                    badA = a; badD = 100U; badQ = qRef; badR = r;
+                }
+                arithErr++;
+                errKind |= 2U;
+            }
+            gLabSink ^= r;
+        } else if (mode == LAB_MODE_SDIV_ONLY) {
+            int32_t sa = (int32_t)(0x12345670U + (iter & 0xFFU));
+            int32_t sd = -(int32_t)(97U + (iter & 7U));
+            __asm__ volatile ("" : "+r"(sa), "+r"(sd));
+            int32_t sq = sa / sd;
+            int64_t prod = (int64_t)sq * (int64_t)sd;
+            int64_t diff = (int64_t)sa - prod;
+            if (diff < 0 || diff >= -(int64_t)sd) {
+                if (arithErr == 0U) {
+                    badA = (uint32_t)sa; badD = (uint32_t)(-sd); badSq = (uint32_t)sq;
+                }
+                arithErr++;
+                errKind |= 4U;
+            }
+            gLabSink ^= (uint32_t)sq;
+        } else if (mode == LAB_MODE_SREM_ONLY) {
+            int32_t sa = -(int32_t)(0x12345670U + (iter & 0xFFU));
+            int32_t sd = 100;
+            __asm__ volatile ("" : "+r"(sa), "+r"(sd));
+            int32_t sr = sa % sd;
+            uint32_t ua = (uint32_t)(-sa);
+            uint32_t qRef = (uint32_t)(((uint64_t)ua * 0x51EB851FULL) >> 37);
+            if (sr > 0 || sr <= -100 || (qRef * 100U + (uint32_t)(-sr)) != ua) {
+                if (arithErr == 0U) {
+                    badA = ua; badD = 100U; badQ = qRef; badR = (uint32_t)sr;
+                }
+                arithErr++;
+                errKind |= 64U;
+            }
+            gLabSink ^= (uint32_t)sr;
         }
 
+        // Snapshot raw CSRs & controller state BEFORE calling __enable_irq()
         uint32_t m = probeReadMstatus();
         if ((m & 8U) == 0U) {
+            uint32_t hwMepc   = probeReadMepc();
+            uint32_t hwMcause = probeReadMcause();
+            uint32_t hwMtval  = probeReadMtval();
+            uint32_t intrStat = THEJAS32_INTR_CTRL.INTR_STATUS;
+            uint32_t intrRaw  = THEJAS32_INTR_CTRL.RAW_INTR;
+            uint32_t curEnt   = probeTrapEnterCnt - ent0;
+            uint32_t curTr    = gProbe.trapHead - tr0;
+
+            if (curEnt == lastEntSeen) {
+                noEntDrops++;
+            }
+            if ((intrStat & (1UL << THEJAS32_IRQ_TIMER1)) != 0U) {
+                statPendDrops++;
+            }
             if (drops == 0U) {
+                firstIter = iter;
                 firstMstat = m;
                 firstIrq = gLabIrqCnt;
-                if (gProbe.trapHead > 0U) {
-                    const probeTrapRec_t *lastT = &gProbe.trapRing[(gProbe.trapHead - 1U) % PROBE_TRAP_RING_LEN];
-                    firstMepc = lastT->mepc;
-                    firstIn = lastT->mstatusIn;
-                    firstOut = lastT->mstatusOut;
+                firstEnt = curEnt;
+                firstTr = curTr;
+                firstHwMepc = hwMepc;
+                firstHwMcause = hwMcause;
+                firstHwMtval = hwMtval;
+                firstStat = intrStat;
+                firstRaw = intrRaw;
+            } else {
+                if (drops == 1U) {
+                    d2It = iter;
+                    d2Ent = curEnt;
+                    d2Stat = intrStat;
+                    d2Mepc = hwMepc;
+                }
+                if (hwMepc != firstHwMepc) {
+                    diffEpcCnt++;
+                }
+                if (hwMcause != firstHwMcause) {
+                    diffCauseCnt++;
                 }
             }
+            lastEntSeen = curEnt;
             drops++;
             __enable_irq();
+        } else {
+            lastEntSeen = probeTrapEnterCnt - ent0;
         }
     }
 
     const uint32_t elapCyc = (uint32_t)(labReadMcycle() - c0);
-    const timeMs_t t1 = millis();
+    const uint32_t elapEnt = probeTrapEnterCnt - ent0;
+    const uint32_t elapTr = gProbe.trapHead - tr0;
 
     THEJAS32_TIMER(1).Control = 0U;
     (void)THEJAS32_TIMER(1).EOI;
@@ -841,105 +1149,140 @@ static void labRunTimer1Case(const char *tag, uint8_t mode, uint8_t trapMode, ui
     thejas32_early_uart_puts(" tm="); probePrintDec(trapMode);
     thejas32_early_uart_puts(" cyc="); probePrintDec(elapCyc);
     thejas32_early_uart_puts(" it="); probePrintDec(iter);
+    thejas32_early_uart_puts(" ent="); probePrintDec(elapEnt);
+    thejas32_early_uart_puts(" tr="); probePrintDec(elapTr);
     thejas32_early_uart_puts(" irqs="); probePrintDec(gLabIrqCnt);
     thejas32_early_uart_puts(" drops="); probePrintDec(drops);
-    if (mode == LAB_MODE_MCYCLE_ATOMIC) {
+    if (drops > 0U) {
+        thejas32_early_uart_puts("(noE="); probePrintDec(noEntDrops);
+        thejas32_early_uart_puts(",pend="); probePrintDec(statPendDrops);
+        thejas32_early_uart_putc(')');
+    }
+    if (mode == LAB_MODE_MCYCLE_DIV_ATOM) {
         thejas32_early_uart_puts(" pre0="); probePrintDec(prevDrops);
     }
-    if (divErr > 0U) {
-        thejas32_early_uart_puts(" divErr="); probePrintDec(divErr);
-        thejas32_early_uart_puts("(a=0x"); thejas32_early_uart_print_hex(badDivA);
-        thejas32_early_uart_puts(",q=0x"); thejas32_early_uart_print_hex(badDivQ);
-        thejas32_early_uart_puts(")");
+    if (arithErr > 0U) {
+        thejas32_early_uart_puts(" err="); probePrintDec(arithErr);
+        thejas32_early_uart_puts("(k=0x"); thejas32_early_uart_print_hex(errKind);
+        thejas32_early_uart_puts(" a=0x"); thejas32_early_uart_print_hex(badA);
+        thejas32_early_uart_puts(" d="); probePrintDec(badD);
+        thejas32_early_uart_puts(" q=0x"); thejas32_early_uart_print_hex(badQ);
+        thejas32_early_uart_puts(" r="); probePrintDec(badR);
+        thejas32_early_uart_puts(" sq=0x"); thejas32_early_uart_print_hex(badSq);
+        thejas32_early_uart_putc(')');
     }
-    if (msJumps > 0U || useMillisExit) {
+    if (msJumps > 0U) {
         thejas32_early_uart_puts(" msJ="); probePrintDec(msJumps);
-        thejas32_early_uart_puts(" t="); probePrintDec(t0);
-        thejas32_early_uart_puts("->"); probePrintDec(t1);
-        if (msJumps > 0U) {
-            thejas32_early_uart_puts("(0x"); thejas32_early_uart_print_hex(badMsPrev);
-            thejas32_early_uart_puts("->0x"); thejas32_early_uart_print_hex(badMsNow);
-            thejas32_early_uart_puts(")");
-        }
+        thejas32_early_uart_puts("(0x"); thejas32_early_uart_print_hex(badMsPrev);
+        thejas32_early_uart_puts("->0x"); thejas32_early_uart_print_hex(badMsCur);
+        thejas32_early_uart_putc(')');
     }
     if (drops > 0U) {
-        thejas32_early_uart_puts(" firstIrq="); probePrintDec(firstIrq);
-        thejas32_early_uart_puts(" m=0x"); thejas32_early_uart_print_hex(firstMstat);
-        thejas32_early_uart_puts(" epc=0x"); thejas32_early_uart_print_hex(firstMepc);
-        thejas32_early_uart_puts(" in=0x"); thejas32_early_uart_print_hex(firstIn);
-        thejas32_early_uart_puts(" out=0x"); thejas32_early_uart_print_hex(firstOut);
+        thejas32_early_uart_puts(" it0="); probePrintDec(firstIter);
+        thejas32_early_uart_puts(" f(e="); probePrintDec(firstEnt);
+        thejas32_early_uart_puts(",t="); probePrintDec(firstTr);
+        thejas32_early_uart_puts(",i="); probePrintDec(firstIrq);
+        thejas32_early_uart_puts(") m=0x"); thejas32_early_uart_print_hex(firstMstat);
+        thejas32_early_uart_puts(" hw(c=0x"); thejas32_early_uart_print_hex(firstHwMcause);
+        thejas32_early_uart_puts(",epc=0x"); thejas32_early_uart_print_hex(firstHwMepc);
+        thejas32_early_uart_puts(",tv=0x"); thejas32_early_uart_print_hex(firstHwMtval);
+        thejas32_early_uart_puts(",st=0x"); thejas32_early_uart_print_hex(firstStat);
+        thejas32_early_uart_puts(",rw=0x"); thejas32_early_uart_print_hex(firstRaw);
+        thejas32_early_uart_putc(')');
+        if (drops > 1U) {
+            thejas32_early_uart_puts(" d2(it="); probePrintDec(d2It);
+            thejas32_early_uart_puts(",e="); probePrintDec(d2Ent);
+            thejas32_early_uart_puts(",epc=0x"); thejas32_early_uart_print_hex(d2Mepc);
+            thejas32_early_uart_puts(",st=0x"); thejas32_early_uart_print_hex(d2Stat);
+            thejas32_early_uart_puts(",dE="); probePrintDec(diffEpcCnt);
+            thejas32_early_uart_puts(",dC="); probePrintDec(diffCauseCnt);
+            thejas32_early_uart_putc(')');
+        }
     }
     thejas32_early_uart_puts("\r\n");
 }
 
 void ariesProbeRunSiliconLab(void)
 {
-    uint32_t m0 = 0U, sM1 = 0U, sM2 = 0U, sM3 = 0U, sM4 = 0U;
-    uint32_t anom = 0U;
+    uint32_t mvendor = 0U, marchid = 0U, mimpid = 0U, misa = 0U, mtvec = 0U, mstat0 = 0U, mie0 = 0U;
+    __asm__ volatile ("csrr %0, mvendorid" : "=r"(mvendor));
+    __asm__ volatile ("csrr %0, marchid"   : "=r"(marchid));
+    __asm__ volatile ("csrr %0, mimpid"    : "=r"(mimpid));
+    __asm__ volatile ("csrr %0, misa"      : "=r"(misa));
+    __asm__ volatile ("csrr %0, mtvec"     : "=r"(mtvec));
+    mstat0 = probeReadMstatus();
+    __asm__ volatile ("csrr %0, mie"       : "=r"(mie0));
 
-    __disable_irq();
-    m0 = probeReadMstatus();
-    for (int i = 0; i < 32; i++) {
-        uint32_t m1, m2, prev, m3, m4;
-        __asm__ volatile ("csrc mstatus, 8" ::: "memory");
-        m1 = probeReadMstatus();
-        __asm__ volatile ("csrs mstatus, 8" ::: "memory");
-        m2 = probeReadMstatus();
-        prev = thejas32_atomic_enter();
-        m3 = probeReadMstatus();
-        thejas32_atomic_exit(prev);
-        m4 = probeReadMstatus();
-        if (i == 0) {
-            sM1 = m1; sM2 = m2; sM3 = m3; sM4 = m4;
-        }
-        if (((m1 & 8U) != 0U) || ((m2 & 8U) == 0U) || ((m3 & 8U) != 0U) || ((m4 & 8U) == 0U) || ((m1 ^ m2) & ~8U)) {
-            anom++;
-        }
-        __disable_irq();
-    }
-
-    thejas32_early_uart_puts("[SILICON LAB] T1_CSR m0=0x"); thejas32_early_uart_print_hex(m0);
-    thejas32_early_uart_puts(" csrc=0x"); thejas32_early_uart_print_hex(sM1);
-    thejas32_early_uart_puts(" csrs=0x"); thejas32_early_uart_print_hex(sM2);
-    thejas32_early_uart_puts(" ent=0x"); thejas32_early_uart_print_hex(sM3);
-    thejas32_early_uart_puts(" ext=0x"); thejas32_early_uart_print_hex(sM4);
-    thejas32_early_uart_puts(" anom="); probePrintDec(anom);
+    thejas32_early_uart_puts("[SILICON LAB] CPU vid=0x"); thejas32_early_uart_print_hex(mvendor);
+    thejas32_early_uart_puts(" aid=0x"); thejas32_early_uart_print_hex(marchid);
+    thejas32_early_uart_puts(" imp=0x"); thejas32_early_uart_print_hex(mimpid);
+    thejas32_early_uart_puts(" misa=0x"); thejas32_early_uart_print_hex(misa);
+    thejas32_early_uart_puts(" mtvec=0x"); thejas32_early_uart_print_hex(mtvec);
+    thejas32_early_uart_puts(" m=0x"); thejas32_early_uart_print_hex(mstat0);
+    thejas32_early_uart_puts(" mie=0x"); thejas32_early_uart_print_hex(mie0);
     thejas32_early_uart_puts("\r\n");
 
-    // 1. Reproduce DBG-03 early-exit millis() cases with full cycle/ms diagnostics
-    labRunTimer1Case("L1_OLD_T2  ", LAB_MODE_OLD_MILLIS_WAIT, 0U, 0U, 30U);
-    labRunTimer1Case("L2_OLD_T3  ", LAB_MODE_OLD_DIV_MILLIS,  0U, 1U, 30U);
+    gProbeFastArmed = 0U;
+    probeTrapEnterCnt = 0U;
 
-    // 2. mcycle-timed 20 ms (~500 IRQ) A/B isolation: trapMode 0=csrs1800, 1=skip1800, 2=csrs+fence, 3=skip+fence
-    labRunTimer1Case("A0_MS_T0   ", LAB_MODE_MCYCLE_MILLIS,   0U, 0U, 20U);
-    labRunTimer1Case("A1_MS_T1   ", LAB_MODE_MCYCLE_MILLIS,   1U, 0U, 20U);
-    labRunTimer1Case("A2_MS_T2   ", LAB_MODE_MCYCLE_MILLIS,   2U, 0U, 20U);
-    labRunTimer1Case("A3_MS_T3   ", LAB_MODE_MCYCLE_MILLIS,   3U, 0U, 20U);
+    // DBG-05 Matrix: tm=0 (baseline), tm=1 (no csrs 0x1800), tm=4 (no csrw mepc), tm=5 (INTERRUPT_Handler_0: neither)
+    labRunTimer1Case("T2_GPR_T1   ", LAB_MODE_GPR_CHK,         1U, 20U);
+    labRunTimer1Case("T2_GPR_T5   ", LAB_MODE_GPR_CHK,         5U, 20U);
+    labRunTimer1Case("A0_MS_T0    ", LAB_MODE_MCYCLE_MILLIS,   0U, 20U);
+    labRunTimer1Case("A1_MS_T1    ", LAB_MODE_MCYCLE_MILLIS,   1U, 20U);
+    labRunTimer1Case("A4_MS_T4    ", LAB_MODE_MCYCLE_MILLIS,   4U, 20U);
+    labRunTimer1Case("A5_MS_T5    ", LAB_MODE_MCYCLE_MILLIS,   5U, 20U);
+    labRunTimer1Case("B0_DIV_T0   ", LAB_MODE_MCYCLE_DIV_CHK,  0U, 20U);
+    labRunTimer1Case("B1_DIV_T1   ", LAB_MODE_MCYCLE_DIV_CHK,  1U, 20U);
+    labRunTimer1Case("B4_DIV_T4   ", LAB_MODE_MCYCLE_DIV_CHK,  4U, 20U);
+    labRunTimer1Case("B5_DIV_T5   ", LAB_MODE_MCYCLE_DIV_CHK,  5U, 20U);
+    labRunTimer1Case("B2_DIVU_T5  ", LAB_MODE_DIVU_ONLY,       5U, 20U);
+    labRunTimer1Case("B3_REMU_T5  ", LAB_MODE_REMU_ONLY,       5U, 20U);
+    labRunTimer1Case("B4_SDIV_T5  ", LAB_MODE_SDIV_ONLY,       5U, 20U);
+    labRunTimer1Case("B6_SREM_T5  ", LAB_MODE_SREM_ONLY,       5U, 20U);
+    labRunTimer1Case("C0_NODIV_T0 ", LAB_MODE_MCYCLE_NODIV,    0U, 20U);
+    labRunTimer1Case("C1_NODIV_T1 ", LAB_MODE_MCYCLE_NODIV,    1U, 20U);
+    labRunTimer1Case("C4_NODIV_T4 ", LAB_MODE_MCYCLE_NODIV,    4U, 20U);
+    labRunTimer1Case("C5_NODIV_T5 ", LAB_MODE_MCYCLE_NODIV,    5U, 20U);
+    labRunTimer1Case("E0_NOP_T0   ", LAB_MODE_MCYCLE_NOP,      0U, 20U);
+    labRunTimer1Case("E1_NOP_T1   ", LAB_MODE_MCYCLE_NOP,      1U, 20U);
+    labRunTimer1Case("E5_NOP_T5   ", LAB_MODE_MCYCLE_NOP,      5U, 20U);
+    labRunTimer1Case("F0_MUL_T0   ", LAB_MODE_MCYCLE_MUL_CHK,  0U, 20U);
+    labRunTimer1Case("F1_MUL_T1   ", LAB_MODE_MCYCLE_MUL_CHK,  1U, 20U);
+    labRunTimer1Case("F5_MUL_T5   ", LAB_MODE_MCYCLE_MUL_CHK,  5U, 20U);
+    labRunTimer1Case("G1_MCYCLE_T1", LAB_MODE_MCYCLE_CSR_READ, 1U, 20U);
+    labRunTimer1Case("G5_MCYCLE_T5", LAB_MODE_MCYCLE_CSR_READ, 5U, 20U);
+    labRunTimer1Case("H1_DIV_ATOM ", LAB_MODE_MCYCLE_DIV_ATOM, 1U, 20U);
+    labRunTimer1Case("H5_DIV_ATOM ", LAB_MODE_MCYCLE_DIV_ATOM, 5U, 20U);
+    labRunTimer1Case("I1_MULHU_T1 ", LAB_MODE_MULHU_TIME,      1U, 20U);
+    labRunTimer1Case("I5_MULHU_T5 ", LAB_MODE_MULHU_TIME,      5U, 20U);
+    labRunTimer1Case("J1_MMIO_T1  ", LAB_MODE_MMIO_POLL,       1U, 20U);
+    labRunTimer1Case("J5_MMIO_T5  ", LAB_MODE_MMIO_POLL,       5U, 20U);
 
-    // 3. Hardware div/divu/remu integrity + MIE drop test vs pure ALU (no div)
-    labRunTimer1Case("B0_DIV_T0  ", LAB_MODE_MCYCLE_DIV_CHK,  0U, 0U, 20U);
-    labRunTimer1Case("B1_DIV_T1  ", LAB_MODE_MCYCLE_DIV_CHK,  1U, 0U, 20U);
-    labRunTimer1Case("C0_NODIV_T0", LAB_MODE_MCYCLE_NODIV,    0U, 0U, 20U);
-    labRunTimer1Case("D1_ATOM_T1 ", LAB_MODE_MCYCLE_ATOMIC,   1U, 1U, 20U);
-
-    // Restore Timer 1 and probe state cleanly before Betaflight init
+    // Restore Timer 1 and run Betaflight runtime under tm=5 (VEGA SDK INTERRUPT_Handler_0 style)
     THEJAS32_TIMER(1).Control = 0U;
     THEJAS32_TIMER(1).LoadCount = 0U;
     (void)THEJAS32_TIMER(1).EOI;
     thejas32_interrupt_disable(THEJAS32_IRQ_TIMER1);
     thejas32_interrupt_register(THEJAS32_IRQ_TIMER1, NULL);
     THEJAS32_MEMORY_FENCE();
-    probeTrapMode = 0U;
+    probeTrapMode = 5U;
+    probeTrapEnterCnt = 0U;
+    gProbeInTrap = 0U;
+    gProbeLastOkSite = 0U;
+    gProbeLastOkCaller = 0U;
 
     volatile uint8_t *p = (volatile uint8_t *)&gProbe;
     for (uint32_t i = 0U; i < sizeof(gProbe); i++) {
         p[i] = 0U;
     }
     __enable_irq();
-    thejas32_early_uart_puts("[SILICON LAB] Done. Post-lab mstatus=0x");
+    gProbe.mieArmed = true;
+    gProbeFastArmed = 1U;
+    thejas32_early_uart_puts("[SILICON LAB] Done. Runtime tm=5 mstatus=0x");
     thejas32_early_uart_print_hex(probeReadMstatus());
     thejas32_early_uart_puts("\r\n");
 }
-// [/HARDWARE-DEBUG-PROBE: DBG-03]
+// [/HARDWARE-DEBUG-PROBE: DBG-05]
 
 #endif // ARIES_PROBE_DEBUG && !UNIT_TEST

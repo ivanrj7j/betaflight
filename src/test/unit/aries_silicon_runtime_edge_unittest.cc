@@ -167,4 +167,24 @@ TEST_F(AriesSiliconRuntimeEdgeTest, Runtime06_StrictAlignPackedProtocolStructs_D
     EXPECT_EQ(hdr.size, 8U);
 }
 
+// =============================================================================
+// EDGE 07: trap_entry x5 Save Order & Pure RV32I ISA Workaround (ET1031 Erratum)
+// =============================================================================
+TEST_F(AriesSiliconRuntimeEdgeTest, Runtime07_TrapEntryPreservesX5AndBuildUsesPureRv32i)
+{
+    static char sBuf[16384];
+    static char mkBuf[16384];
+    ASSERT_TRUE(runtime_read_repo_file("src/platform/ARIES/startup.S", sBuf, sizeof(sBuf)));
+    ASSERT_TRUE(runtime_read_repo_file("src/platform/ARIES/mk/ARIES.mk", mkBuf, sizeof(mkBuf)));
+
+    const char *saveX5 = strstr(sBuf, "SREG x5,  5*REGBYTES(sp)");
+    const char *clobberT0 = strstr(sBuf, "addi t0, sp, 128");
+    ASSERT_NE(saveX5, nullptr);
+    ASSERT_NE(clobberT0, nullptr);
+    EXPECT_LT(saveX5, clobberT0); // x5 (t0) must be saved before addi t0, sp, 128
+
+    EXPECT_NE(strstr(mkBuf, "-march=rv32i_zicsr"), nullptr);
+    EXPECT_EQ(strstr(mkBuf, "-march=rv32im_zicsr"), nullptr);
+}
+
 } // namespace

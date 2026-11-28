@@ -186,6 +186,9 @@ class AriesElfInvariantsTest(unittest.TestCase):
             self.assertEqual(len(c_insns), 0, f"Detected {len(c_insns)} forbidden 16-bit RVC instructions: {c_insns[:3]}")
             hw_fp = re.findall(r"^\s*[0-9a-f]+:\s+[0-9a-f]{8}\s+(flw|fsw|fadd\.s|fmul\.s|fdiv\.s)\b", proc.stdout, re.MULTILINE)
             self.assertEqual(len(hw_fp), 0, f"Detected hardware FPU instructions on soft-float core: {hw_fp[:3]}")
+            # VEGA ET1031 (imp=0x80000004) erratum: hardware M-extension instructions drop mstatus.MIE and corrupt rd on external IRQ
+            m_ext = re.findall(r"^\s*[0-9a-f]+:\s+[0-9a-f]{8}\s+(mul|mulh|mulhu|mulhsu|div|divu|rem|remu)\b", proc.stdout, re.MULTILINE)
+            self.assertEqual(len(m_ext), 0, f"Detected hardware M-extension instructions triggering ET1031 IRQ erratum: {m_ext[:5]}")
 
     def test_03_pg_registry_and_noinit_section_ordering(self):
         elf_info = parse_elf32_header_and_sections(ELF_PATH)

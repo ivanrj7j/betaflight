@@ -59,7 +59,8 @@ HSE_VALUE    := 100000000
 ARIES_DEV_LOGGING ?= 1
 # [HARDWARE-DEBUG-PROBE: DBG-01 / DBG-03] ARIES_PROBE_DEBUG & ARIES/aries_probe.c (temporary probe - remove at Step D5 cleanup)
 ARIES_PROBE_DEBUG ?= 0
-ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany -mstrict-align -DARIES_PROBE_DEBUG=$(ARIES_PROBE_DEBUG)
+# Use pure RV32I (no hardware mul/div): ET1031 (imp=0x80000004) drops mstatus.MIE and corrupts rd when an IRQ hits M-extension ops
+ARCH_FLAGS   = -march=rv32i_zicsr -mabi=ilp32 -mcmodel=medany -mstrict-align -DARIES_PROBE_DEBUG=$(ARIES_PROBE_DEBUG)
 
 # Memory builtins disabled to prevent compiler from emitting calls to compressed libc helpers
 DEVICE_FLAGS = -DARIES -DTHEJAS32 -DUSE_CONFIG \

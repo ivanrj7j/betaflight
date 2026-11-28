@@ -135,7 +135,21 @@ FAST_CODE timeUs_t micros(void)
     uint32_t lo_sum = lo + add;
     uint32_t carry = (lo_sum < lo) ? 1U : 0U;
     uint32_t q = (carry * 42949672U) + ((carry * 96U + lo_sum) / 100U);
-    return (r_hi * 42949672U) + q;
+    uint32_t res = (r_hi * 42949672U) + q;
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    static volatile uint32_t lastUs = 0U;
+    if (gProbeFastArmed && lastUs != 0U && res < lastUs) {
+        uint32_t delta = (uint32_t)(lastUs - res);
+        if (delta > 5000U && delta < 0x80000000U) {
+            ariesProbeRecordTimeWarp(0U, lastUs, res);
+        }
+    }
+    if (gProbeFastArmed) {
+        lastUs = res;
+    }
+#endif
+    ariesProbeCheckMieInline('u', __builtin_return_address(0));
+    return res;
 }
 
 timeMs_t millis(void)
@@ -149,7 +163,21 @@ timeMs_t millis(void)
     uint32_t carry = (uint32_t)(rem >> 32);
     uint32_t lo_sum = (uint32_t)rem;
     uint32_t q_rem = (carry * 42949U) + (uint32_t)((carry * 67296U + lo_sum) / 100000U);
-    return (r_hi * 42949U) + q_rem;
+    uint32_t res = (r_hi * 42949U) + q_rem;
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    static volatile uint32_t lastMs = 0U;
+    if (gProbeFastArmed && lastMs != 0U && res < lastMs) {
+        uint32_t delta = (uint32_t)(lastMs - res);
+        if (delta > 5U && delta < 0x80000000U) {
+            ariesProbeRecordTimeWarp(1U, lastMs, res);
+        }
+    }
+    if (gProbeFastArmed) {
+        lastMs = res;
+    }
+#endif
+    ariesProbeCheckMieInline('l', __builtin_return_address(0));
+    return res;
 }
 
 FAST_CODE timeUs_t microsISR(void)
@@ -327,6 +355,7 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
 {
 #if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
     // [HARDWARE-DEBUG-PROBE: DBG-02]
+    gProbeInTrap++;
     uint32_t probeMstatusIn = 0U;
     __asm__ volatile ("csrr %0, mstatus" : "=r"(probeMstatusIn));
     // [/HARDWARE-DEBUG-PROBE: DBG-02]
@@ -366,12 +395,16 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
         uint32_t probeMstatusOut = 0U;
         __asm__ volatile ("csrr %0, mstatus" : "=r"(probeMstatusOut));
         ariesProbeRecordTrap(mcause, mepc, probeMstatusIn, probeMstatusOut);
+        gProbeInTrap--;
         // [/HARDWARE-DEBUG-PROBE: DBG-02]
 #endif
         return mepc;
     } else {
         // Synchronous exception (Illegal instruction, Load/Store fault, etc.)
         handle_trap_panic(mcause, mepc, sp);
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+        gProbeInTrap--;
+#endif
         return mepc + 4;
     }
 }

@@ -171,6 +171,10 @@ static void taskHandleSerial(timeUs_t currentTimeUs)
 
     UNUSED(currentTimeUs);
 
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    ariesProbeCheckMieInline('H', __builtin_return_address(0));
+#endif
+
 #if defined(USE_VCP)
     DEBUG_SET(DEBUG_USB, 0, usbCableIsInserted());  //!< USB Cable Inserted
     DEBUG_SET(DEBUG_USB, 1, usbVcpIsConnected());   //!< USB VCP Connected
@@ -182,6 +186,10 @@ static void taskHandleSerial(timeUs_t currentTimeUs)
 
     bool evaluateMspData = ARMING_FLAG(ARMED) ? MSP_SKIP_NON_MSP_DATA : MSP_EVALUATE_NON_MSP_DATA;
     mspSerialProcess(evaluateMspData, mspFcProcessCommand, mspFcProcessReply);
+
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    ariesProbeCheckMieInline('h', __builtin_return_address(0));
+#endif
 
 #if defined(USE_UART_POLLED_DRAIN)
     uartPollTx();

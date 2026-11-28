@@ -124,17 +124,23 @@ trap_entry:
     /* Allocate stack frame for 32 registers (32 * 4 = 128 bytes, 16-byte aligned) */
     addi sp, sp, -128
 
-    /* Save caller-saved and callee-saved registers */
+    /* Save caller-saved and callee-saved registers (save x5/t0 BEFORE using t0!) */
     SREG x1,  1*REGBYTES(sp)
-
-    /* CRITICAL FIX: Calculate and save original pre-trap stack pointer (x2) into frame[2] */
-    addi t0, sp, 128
-    SREG t0,  2*REGBYTES(sp)
-
     SREG x3,  3*REGBYTES(sp)
     SREG x4,  4*REGBYTES(sp)
     SREG x5,  5*REGBYTES(sp)
     SREG x6,  6*REGBYTES(sp)
+
+    /* Calculate and save original pre-trap stack pointer (x2) into frame[2] */
+    addi t0, sp, 128
+    SREG t0,  2*REGBYTES(sp)
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0)
+    /* [HARDWARE-DEBUG-PROBE: DBG-05] Count hardware vector entries into trap_entry */
+    la   t0, probeTrapEnterCnt
+    lw   t1, 0(t0)
+    addi t1, t1, 1
+    sw   t1, 0(t0)
+#endif
     SREG x7,  7*REGBYTES(sp)
     SREG x8,  8*REGBYTES(sp)
     SREG x9,  9*REGBYTES(sp)
@@ -165,18 +171,26 @@ trap_entry:
     csrr a0, mcause
     csrr a1, mepc
     mv   a2, sp
+    /* Preserve mcause in callee-saved s1 so async IRQs match VEGA SDK INTERRUPT_Handler_0 epilogue */
+    mv   s1, a0
 
     /* Pass to C handler: handle_trap(mcause, mepc, sp) */
     jal handle_trap
 
-    /* handle_trap returns new/resumed mepc in a0 */
-    csrw mepc, a0
-
 #if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0)
-    /* [HARDWARE-DEBUG-PROBE: DBG-04] probeTrapMode bits:
+    /* [HARDWARE-DEBUG-PROBE: DBG-05] probeTrapMode bits:
      *   bit 0 = 1 -> skip csrs mstatus, 0x1800 (matches VEGA SDK INTERRUPT_Handler_0)
      *   bit 1 = 1 -> run fence + 4x nop immediately before mret
+     *   bit 2 = 1 -> skip csrw mepc, a0 on interrupts (mcause < 0, matches INTERRUPT_Handler_0)
      */
+    bgez s1, .L_probe_write_mepc
+    la   t0, probeTrapMode
+    lbu  t0, 0(t0)
+    andi t1, t0, 4
+    bnez t1, .L_probe_skip_mepc
+.L_probe_write_mepc:
+    csrw mepc, a0
+.L_probe_skip_mepc:
     la   t0, probeTrapMode
     lbu  t0, 0(t0)
     andi t1, t0, 1
@@ -187,9 +201,13 @@ trap_entry:
     andi t0, t0, 2
     bnez t0, .L_probe_restore_fence
 #else
-    /* Remain in Machine Mode after mret (MSTATUS_MPP = 3 << 11 = 0x1800) */
-    li t0, 0x1800
+    bgez s1, .L_rel_write_mepc
+    j    .L_rel_restore
+.L_rel_write_mepc:
+    csrw mepc, a0
+    li   t0, 0x1800
     csrs mstatus, t0
+.L_rel_restore:
 #endif
 
     /* Restore context */
@@ -268,6 +286,7 @@ trap_entry:
     nop
     nop
     mret
+    nop
 #endif
 
     .size trap_entry, . - trap_entry
