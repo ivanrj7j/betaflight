@@ -8,7 +8,8 @@ Features:
   - Keeps listening for Betaflight Configurator even if the serial port (e.g. COM9)
     is absent at startup or temporarily unplugged, and auto-connects when present.
   - Supports easy port switching via CLI (`python com9_betaflight_proxy.py COM5` or
-    `--port COM5`) and live in-console commands (`:ports`, `:port COM5`, `:baud 115200`).
+    `python com9_betaflight_proxy.py usb0` or `--port /dev/ttyUSB0`) and live
+    in-console commands (`:ports`, `:port COM5`, `:port usb0`, `:baud 115200`).
   - Accepts BOTH:
       * Betaflight Web App PWA (master.app.betaflight.com / app.betaflight.com,
         Manual connection mode):  ws://127.0.0.1:5761
@@ -64,6 +65,26 @@ def run_stamp(epoch_sec=None):
     return time.strftime("%Y%m%d_%H%M%S", lt)
 
 
+def normalize_serial_port(port_name):
+    """Normalize shorthand port names like com9 (Windows) or usb0 (Linux)."""
+    port = (port_name or "").strip()
+    if not port:
+        return ""
+    m = re.fullmatch(r"com(\d+)", port, re.IGNORECASE)
+    if m:
+        return f"COM{m.group(1)}"
+    m = re.fullmatch(r"(?:tty)?usb(\d+)", port, re.IGNORECASE)
+    if m:
+        return f"/dev/ttyUSB{m.group(1)}"
+    m = re.fullmatch(r"(?:tty)?acm(\d+)", port, re.IGNORECASE)
+    if m:
+        return f"/dev/ttyACM{m.group(1)}"
+    m = re.fullmatch(r"ttys(\d+)", port, re.IGNORECASE)
+    if m:
+        return f"/dev/ttyS{m.group(1)}"
+    return port
+
+
 def sanitize_port_for_filename(port_name):
     """Normalize a serial port string into a safe lowercase filename prefix."""
     base = os.path.basename(port_name.strip()) if port_name else "serial"
@@ -76,6 +97,18 @@ def make_default_log_path(port_name, base_dir=None, epoch_sec=None):
     target_dir = base_dir or os.path.dirname(os.path.abspath(__file__))
     prefix = sanitize_port_for_filename(port_name)
     return os.path.join(target_dir, f"{prefix}_proxy_{run_stamp(epoch_sec)}.txt")
+
+
+def format_saved_logs_summary(log_paths):
+    """Format a shutdown summary listing saved log file names and full paths."""
+    paths = [p for p in log_paths if p]
+    if not paths:
+        return ""
+    lines = ["Saved log file(s):"]
+    for p in paths:
+        abs_p = os.path.abspath(p)
+        lines.append(f"  - {os.path.basename(abs_p)} ({abs_p})")
+    return "\n".join(lines)
 
 
 def enumerate_serial_ports():
@@ -349,7 +382,7 @@ class SerialBetaflightProxy:
         port_lister=None,
         retry_interval=0.5,
     ):
-        self.target_port = target_port
+        self.target_port = normalize_serial_port(target_port) or DEFAULT_SERIAL_PORT
         self.target_baud = int(target_baud)
         self.log_file = log_file
         self.raw_file = raw_file
@@ -380,7 +413,7 @@ class SerialBetaflightProxy:
 
     def switch_port(self, new_port, new_baud=None):
         """Request immediate switch to another serial port (and optional baud rate)."""
-        new_port = new_port.strip()
+        new_port = normalize_serial_port(new_port)
         if not new_port:
             return
         with self.ser_state_lock:
@@ -594,7 +627,7 @@ class SerialBetaflightProxy:
 
         if verb in ("port", "switch", "use"):
             if len(parts) < 2:
-                self.log_event("[USAGE] :port <PORT> [BAUD]   (example: :port COM5)")
+                self.log_event("[USAGE] :port <PORT> [BAUD]   (examples: :port COM5 | :port usb0 | :port /dev/ttyUSB0)")
                 return
             baud = None
             if len(parts) >= 3:
@@ -629,12 +662,12 @@ class SerialBetaflightProxy:
 
         if verb in ("help", "?"):
             self.log_event(
-                "[COMMANDS] :ports | :port <COMx> [baud] | :baud <rate> | :reconnect | :status | :quit"
+                "[COMMANDS] :ports | :port <comX|usbX|/dev/tty...> [baud] | :baud <rate> | :reconnect | :status | :quit"
             )
             return
 
-        # Shorthand when someone types just "COM5" or "/dev/ttyUSB0"
-        if re.match(r"^(COM\d+|/dev/tty\S+)$", parts[0], re.IGNORECASE):
+        # Shorthand when someone types just "COM5", "usb0", "ttyUSB0", or "/dev/ttyUSB0"
+        if re.match(r"^(COM\d+|(?:tty)?USB\d+|(?:tty)?ACM\d+|ttyS\d+|/dev/\S+)$", parts[0], re.IGNORECASE):
             baud = None
             if len(parts) >= 2:
                 try:
@@ -682,6 +715,7 @@ class SerialBetaflightProxy:
 
                 ch = msvcrt.getch()
                 if ch == b"\x03":  # Ctrl+C
+                    self.log_event("[STOPPING] Ctrl+C received, closing proxy...")
                     self.stop_event.set()
                     return
                 if ch in (b"\x00", b"\xe0"):
@@ -818,13 +852,13 @@ def parse_args():
         "positional_port",
         nargs="?",
         default=None,
-        help="Optional serial port shorthand (e.g. COM5), overrides --port",
+        help="Optional serial port (e.g. COM5, com9, usb0, /dev/ttyUSB0), overrides --port",
     )
     p.add_argument(
         "-p",
         "--port",
         default=DEFAULT_SERIAL_PORT,
-        help=f"Initial serial port (default: {DEFAULT_SERIAL_PORT})",
+        help=f"Initial serial port: comX, usbX, or device path (default: {DEFAULT_SERIAL_PORT})",
     )
     p.add_argument(
         "-b",
@@ -874,7 +908,7 @@ def main():
         print("ERROR: pyserial is required. Install with: pip install pyserial", file=sys.stderr)
         sys.exit(1)
 
-    initial_port = args.positional_port or args.port
+    initial_port = normalize_serial_port(args.positional_port or args.port) or DEFAULT_SERIAL_PORT
     log_path = args.out or make_default_log_path(initial_port)
 
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -906,7 +940,7 @@ def main():
             f"[CONNECT URL] Betaflight Desktop (Manual):      tcp://{args.listen_host}:{args.listen_port}"
         )
         proxy.log_event(
-            "[SWITCH PORTS] Type :ports or :port COM5 (no ':' needed while waiting) | Ctrl+C to quit"
+            "[SWITCH PORTS] Type :ports or :port COM5 / usb0 (no ':' needed while waiting) | Ctrl+C to quit"
         )
 
         rx_thread = threading.Thread(target=proxy.serial_reader_loop, daemon=True)
@@ -934,7 +968,7 @@ def main():
             rx_thread.join(timeout=1.5)
             if raw_f is not None:
                 raw_f.close()
-            print(f"\nSaved log to {log_path}")
+            print(f"\n{format_saved_logs_summary([log_path, args.raw_out])}", flush=True)
 
 
 if __name__ == "__main__":
