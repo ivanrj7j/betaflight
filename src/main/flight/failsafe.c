@@ -161,7 +161,7 @@ void failsafeStartMonitoring(void)
 
 static bool failsafeShouldHaveCausedLandingByNow(void)
 {
-    return (millis() > failsafeState.landingShouldBeFinishedAt);
+    return (cmp32(millis(), failsafeState.landingShouldBeFinishedAt) > 0);
 }
 
 bool failsafeIsReceivingRxData(void)
@@ -361,7 +361,7 @@ FAST_CODE_NOINLINE void failsafeUpdateState(void)
                         //  allow re-arming 1 second after Rx recovery, customisable
                         reprocessState = true;
                     } else if (!receivingRxData) {
-                        if ((millis() > failsafeState.throttleLowPeriod && !autopilotControlsThrottle
+                        if ((cmp32(millis(), failsafeState.throttleLowPeriod) > 0 && !autopilotControlsThrottle
 #ifdef USE_GPS_RESCUE
                             && failsafeConfig()->failsafe_procedure != FAILSAFE_PROCEDURE_GPS_RESCUE
 #endif
@@ -545,7 +545,7 @@ FAST_CODE_NOINLINE void failsafeUpdateState(void)
                 // receivingRxData is true when we get valid Rx Data and the recovery period has expired
                 // for switch initiated failsafes, the recovery period is zero
                 if (receivingRxData) {
-                    if (millis() > failsafeState.receivingRxDataPeriod) {
+                    if (cmp32(millis(), failsafeState.receivingRxDataPeriod) > 0) {
                         // rx link is good now
                         failsafeState.phase = FAILSAFE_RX_LOSS_RECOVERED;
                         reprocessState = true;

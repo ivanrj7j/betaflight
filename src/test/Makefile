@@ -301,6 +301,330 @@ aries_rx_crsf_unittest_DEFINES := \
 aries_rx_crsf_unittest_INCLUDE_DIRS := \
 		$(ARIES_UNIT_INCLUDE_DIRS)
 
+aries_config_flash_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/config/config_eeprom.c \
+		$(USER_DIR)/config/config_streamer.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/pg/pg.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/streambuf.c
+
+aries_config_flash_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_config_flash_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_scheduler_integration_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/pwm_motor_aries.c \
+		$(ARIES_DIR)/bus_spi_aries.c \
+		$(ARIES_DIR)/exti_aries.c \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/scheduler/scheduler.c \
+		$(USER_DIR)/drivers/bus_spi.c \
+		$(USER_DIR)/drivers/bus.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/serial.c \
+		$(USER_DIR)/drivers/serial_impl.c \
+		$(USER_DIR)/io/serial_resource.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/pg/pg.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/common/time.c
+
+aries_scheduler_integration_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_scheduler_integration_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_preflight_uart_msp_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/serial.c \
+		$(USER_DIR)/drivers/serial_impl.c \
+		$(USER_DIR)/io/serial_resource.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/streambuf.c
+
+aries_preflight_uart_msp_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_preflight_uart_msp_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_imu_pipeline_integration_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/bus_spi_aries.c \
+		$(ARIES_DIR)/exti_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(USER_DIR)/drivers/bus_spi.c \
+		$(USER_DIR)/drivers/bus_spi_config.c \
+		$(USER_DIR)/drivers/bus.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/drivers/accgyro/accgyro_spi_icm426xx.c \
+		$(USER_DIR)/sensors/boardalignment.c \
+		$(USER_DIR)/common/sensor_alignment.c \
+		$(USER_DIR)/common/bitarray.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/filter.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/common/vector.c \
+		$(USER_DIR)/config/feature.c \
+		$(USER_DIR)/fc/rc_modes.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/flight/imu.c \
+		$(USER_DIR)/flight/position.c \
+		$(USER_DIR)/pg/autopilot_wing.c \
+		$(USER_DIR)/pg/bus_spi.c \
+		$(USER_DIR)/pg/pg.c
+
+aries_imu_pipeline_integration_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES) \
+		USE_GYRO_SPI_ICM42688P=
+
+aries_imu_pipeline_integration_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_fc_flight_safety_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/pwm_motor_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/drivers/accgyro/gyro_sync.c \
+		$(USER_DIR)/common/bitarray.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/filter.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/pwl.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/common/vector.c \
+		$(USER_DIR)/config/feature.c \
+		$(USER_DIR)/fc/controlrate_profile.c \
+		$(USER_DIR)/fc/rc_modes.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/flight/imu.c \
+		$(USER_DIR)/flight/mixer.c \
+		$(USER_DIR)/flight/pid.c \
+		$(USER_DIR)/flight/pid_init.c \
+		$(USER_DIR)/flight/position.c \
+		$(USER_DIR)/pg/autopilot_wing.c \
+		$(USER_DIR)/pg/pg.c
+
+aries_fc_flight_safety_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_fc_flight_safety_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_adc_i2c_battery_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/sensors/voltage.c \
+		$(USER_DIR)/sensors/battery.c \
+		$(USER_DIR)/config/feature.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/filter.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/pg/pg.c
+
+aries_adc_i2c_battery_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_adc_i2c_battery_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_msp_cli_full_protocol_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/serial.c \
+		$(USER_DIR)/drivers/serial_impl.c \
+		$(USER_DIR)/io/serial_resource.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/msp/msp.c \
+		$(USER_DIR)/msp/msp_serial.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/pg/pg.c
+
+aries_msp_cli_full_protocol_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES) \
+		USE_CLI= \
+		USE_IMMEDIATE_CLI=
+
+aries_msp_cli_full_protocol_unittest_C_FLAGS := -ffunction-sections -fdata-sections
+aries_msp_cli_full_protocol_unittest_LDFLAGS := -Wl,--gc-sections
+
+aries_msp_cli_full_protocol_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_pg_eeprom_migration_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/config/config_eeprom.c \
+		$(USER_DIR)/config/config_streamer.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/pg/pg.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/streambuf.c
+
+aries_pg_eeprom_migration_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_pg_eeprom_migration_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_rx_link_failsafe_edge_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/rx/crsf.c \
+		$(USER_DIR)/flight/failsafe.c \
+		$(USER_DIR)/fc/rc_modes.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/config/feature.c \
+		$(USER_DIR)/pg/pg.c \
+		$(USER_DIR)/pg/autopilot.c \
+		$(USER_DIR)/common/bitarray.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/printf.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/common/typeconversion.c
+
+aries_rx_link_failsafe_edge_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES) \
+		USE_SERIALRX_CRSF= \
+		USE_TELEMETRY_CRSF=
+
+aries_rx_link_failsafe_edge_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_msp_cli_protocol_edge_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/serial.c \
+		$(USER_DIR)/drivers/serial_impl.c \
+		$(USER_DIR)/drivers/buf_writer.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/io/serial_resource.c \
+		$(USER_DIR)/msp/msp.c \
+		$(USER_DIR)/msp/msp_serial.c \
+		$(USER_DIR)/cli/cli.c \
+		$(USER_DIR)/fc/runtime_config.c \
+		$(USER_DIR)/config/feature.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/gps_conversion.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/printf.c \
+		$(USER_DIR)/common/streambuf.c \
+		$(USER_DIR)/common/typeconversion.c \
+		$(USER_DIR)/io/gps.c \
+		$(USER_DIR)/pg/pg.c
+
+aries_msp_cli_protocol_edge_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES) \
+		USE_CLI= \
+		USE_IMMEDIATE_CLI= \
+		USE_MSP_CLI_COMMAND= \
+		USE_UART0= \
+		USE_UART1=
+
+aries_msp_cli_protocol_edge_unittest_C_FLAGS := -ffunction-sections -fdata-sections
+aries_msp_cli_protocol_edge_unittest_LDFLAGS := -Wl,--gc-sections
+
+aries_msp_cli_protocol_edge_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_bus_gpio_trap_edge_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/bus_spi_aries.c \
+		$(ARIES_DIR)/exti_aries.c \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/serial_uart_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(USER_DIR)/drivers/bus_spi.c \
+		$(USER_DIR)/drivers/serial_uart.c \
+		$(USER_DIR)/drivers/serial.c \
+		$(USER_DIR)/drivers/serial_impl.c \
+		$(USER_DIR)/io/serial_resource.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/drivers/accgyro/accgyro_spi_icm426xx.c \
+		$(USER_DIR)/pg/bus_spi.c \
+		$(USER_DIR)/pg/pg.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/filter.c \
+		$(USER_DIR)/common/maths.c \
+		$(USER_DIR)/common/streambuf.c
+
+aries_bus_gpio_trap_edge_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES) \
+		USE_EXTI= \
+		USE_GYRO_SPI_ICM42688P=
+
+aries_bus_gpio_trap_edge_unittest_LDFLAGS := -Wl,--wrap=delay
+
+aries_bus_gpio_trap_edge_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
+aries_silicon_runtime_edge_unittest_SRC := \
+		$(ARIES_UNIT_COMMON_SRC) \
+		$(ARIES_DIR)/io_aries.c \
+		$(ARIES_DIR)/system.c \
+		$(ARIES_DIR)/stub_drivers.c \
+		$(USER_DIR)/drivers/io.c \
+		$(USER_DIR)/common/crc.c \
+		$(USER_DIR)/common/streambuf.c
+
+aries_silicon_runtime_edge_unittest_DEFINES := \
+		$(ARIES_UNIT_DEFINES)
+
+aries_silicon_runtime_edge_unittest_INCLUDE_DIRS := \
+		$(ARIES_UNIT_INCLUDE_DIRS)
+
 alignsensor_unittest_SRC := \
 		$(USER_DIR)/sensors/boardalignment.c \
 		$(USER_DIR)/common/sensor_alignment.c \

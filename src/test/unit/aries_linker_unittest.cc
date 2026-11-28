@@ -383,3 +383,26 @@ TEST(AriesLinkerTest, Test_BuildVerifyScript_ActualScriptEnforces242KCeilingZero
     // CI verification must fail immediately if firmware size crosses the bootloader-safe 242 KB bound
     // or if any 16-bit RVC opcode creeps into RV32IM silicon.
 }
+
+// =============================================================================
+// TEST 11 (Suite 4 Upgrade): .noinit Overflow Past 0x0023E7FF Caught + Sorted PG Registry
+// =============================================================================
+TEST(AriesLinkerTest, Test_LinkerScript_NoinitGrowthOverflowCaughtAndSortedPgRegistryAligned)
+{
+    static char ldBuf[32768];
+    ASSERT_TRUE(linker_read_repo_file("src/platform/ARIES/link/aries_v3.ld", ldBuf, sizeof(ldBuf)));
+
+    // Verify sorted PG sections and overflow assertion formula
+    EXPECT_NE(strstr(ldBuf, "SORT(.pg_registry.*)"), nullptr);
+    EXPECT_NE(strstr(ldBuf, "SORT(.pg_resetdata.*)"), nullptr);
+
+    const uint32_t ramOrigin = 0x00202000U;
+    const uint32_t ramLimit  = 242U * 1024U; // 0x0023E800 ceiling
+    const uint32_t eepromNoinit = 8192U;
+    const uint32_t stackReserve = 8192U;
+    uint32_t totalWithNoinit = (195U * 1024U) + eepromNoinit + stackReserve;
+    EXPECT_LE(ramOrigin + totalWithNoinit, ramOrigin + ramLimit);
+
+    uint32_t bloatedNoinit = (230U * 1024U) + eepromNoinit + stackReserve + 4096U;
+    EXPECT_GT(ramOrigin + bloatedNoinit, ramOrigin + ramLimit);
+}

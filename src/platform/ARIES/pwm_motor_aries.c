@@ -209,6 +209,13 @@ static void ariesPwmMotorWrite(uint8_t index, float value)
 {
     if (index >= aries_motor_count) return;
 
+    // Guard non-finite inputs (NaN / +Inf / -Inf) via IEEE-754 bit pattern so -ffast-math
+    // (-ffinite-math-only) cannot optimize out an isnan()/isfinite() safety check on RV32IM.
+    union { float f; uint32_t u; } conv = { .f = value };
+    if ((conv.u & 0x7F800000UL) == 0x7F800000UL) {
+        value = 1000.0f;
+    }
+
     // Safety Clamping: constrain strictly within standard ESC range (1000.0f - 2000.0f us)
     if (value < 1000.0f) value = 1000.0f;
     if (value > 2000.0f) value = 2000.0f;

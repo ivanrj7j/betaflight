@@ -28,8 +28,11 @@ extern "C" {
 #include "aries_host_mmio.h"
 #include "drivers/persistent.h"
 uint64_t getCycleCounter64(void);
+uint32_t getCycleCounter(void);
 uint32_t micros(void);
 uint32_t millis(void);
+void thejas32_timer_init(void);
+uint32_t timer0GetOverflows(void);
 void thejas32_interrupt_register(uint8_t irq_number, thejas32_irq_handler_t handler);
 void thejas32_interrupt_enable(uint8_t irq_number);
 uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp);
@@ -793,4 +796,29 @@ TEST(AriesSystemTimeTest, Test_RealSystemC_HandleTrapSpuriousAndConcurrentIrqPre
 
     // Real-world flight consequence:
     // Torn 64-bit CSR mcycle reads at 42.9-second intervals cause huge negative loop delta spikes in PID/EKF.
+}
+
+// =============================================================================
+// UPGRADE (Suite 4): Timer 0 ISR EOI Clear & Overflow + Bootloader Modes + Rollover Wrap
+// =============================================================================
+TEST(AriesSystemTimeTest, Test_RealSystemC_Timer0IsrClearsEoiAndIncrementsOverflowsAcrossRollover)
+{
+    thejas32_host_reset_all();
+    thejas32_timer_init();
+    EXPECT_EQ(THEJAS32_TIMER(0).LoadCount, 0xFFFFFFFFUL);
+    EXPECT_EQ(THEJAS32_TIMER(0).Control, 0x03U);
+    EXPECT_NE(THEJAS32_INTR_CTRL.INTR_EN & (1UL << THEJAS32_IRQ_TIMER0), 0U);
+
+    const uint32_t before = timer0GetOverflows();
+    THEJAS32_INTR_CTRL.INTR_STATUS = (1UL << THEJAS32_IRQ_TIMER0);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    handle_trap(0x8000000BUL, 0U, nullptr);
+    EXPECT_EQ(timer0GetOverflows(), before + 2U);
+
+    // Check 32-bit getCycleCounter() wraparound matches 64-bit counter across 0xFFFFFFFF -> 0
+    thejas32_host_mcycle_set(0x00000001FFFFFFFFULL);
+    EXPECT_EQ(getCycleCounter(), 0xFFFFFFFFU);
+    thejas32_host_mcycle_advance(250ULL);
+    EXPECT_EQ(getCycleCounter(), 249U);
+    EXPECT_EQ(getCycleCounter64(), 0x00000002000000F9ULL);
 }

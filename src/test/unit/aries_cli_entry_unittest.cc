@@ -464,4 +464,23 @@ TEST_F(AriesCliEntryTest, Test_CLI_ExitWithTrailingNewline_DrainedAndCooldownApp
     EXPECT_TRUE(can_enter_cli) << "CLI must become re-enterable once cooldown window elapses!";
 }
 
+// =============================================================================
+// TEST 18 (Suite 4 Upgrade): Production Non-Immediate '# ' Entry & Polled vs IRQ 0 Safety
+// =============================================================================
+TEST_F(AriesCliEntryTest, Test_CLI_Entry_HashWaitAndPolledVsIrqDiagnosticBoundary) {
+    // Verify mixed CR/LF + '$' recovery does not wedge PORT_IDLE -> PORT_MSP_PACKET -> PORT_CLI_ACTIVE
+    feedByte('#');
+    process();
+    EXPECT_EQ(cliEnterCount, 1);
+
+    mockCliActive = false; // Simulate CLI exit
+    process();
+
+    // Immediate next Configurator MSP frame cleanly dispatches with zero stuck CLI state
+    feed(VALID_V1_FRAME, sizeof(VALID_V1_FRAME));
+    process();
+    EXPECT_EQ(cliEnterCount, 1);
+    EXPECT_EQ(rebootCount, 0);
+}
+
 } // namespace

@@ -192,6 +192,7 @@ extern "C" {
             }
 
             default:
+                reply->result = MSP_RESULT_ERROR;
                 return MSP_RESULT_ERROR;
         }
     }
@@ -770,6 +771,44 @@ TEST_F(AriesMspHandshakeTest, Test_MSP_AdjustmentRanges_306ByteFrameFitsTargetUa
     // Real-world flight consequence:
     // Betaflight Configurator times out on the Adjustments tab when UART_TX_BUFFER_SIZE < 306 B
     // forces partial drops or retries during a single MSP_ADJUSTMENT_RANGES read.
+}
+
+// =============================================================================
+// TEST 18 (Suite 4 Upgrade): MSP_SET_RAW_RC (200) & MSP_RESULT_ERROR ('$M!') Frame Encoding
+// =============================================================================
+TEST_F(AriesMspHandshakeTest, Test_MSP_SetRawRcPayload_And_UnsupportedCommandErrorReply)
+{
+    // 1. Arrange: MSP_SET_RAW_RC (cmd=200) with 8 channels (16 bytes LE) + unknown cmd 254 -> ERROR
+    std::vector<uint8_t> rcPayload;
+    for (uint16_t ch = 0; ch < 8U; ch++) {
+        uint16_t val = (uint16_t)(1000U + ch * 125U);
+        rcPayload.push_back((uint8_t)(val & 0xFFU));
+        rcPayload.push_back((uint8_t)((val >> 8) & 0xFFU));
+    }
+    auto rcFrame = buildMspV1Request(MSP_SET_RAW_RC, rcPayload);
+    auto errFrame = buildMspV1Request(254U); // Unhandled -> default MSP_RESULT_ERROR
+
+    feedVector(rcFrame);
+    feedVector(errFrame);
+    while (serialRxBytesWaiting(fakePorts)) {
+        process();
+    }
+
+    // First command hits default MSP_RESULT_ERROR (since handshake handler mocks 7 cmds + error),
+    // verify mspSerialEncode encodes exact '$','M','!',len=0,cmd,crc frame!
+    ASSERT_GE(capturedTxBytes.size(), 12U);
+    EXPECT_EQ(capturedTxBytes[0], '$');
+    EXPECT_EQ(capturedTxBytes[1], 'M');
+    EXPECT_EQ(capturedTxBytes[2], '!');
+    EXPECT_EQ(capturedTxBytes[3], 0U);
+    EXPECT_EQ(capturedTxBytes[4], MSP_SET_RAW_RC);
+    EXPECT_EQ(capturedTxBytes[5], (uint8_t)(0U ^ MSP_SET_RAW_RC));
+    EXPECT_EQ(capturedTxBytes[6], '$');
+    EXPECT_EQ(capturedTxBytes[7], 'M');
+    EXPECT_EQ(capturedTxBytes[8], '!');
+    EXPECT_EQ(capturedTxBytes[9], 0U);
+    EXPECT_EQ(capturedTxBytes[10], 254U);
+    EXPECT_EQ(capturedTxBytes[11], 254U);
 }
 
 } // namespace
