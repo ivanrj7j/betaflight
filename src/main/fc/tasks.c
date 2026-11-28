@@ -123,6 +123,12 @@
 
 #include "tasks.h"
 
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+#include "platform/aries_probe.h"
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
+
 // taskUpdateRxMain() has occasional peaks in execution time so normal moving average duration estimation doesn't work
 // Decay the estimated max task duration by 1/(1 << RX_TASK_DECAY_SHIFT) on every invocation
 #define RX_TASK_DECAY_SHIFT 6
@@ -145,6 +151,12 @@ static void taskMain(timeUs_t currentTimeUs)
     // Drain non-FIFO UART TX at 1 kHz (>= 1 KB/s) without arming flaky DW_apb_uart ETBEI
     uartPollTx();
 #endif
+
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    ariesProbeTickMain();
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
 }
 
 static void taskHandleSerial(timeUs_t currentTimeUs)

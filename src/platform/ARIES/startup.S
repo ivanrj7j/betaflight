@@ -172,9 +172,25 @@ trap_entry:
     /* handle_trap returns new/resumed mepc in a0 */
     csrw mepc, a0
 
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0)
+    /* [HARDWARE-DEBUG-PROBE: DBG-04] probeTrapMode bits:
+     *   bit 0 = 1 -> skip csrs mstatus, 0x1800 (matches VEGA SDK INTERRUPT_Handler_0)
+     *   bit 1 = 1 -> run fence + 4x nop immediately before mret
+     */
+    la   t0, probeTrapMode
+    lbu  t0, 0(t0)
+    andi t1, t0, 1
+    bnez t1, 1f
+    li   t1, 0x1800
+    csrs mstatus, t1
+1:
+    andi t0, t0, 2
+    bnez t0, .L_probe_restore_fence
+#else
     /* Remain in Machine Mode after mret (MSTATUS_MPP = 3 << 11 = 0x1800) */
     li t0, 0x1800
     csrs mstatus, t0
+#endif
 
     /* Restore context */
     LREG x1,  1*REGBYTES(sp)
@@ -212,5 +228,46 @@ trap_entry:
     /* Deallocate stack frame and return from trap */
     addi sp, sp, 128
     mret
+
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0)
+.L_probe_restore_fence:
+    LREG x1,  1*REGBYTES(sp)
+    LREG x3,  3*REGBYTES(sp)
+    LREG x4,  4*REGBYTES(sp)
+    LREG x5,  5*REGBYTES(sp)
+    LREG x6,  6*REGBYTES(sp)
+    LREG x7,  7*REGBYTES(sp)
+    LREG x8,  8*REGBYTES(sp)
+    LREG x9,  9*REGBYTES(sp)
+    LREG x10, 10*REGBYTES(sp)
+    LREG x11, 11*REGBYTES(sp)
+    LREG x12, 12*REGBYTES(sp)
+    LREG x13, 13*REGBYTES(sp)
+    LREG x14, 14*REGBYTES(sp)
+    LREG x15, 15*REGBYTES(sp)
+    LREG x16, 16*REGBYTES(sp)
+    LREG x17, 17*REGBYTES(sp)
+    LREG x18, 18*REGBYTES(sp)
+    LREG x19, 19*REGBYTES(sp)
+    LREG x20, 20*REGBYTES(sp)
+    LREG x21, 21*REGBYTES(sp)
+    LREG x22, 22*REGBYTES(sp)
+    LREG x23, 23*REGBYTES(sp)
+    LREG x24, 24*REGBYTES(sp)
+    LREG x25, 25*REGBYTES(sp)
+    LREG x26, 26*REGBYTES(sp)
+    LREG x27, 27*REGBYTES(sp)
+    LREG x28, 28*REGBYTES(sp)
+    LREG x29, 29*REGBYTES(sp)
+    LREG x30, 30*REGBYTES(sp)
+    LREG x31, 31*REGBYTES(sp)
+    addi sp, sp, 128
+    fence
+    nop
+    nop
+    nop
+    nop
+    mret
+#endif
 
     .size trap_entry, . - trap_entry

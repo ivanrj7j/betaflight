@@ -37,6 +37,7 @@ Every AI agent assigned to this repository must automatically activate and execu
 | :--- | :--- | :--- |
 | **`project-onboarding`** | • Session start<br>• Starting a new development phase or task<br>• Checking toolchain setup or git branch | Read [`.agents/skills/project-onboarding/SKILL.md`](.agents/skills/project-onboarding/SKILL.md); verify active branch is `rebuild`; review 8 silicon ground truths. |
 | **`knowledge-search`** | • Planning or reviewing architecture<br>• Authoring unit tests (TDD Step 1)<br>• Proposing or editing build flags/Makefiles<br>• **Before writing code in development (TDD Step 3)** | Read [`.agents/skills/knowledge-search/SKILL.md`](.agents/skills/knowledge-search/SKILL.md); search `knowledgebase/`; cross-check VEGA SDK, STM32, and ESP32 reference implementations before writing code. |
+| **`hardware-debug`** | • Unexplained physical silicon failure or timeout<br>• Persistent hardware bug after unit tests pass<br>• Analyzing failing `COM9` / proxy / trap captures | Read [`.agents/skills/hardware-debug/SKILL.md`](.agents/skills/hardware-debug/SKILL.md); build timeline, rank testable hypotheses, verify via minimal silicon probe build (`tempfiles/`), then enter normal TDD once root cause is proven. |
 | **`knowledge-update`** | • Completing a development phase<br>• Concluding hardware inspection or bench test<br>• Auditing drivers or discovering bugs/fixes<br>• Creating retrospective or evaluation notes | Read [`.agents/skills/knowledge-update/SKILL.md`](.agents/skills/knowledge-update/SKILL.md); document using 4-part 0–10 scoring template; synchronize `INDEX.md` and `PORTING_KNOWLEDGE_GRAPH.md`. |
 
 ### Skill Protocols
@@ -46,7 +47,9 @@ Every AI agent assigned to this repository must automatically activate and execu
 2. **`knowledge-search`**:
    - **MANDATORY FOR CODE ACCURACY:** Must be invoked **EVERY SINGLE TIME** before proposing, reviewing, planning, or writing any code, driver, register configuration, or build setting.
    - Queries the 50+ node knowledge base to find verified register maps, comparative logs (STM32 vs ESP32 vs THEJAS32), historical failure post-mortems, and evaluation scores before writing any code. Guessing or hallucinating hardware registers without searching is strictly prohibited.
-3. **`knowledge-update`**:
+3. **`hardware-debug`**:
+   - **MANDATORY FOR UNPROVEN SILICON FAILURES:** Activated whenever hardware logs exhibit unexplained timeouts, drops, traps, or lockups. Enforces: `(D1) Forensic Timeline & Code/KB Audit -> (D2) Ranked Testable Hypotheses -> (D3) Minimal Wire-Safe Silicon Probe Build -> (D4) Physical Output Evaluation Until Confirmed -> (D5) Clean Handoff to Normal TDD Workflow`.
+4. **`knowledge-update`**:
    - Enforces documentation discipline: authors dedicated phase logs in `logs/dev/phase_XX_<name>.md` covering High-Level Overview, Unit Test Rationales (AAA, conditions, flight consequences), Code Implementation Rationales, Expected Outputs, 10-Point Audit, and 0–10 Scoring.
    - Updates both [`knowledgebase/INDEX.md`](knowledgebase/INDEX.md) and [`knowledgebase/PORTING_KNOWLEDGE_GRAPH.md`](knowledgebase/PORTING_KNOWLEDGE_GRAPH.md).
 

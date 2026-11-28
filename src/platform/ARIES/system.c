@@ -13,6 +13,7 @@
 
 #include "platform.h"
 #include "platform/bsp_thejas32.h"
+#include "platform/aries_probe.h" // [HARDWARE-DEBUG-PROBE: DBG-01]
 #include "drivers/time.h"
 #include "drivers/system.h"
 #include "drivers/persistent.h"
@@ -265,6 +266,7 @@ static void handle_trap_panic(uint32_t mcause, uint32_t mepc, uint32_t *sp)
     thejas32_early_uart_puts(" sp=0x");
     thejas32_early_uart_print_hex((uint32_t)(uintptr_t)sp);
     thejas32_early_uart_puts("\r\n");
+    ariesProbeDumpReport("TRAP_PANIC", mcause); // [HARDWARE-DEBUG-PROBE: DBG-01]
 #ifdef UNIT_TEST
     extern uint32_t thejas32_host_panic_count;
     thejas32_host_panic_count++;
@@ -323,6 +325,12 @@ __attribute__((used)) int __ctzsi2(int val)
  */
 uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
 {
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    // [HARDWARE-DEBUG-PROBE: DBG-02]
+    uint32_t probeMstatusIn = 0U;
+    __asm__ volatile ("csrr %0, mstatus" : "=r"(probeMstatusIn));
+    // [/HARDWARE-DEBUG-PROBE: DBG-02]
+#endif
     if (mcause & 0x80000000UL) {
         uint32_t cause_num = mcause & 0x7FFFFFFFUL;
         // Machine External Interrupt (cause 11)
@@ -331,6 +339,7 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
             uint32_t status = THEJAS32_INTR_CTRL.INTR_STATUS;
             while (status != 0U) {
                 uint32_t i = (uint32_t)__ctzsi2((int)status);
+                ariesProbeRecordIrq((uint8_t)i, status); // [HARDWARE-DEBUG-PROBE: DBG-01]
                 if (i < 32 && interrupt_table[i]) {
                     interrupt_table[i]();
                 } else {
@@ -352,6 +361,13 @@ uint32_t handle_trap(uint32_t mcause, uint32_t mepc, uint32_t *sp)
             __asm__ volatile ("csrc mie, %0" : : "r"(1UL << cause_num));
 #endif
         }
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+        // [HARDWARE-DEBUG-PROBE: DBG-02]
+        uint32_t probeMstatusOut = 0U;
+        __asm__ volatile ("csrr %0, mstatus" : "=r"(probeMstatusOut));
+        ariesProbeRecordTrap(mcause, mepc, probeMstatusIn, probeMstatusOut);
+        // [/HARDWARE-DEBUG-PROBE: DBG-02]
+#endif
         return mepc;
     } else {
         // Synchronous exception (Illegal instruction, Load/Store fault, etc.)
@@ -364,6 +380,7 @@ void targetPreInit(void)
 {
     // RV32IM boots with mstatus.MIE=0 and mie.MEIE=0 (unlike ARM PRIMASK=0); arm CPU IRQs before peripheral init
     __enable_irq();
+    ariesProbeRunSiliconLab(); // [HARDWARE-DEBUG-PROBE: DBG-03]
 #if defined(ARIES_DEV_LOGGING) && (ARIES_DEV_LOGGING > 0)
     thejas32_early_uart_puts("[ARIES v3] EEPROM & Config Initialized Successfully! (IRQ Enabled)\r\n");
 #endif

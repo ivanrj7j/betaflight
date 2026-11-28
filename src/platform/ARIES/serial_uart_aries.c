@@ -33,6 +33,14 @@
 #include "drivers/serial_uart_impl.h"
 
 #include "platform/bsp_thejas32.h"
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#include "platform/aries_probe.h"
+
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+static volatile uint8_t probeUartRxSrcTag = 'X';
+static volatile bool probeUartInIsr = false;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
 
 // -----------------------------------------------------------------------------
 // Hardware UART Resource Table for C-DAC ARIES v3.0
@@ -243,6 +251,10 @@ void uartReconfigure(uartPort_t *uartPort)
     }
 
     THEJAS32_MEMORY_FENCE();
+    // [HARDWARE-DEBUG-PROBE: DBG-01]
+    ariesProbeRecordUartReconfig((uint8_t)ch, uartPort->port.baudRate, (uint8_t)uartPort->port.mode,
+                                 (uint8_t)(THEJAS32_UART(ch).UART_IE & 0xFFU));
+    // [/HARDWARE-DEBUG-PROBE: DBG-01]
 }
 
 // -----------------------------------------------------------------------------
@@ -272,6 +284,14 @@ void uartEnableTxInterrupt(uartPort_t *uartPort)
     }
     // H22 / Ground Truth 8: Never set UART_IE bit 1 (ETBEI); TX drains via LSR polling.
     thejas32_atomic_exit(prev);
+    ariesProbeRecordCsr('T', prev); // [HARDWARE-DEBUG-PROBE: DBG-02]
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    if (bytesWritten > 0U) {
+        ariesProbeRecordUartTxBytes((uint8_t)ch, bytesWritten, probeUartInIsr);
+    }
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
 }
 
 // Periodic / polled transmit queue drain hook for background tasks and scheduler
@@ -295,10 +315,26 @@ void thejas32_uart_poll_rx(void)
         if (s->USARTx && s->port.rxBuffer && s->port.rxBufferSize > 0) {
             int8_t ch = uartGetIndex(s->USARTx);
             uint32_t prev = thejas32_atomic_enter();
+            // [HARDWARE-DEBUG-PROBE: DBG-01]
+            if (ch == 0) {
+                ariesProbeRecordUartPollTick('P');
+            }
+            // [/HARDWARE-DEBUG-PROBE: DBG-01]
             if (ch >= 0 && ch < 2) {
                 uartLineNoiseSeen[ch] = false;
             }
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+            uint8_t prevTag = probeUartRxSrcTag;
+            probeUartRxSrcTag = 'P';
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
             uartIrqHandler(s);
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+            probeUartRxSrcTag = prevTag;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
             if ((ch == 1) && uartIrqSuppressed[1] && (s->port.mode & MODE_RX)) {
                 if (!uartLineNoiseSeen[1] && ((THEJAS32_UART(1).UART_LSR & 0x1DU) == 0U)) {
                     if (++uartCleanIdleTicks[1] >= UART1_IDLE_REARM_TICKS) {
@@ -308,12 +344,14 @@ void thejas32_uart_poll_rx(void)
                         THEJAS32_UART(1).UART_IE = 0x01U;
                         thejas32_interrupt_enable(THEJAS32_IRQ_UART1);
                         THEJAS32_MEMORY_FENCE();
+                        ariesProbeRecordUart1Event(3U); // [HARDWARE-DEBUG-PROBE: DBG-01]
                     }
                 } else {
                     uartCleanIdleTicks[1] = 0U;
                 }
             }
             thejas32_atomic_exit(prev);
+            ariesProbeRecordCsr('P', prev); // [HARDWARE-DEBUG-PROBE: DBG-02]
         }
     }
 }
@@ -328,8 +366,10 @@ void uartPollTx(void)
     thejas32_uart_poll_tx();
 }
 
-static inline void uartIngestRxByte(uartPort_t *s, uint8_t rxChar)
+// [HARDWARE-DEBUG-PROBE: DBG-01] (restore 2-arg signature when removing probe)
+static inline void uartIngestRxByte(uartPort_t *s, uint8_t rxChar, uint8_t ch, uint32_t lsr)
 {
+    bool dropped = false;
     if (s->port.rxCallback) {
         s->port.rxCallback(rxChar, s->port.rxCallbackData);
     } else {
@@ -338,8 +378,18 @@ static inline void uartIngestRxByte(uartPort_t *s, uint8_t rxChar)
         if (nextHead != s->port.rxBufferTail) {
             s->port.rxBuffer[s->port.rxBufferHead] = rxChar;
             s->port.rxBufferHead = nextHead;
+        } else {
+            dropped = true; // [HARDWARE-DEBUG-PROBE: DBG-01]
         }
     }
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    ariesProbeRecordUartRxByte(ch, probeUartRxSrcTag, (uint8_t)(lsr & 0xFFU), rxChar, dropped);
+#else
+    (void)ch;
+    (void)lsr;
+    (void)dropped;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
 }
 
 // -----------------------------------------------------------------------------
@@ -364,16 +414,27 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
 
     // Check Data Ready (LSR Bit 0) and ingest up to 32 bytes per pass (prevents lockup on break condition)
     uint8_t rxLimit = 32U;
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    uint8_t rxCountInPass = 0U;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
     while ((lsr & 0x01) && rxLimit--) {
         uint8_t rxChar = thejas32_uart_read_rx((uint8_t)ch);
         if (ch == 0) {
             // Phase 13.3 / VEGA SDK: UART0 CLI & binary MSP ingest every DR byte; protocol CRCs guard corrupted frames
-            uartIngestRxByte(s, rxChar);
+            uartIngestRxByte(s, rxChar, (uint8_t)ch, lsr); // [HARDWARE-DEBUG-PROBE: DBG-01]
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+            rxCountInPass++;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
         } else if ((lsr & 0x1CU) == 0U) {
             // UART1 CRSF rejects PE/FE/BI line noise while tolerating OE so valid RC frames recover cleanly
             uartErrorStreak[1] = 0U;
-            uartIngestRxByte(s, rxChar);
+            uartIngestRxByte(s, rxChar, (uint8_t)ch, lsr); // [HARDWARE-DEBUG-PROBE: DBG-01]
         } else {
+            ariesProbeRecordUart1Event(1U); // [HARDWARE-DEBUG-PROBE: DBG-01]
             uartLineNoiseSeen[1] = true;
             uartCleanIdleTicks[1] = 0U;
             if (uartErrorStreak[1] < UART1_NOISE_SUPPRESS_THRESHOLD) {
@@ -384,6 +445,7 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
                 THEJAS32_UART(1).UART_IE = 0x00U;
                 thejas32_interrupt_disable(THEJAS32_IRQ_UART1);
                 uartIrqSuppressed[1] = true;
+                ariesProbeRecordUart1Event(2U); // [HARDWARE-DEBUG-PROBE: DBG-01]
             }
         }
         lsr = thejas32_uart_read_lsr((uint8_t)ch);
@@ -395,6 +457,13 @@ FAST_IRQ_HANDLER void uartIrqHandler(uartPort_t *s)
     }
 
     THEJAS32_MEMORY_FENCE();
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    if (ch == 0 && probeUartRxSrcTag == 'I') {
+        ariesProbeRecordUart0IsrDone(rxCountInPass);
+    }
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
 }
 
 static void thejas32_uart0_isr(void)
@@ -402,7 +471,22 @@ static void thejas32_uart0_isr(void)
     // C-DAC HardwareSerial.cpp: ack IIR strictly inside hardware ISR entry (never inside polled paths)
     volatile uint32_t iir = THEJAS32_UART(0).UART_IIR_FCR;
     (void)iir;
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    ariesProbeRecordUart0IsrEntry((uint8_t)(iir & 0xFFU), (uint8_t)(THEJAS32_UART(0).UART_LSR & 0xFFU));
+    uint8_t prevTag = probeUartRxSrcTag;
+    bool prevIsr = probeUartInIsr;
+    probeUartRxSrcTag = 'I';
+    probeUartInIsr = true;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
     uartIrqHandler(&uartDevice[UARTDEV_0].port);
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    probeUartRxSrcTag = prevTag;
+    probeUartInIsr = prevIsr;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
 }
 
 #ifdef USE_UART1
@@ -410,7 +494,19 @@ void thejas32_uart1_isr(void)
 {
     volatile uint32_t iir = THEJAS32_UART(1).UART_IIR_FCR;
     (void)iir;
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+    ariesProbeRecordUart1Event(0U);
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    bool prevIsr = probeUartInIsr;
+    probeUartInIsr = true;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
     uartIrqHandler(&uartDevice[UARTDEV_1].port);
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    probeUartInIsr = prevIsr;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
 }
 #endif
 
@@ -495,8 +591,23 @@ void uartPlatformPollRx(uartPort_t *s)
     if (s && s->USARTx && s->port.rxBuffer && s->port.rxBufferSize > 0) {
         if (s->port.rxBufferHead == s->port.rxBufferTail) {
             uint32_t prev = thejas32_atomic_enter();
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+            if (uartGetIndex(s->USARTx) == 0) {
+                ariesProbeRecordUartPollTick('U');
+            }
+            uint8_t prevTag = probeUartRxSrcTag;
+            probeUartRxSrcTag = 'U';
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
             uartIrqHandler(s);
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+            probeUartRxSrcTag = prevTag;
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
             thejas32_atomic_exit(prev);
+            ariesProbeRecordCsr('U', prev); // [HARDWARE-DEBUG-PROBE: DBG-02]
         }
     }
 }

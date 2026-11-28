@@ -57,14 +57,17 @@ INCLUDE_DIRS := \
 # The core does NOT implement compressed ('C') or hardware float ('F'/'D') extensions.
 HSE_VALUE    := 100000000
 ARIES_DEV_LOGGING ?= 1
-ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany -mstrict-align
+# [HARDWARE-DEBUG-PROBE: DBG-01 / DBG-03] ARIES_PROBE_DEBUG & ARIES/aries_probe.c (temporary probe - remove at Step D5 cleanup)
+ARIES_PROBE_DEBUG ?= 0
+ARCH_FLAGS   = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany -mstrict-align -DARIES_PROBE_DEBUG=$(ARIES_PROBE_DEBUG)
 
 # Memory builtins disabled to prevent compiler from emitting calls to compressed libc helpers
 DEVICE_FLAGS = -DARIES -DTHEJAS32 -DUSE_CONFIG \
                -Wno-type-limits -Wno-sign-compare -Wno-unused-parameter \
                -ffast-math -fno-math-errno \
                -fno-builtin-memset -fno-builtin-memcpy -fno-builtin-memmove \
-               -DARIES_DEV_LOGGING=$(ARIES_DEV_LOGGING)
+               -DARIES_DEV_LOGGING=$(ARIES_DEV_LOGGING) \
+               -DARIES_PROBE_DEBUG=$(ARIES_PROBE_DEBUG)
 
 LD_SCRIPT    = $(LINKER_DIR)/aries_v3.ld
 
@@ -99,9 +102,11 @@ MCU_COMMON_SRC := \
     ARIES/exti_aries.c \
     ARIES/pwm_motor_aries.c \
     ARIES/stub_drivers.c \
+    ARIES/aries_probe.c \
     drivers/serial_pinconfig.c \
     drivers/bus_spi_config.c \
     ARIES/bus_spi_aries.c
+# [/HARDWARE-DEBUG-PROBE: DBG-01] (remove ARIES/aries_probe.c from MCU_COMMON_SRC at Step D5 cleanup)
     # Future Phase Drivers (uncomment as phases are implemented):
     # ARIES/config_flash_aries.c (Phase 18)
 

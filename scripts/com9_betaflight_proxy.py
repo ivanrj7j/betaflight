@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
 """
-COM9 Serial Monitor + Dual-Mode (WebSocket & Raw TCP) Betaflight Configurator Proxy.
+Serial Monitor + Dual-Mode (WebSocket & Raw TCP) Betaflight Configurator Proxy.
 
-Owns the hardware serial port exclusively (no COM port conflict), logs all RX/TX traffic
-to a file in real time, prints human-readable telemetry/MSP traces to stdout, and exposes a
-loopback proxy that accepts BOTH:
-  - Betaflight Web App PWA (Chrome/Edge at master.app.betaflight.com / app.betaflight.com):
-      Enable "Manual connection mode" -> connect to:  ws://127.0.0.1:5761
-  - Standalone Desktop Betaflight Configurator:
-      Select manual port -> connect to:               tcp://127.0.0.1:5761
+Features:
+  - Creates a unique timestamped log file on every run by default
+    (e.g., com9_proxy_20261128_112627.txt).
+  - Keeps listening for Betaflight Configurator even if the serial port (e.g. COM9)
+    is absent at startup or temporarily unplugged, and auto-connects when present.
+  - Supports easy port switching via CLI (`python com9_betaflight_proxy.py COM5` or
+    `--port COM5`) and live in-console commands (`:ports`, `:port COM5`, `:baud 115200`).
+  - Accepts BOTH:
+      * Betaflight Web App PWA (master.app.betaflight.com / app.betaflight.com,
+        Manual connection mode):  ws://127.0.0.1:5761
+      * Desktop Betaflight Configurator (Manual port):
+                                  tcp://127.0.0.1:5761
 """
 
 import argparse
 import base64
 import hashlib
 import os
+import re
 import select
 import socket
 import struct
@@ -24,8 +30,12 @@ import time
 
 try:
     import serial
+    from serial import SerialException
+    from serial.tools import list_ports
 except ImportError:
     serial = None
+    SerialException = OSError
+    list_ports = None
 
 try:
     import msvcrt
@@ -38,9 +48,6 @@ DEFAULT_SERIAL_PORT = "COM9"
 DEFAULT_BAUD = 115200
 DEFAULT_LISTEN_HOST = "127.0.0.1"
 DEFAULT_LISTEN_PORT = 5761
-DEFAULT_LOG_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "com9_proxy_log.txt"
-)
 
 
 def now_ts():
@@ -49,6 +56,44 @@ def now_ts():
     lt = time.localtime(t)
     ms = int((t - int(t)) * 1000)
     return time.strftime("%H:%M:%S", lt) + f".{ms:03d}"
+
+
+def run_stamp(epoch_sec=None):
+    """Return filename-safe YYYYMMDD_HHMMSS timestamp for the current run."""
+    lt = time.localtime(epoch_sec if epoch_sec is not None else time.time())
+    return time.strftime("%Y%m%d_%H%M%S", lt)
+
+
+def sanitize_port_for_filename(port_name):
+    """Normalize a serial port string into a safe lowercase filename prefix."""
+    base = os.path.basename(port_name.strip()) if port_name else "serial"
+    cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_").lower()
+    return cleaned or "serial"
+
+
+def make_default_log_path(port_name, base_dir=None, epoch_sec=None):
+    """Build a unique per-run log filename containing port and start time."""
+    target_dir = base_dir or os.path.dirname(os.path.abspath(__file__))
+    prefix = sanitize_port_for_filename(port_name)
+    return os.path.join(target_dir, f"{prefix}_proxy_{run_stamp(epoch_sec)}.txt")
+
+
+def enumerate_serial_ports():
+    """Return list of (device, description) for currently attached serial ports."""
+    if list_ports is None:
+        return []
+    try:
+        return [(p.device, p.description or "") for p in sorted(list_ports.comports(), key=lambda x: x.device)]
+    except Exception:
+        return []
+
+
+def format_available_ports():
+    """Format attached COM/tty serial ports for human-readable status messages."""
+    ports = enumerate_serial_ports()
+    if not ports:
+        return "none detected"
+    return ", ".join(f"{dev} ({desc})" if desc else dev for dev, desc in ports)
 
 
 def describe_msp_packets(data):
@@ -185,32 +230,51 @@ def try_ws_handshake(sock, request_bytes):
             b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n"
             b"Expected WebSocket upgrade or raw TCP Betaflight MSP stream.\r\n"
         )
-        return False
+        return False, "invalid-upgrade"
 
     accept_raw = (key + WS_MAGIC_GUID).encode("ascii")
     accept_b64 = base64.b64encode(hashlib.sha1(accept_raw).digest()).decode("ascii")
+
+    proto_line = ""
+    chosen_proto = None
+    req_protos = headers.get("sec-websocket-protocol", "")
+    if req_protos:
+        tokens = [p.strip() for p in req_protos.split(",") if p.strip()]
+        if "binary" in tokens:
+            chosen_proto = "binary"
+        elif tokens:
+            chosen_proto = tokens[0]
+        if chosen_proto:
+            proto_line = f"Sec-WebSocket-Protocol: {chosen_proto}\r\n"
+
     resp = (
         "HTTP/1.1 101 Switching Protocols\r\n"
         "Upgrade: websocket\r\n"
         "Connection: Upgrade\r\n"
         f"Sec-WebSocket-Accept: {accept_b64}\r\n"
+        f"{proto_line}"
         "\r\n"
     ).encode("ascii")
     sock.sendall(resp)
-    return True
+    origin = headers.get("origin", "-")
+    return True, f"origin={origin} proto={chosen_proto or '-'}"
 
 
-def read_http_header_block(sock, initial_timeout=0.25):
-    """Peek first bytes to distinguish HTTP WebSocket Upgrade from raw TCP stream."""
-    ready, _, _ = select.select([sock], [], [], initial_timeout)
-    if not ready:
-        return "tcp", b""
+def read_http_header_block(sock, stop_event=None):
+    """Wait for client's first byte and distinguish HTTP WebSocket Upgrade from raw TCP."""
+    while True:
+        if stop_event is not None and stop_event.is_set():
+            return "eof", b""
+        ready, _, _ = select.select([sock], [], [], 0.2)
+        if ready:
+            break
 
     peeked = sock.recv(16, socket.MSG_PEEK)
     if not peeked:
         return "eof", b""
 
-    if peeked.startswith(b"GET ") or peeked.startswith(b"get "):
+    upper = peeked.upper()
+    if upper.startswith((b"GET ", b"HEAD ", b"POST ", b"OPTIONS ")):
         buf = bytearray()
         sock.settimeout(2.0)
         while b"\r\n\r\n" not in buf and len(buf) < 16384:
@@ -222,6 +286,13 @@ def read_http_header_block(sock, initial_timeout=0.25):
         return "ws", bytes(buf)
 
     return "tcp", b""
+
+
+def default_serial_opener(port, baud):
+    """Open physical serial port via pyserial with short timeout for clean switching."""
+    if serial is None:
+        raise RuntimeError("pyserial is not installed")
+    return serial.Serial(port, baud, timeout=0.05, write_timeout=1.0)
 
 
 class ClientSession:
@@ -265,19 +336,68 @@ class ClientSession:
 
 
 class SerialBetaflightProxy:
-    """Bridges one physical serial port to a log file and sequential TCP/WS clients."""
+    """Bridges a hot-pluggable/switchable serial port to a log file and TCP/WS clients."""
 
-    def __init__(self, ser, log_file, raw_file=None, echo_stdout=True):
-        self.ser = ser
+    def __init__(
+        self,
+        target_port,
+        target_baud,
+        log_file,
+        raw_file=None,
+        echo_stdout=True,
+        serial_opener=None,
+        port_lister=None,
+        retry_interval=0.5,
+    ):
+        self.target_port = target_port
+        self.target_baud = int(target_baud)
         self.log_file = log_file
         self.raw_file = raw_file
         self.echo_stdout = echo_stdout
+        self.serial_opener = serial_opener or default_serial_opener
+        self.port_lister = port_lister or format_available_ports
+        self.retry_interval = retry_interval
 
         self.stop_event = threading.Event()
         self.log_lock = threading.Lock()
+        self.ser_state_lock = threading.Lock()
         self.ser_write_lock = threading.Lock()
         self.client_lock = threading.Lock()
+
+        self.ser = None
+        self.active_port = None
+        self.active_baud = None
+        self.reconnect_requested = True
         self.active_client = None
+
+    def get_active_serial(self):
+        with self.ser_state_lock:
+            return self.ser, self.active_port, self.active_baud
+
+    def get_target(self):
+        with self.ser_state_lock:
+            return self.target_port, self.target_baud
+
+    def switch_port(self, new_port, new_baud=None):
+        """Request immediate switch to another serial port (and optional baud rate)."""
+        new_port = new_port.strip()
+        if not new_port:
+            return
+        with self.ser_state_lock:
+            self.target_port = new_port
+            if new_baud is not None:
+                self.target_baud = int(new_baud)
+            baud = self.target_baud
+            self.reconnect_requested = True
+        self.log_event(f"[PORT SWITCH REQUESTED] Target={new_port} @ {baud}")
+
+    def set_baud(self, new_baud):
+        """Request baud rate change on the current target serial port."""
+        with self.ser_state_lock:
+            self.target_baud = int(new_baud)
+            port = self.target_port
+            self.reconnect_requested = True
+        self.log_event(f"[BAUD CHANGE REQUESTED] Target={port} @ {int(new_baud)}")
 
     def log_event(self, text):
         line = f"[{now_ts()}] {text}\n"
@@ -299,7 +419,7 @@ class SerialBetaflightProxy:
 
             if direction == "RX" and is_mostly_printable_text(data):
                 text = data.decode("utf-8", errors="replace")
-                entry = f"[{now_ts()}] [RX <- SERIAL {len(data)}B TEXT]\n{text}"
+                entry = f"[{now_ts()}] [RX <- {self.active_port or 'SERIAL'} {len(data)}B TEXT]\n{text}"
                 if not text.endswith("\n"):
                     entry += "\n"
                 self.log_file.write(entry.encode("utf-8", errors="replace"))
@@ -325,11 +445,24 @@ class SerialBetaflightProxy:
 
     def write_serial(self, data, source_label="PROXY"):
         if not data:
-            return
-        self.log_traffic(f"TX <- {source_label}", data)
-        with self.ser_write_lock:
-            self.ser.write(data)
-            self.ser.flush()
+            return False
+        ser, port, _ = self.get_active_serial()
+        if ser is None:
+            target_port, _ = self.get_target()
+            self.log_traffic(f"TX DROPPED (NO SERIAL {target_port}) <- {source_label}", data)
+            return False
+
+        self.log_traffic(f"TX({port}) <- {source_label}", data)
+        try:
+            with self.ser_write_lock:
+                ser.write(data)
+                ser.flush()
+            return True
+        except Exception as exc:
+            self.log_event(f"[SERIAL WRITE ERROR] {port}: {exc}")
+            with self.ser_state_lock:
+                self.reconnect_requested = True
+            return False
 
     def set_client(self, session):
         with self.client_lock:
@@ -343,21 +476,76 @@ class SerialBetaflightProxy:
             if self.active_client is session:
                 self.active_client = None
 
-    def serial_reader_loop(self):
-        while not self.stop_event.is_set():
+    def _close_current_serial(self):
+        with self.ser_state_lock:
+            ser = self.ser
+            self.ser = None
+            self.active_port = None
+            self.active_baud = None
+        if ser is not None:
             try:
-                pending = self.ser.in_waiting
-                chunk = self.ser.read(pending if pending > 0 else 1)
+                ser.close()
+            except Exception:
+                pass
+
+    def serial_reader_loop(self):
+        last_wait_msg = None
+        while not self.stop_event.is_set():
+            with self.ser_state_lock:
+                need_reconnect = self.reconnect_requested or (self.ser is None)
+                target_port = self.target_port
+                target_baud = self.target_baud
+
+            if need_reconnect:
+                if self.ser is not None:
+                    old_port = self.active_port
+                    self._close_current_serial()
+                    self.log_event(f"[SERIAL CLOSED] Closed {old_port}")
+
+                with self.ser_state_lock:
+                    self.reconnect_requested = False
+
+                try:
+                    new_ser = self.serial_opener(target_port, target_baud)
+                    with self.ser_state_lock:
+                        if self.target_port != target_port or self.target_baud != target_baud:
+                            # Target changed mid-open; discard and loop immediately
+                            self.reconnect_requested = True
+                            new_ser.close()
+                            continue
+                        self.ser = new_ser
+                        self.active_port = target_port
+                        self.active_baud = target_baud
+                    last_wait_msg = None
+                    self.log_event(f"[SERIAL CONNECTED] {target_port} @ {target_baud}")
+                except Exception as exc:
+                    avail = self.port_lister()
+                    wait_sig = (target_port, target_baud, avail)
+                    if last_wait_msg != wait_sig:
+                        self.log_event(
+                            f"[WAIT SERIAL] {target_port} @ {target_baud} unavailable ({exc}). "
+                            f"Proxy still listening | Attached ports: {avail}"
+                        )
+                        last_wait_msg = wait_sig
+                    self.stop_event.wait(self.retry_interval)
+                    continue
+
+            ser = self.ser
+            if ser is None:
+                continue
+
+            try:
+                pending = ser.in_waiting
+                chunk = ser.read(pending if pending > 0 else 1)
                 if not chunk:
                     continue
 
-                # Coalesce short burst (e.g., line of text or single MSP reply)
                 buf = bytearray(chunk)
                 deadline = time.monotonic() + 0.012
-                while time.monotonic() < deadline and len(buf) < 4096:
-                    more = self.ser.in_waiting
+                while time.monotonic() < deadline and len(buf) < 4096 and not self.reconnect_requested:
+                    more = ser.in_waiting
                     if more > 0:
-                        buf.extend(self.ser.read(min(more, 4096 - len(buf))))
+                        buf.extend(ser.read(min(more, 4096 - len(buf))))
                         deadline = time.monotonic() + 0.004
                     else:
                         time.sleep(0.001)
@@ -373,25 +561,179 @@ class SerialBetaflightProxy:
                         client.close()
             except Exception as exc:
                 if not self.stop_event.is_set():
-                    self.log_event(f"[ERROR] Serial read error: {exc}")
-                    time.sleep(0.05)
+                    self.log_event(f"[SERIAL DISCONNECTED] {target_port} lost ({exc}); waiting to reconnect...")
+                    self._close_current_serial()
+                    last_wait_msg = None
+                    self.stop_event.wait(self.retry_interval)
+
+        self._close_current_serial()
+
+    def handle_local_command(self, raw_cmd):
+        """Process interactive local proxy commands (:ports, :port COM5, :baud 115200, :status, :help, :quit)."""
+        cmd_line = raw_cmd.strip()
+        if cmd_line.startswith(":"):
+            cmd_line = cmd_line[1:].strip()
+        if not cmd_line:
+            return
+
+        parts = cmd_line.split()
+        verb = parts[0].lower()
+
+        if verb in ("ports", "list", "ls"):
+            self.log_event(f"[PORTS] {self.port_lister()}")
+            return
+
+        if verb in ("status", "info"):
+            ser, act_port, act_baud = self.get_active_serial()
+            tgt_port, tgt_baud = self.get_target()
+            state = f"CONNECTED ({act_port} @ {act_baud})" if ser else f"WAITING ({tgt_port} @ {tgt_baud})"
+            with self.client_lock:
+                cli = f"{self.active_client.mode.upper()} {self.active_client.addr}" if self.active_client else "none"
+            self.log_event(f"[STATUS] Serial={state} | Client={cli}")
+            return
+
+        if verb in ("port", "switch", "use"):
+            if len(parts) < 2:
+                self.log_event("[USAGE] :port <PORT> [BAUD]   (example: :port COM5)")
+                return
+            baud = None
+            if len(parts) >= 3:
+                try:
+                    baud = int(parts[2])
+                except ValueError:
+                    self.log_event(f"[ERROR] Invalid baud rate: {parts[2]}")
+                    return
+            self.switch_port(parts[1], baud)
+            return
+
+        if verb == "baud":
+            if len(parts) < 2:
+                self.log_event("[USAGE] :baud <RATE>   (example: :baud 115200)")
+                return
+            try:
+                self.set_baud(int(parts[1]))
+            except ValueError:
+                self.log_event(f"[ERROR] Invalid baud rate: {parts[1]}")
+            return
+
+        if verb == "reconnect":
+            with self.ser_state_lock:
+                self.reconnect_requested = True
+            self.log_event("[RECONNECT] Forcing serial reconnect...")
+            return
+
+        if verb in ("quit", "exit"):
+            self.log_event("[STOPPING] Exit requested from console.")
+            self.stop_event.set()
+            return
+
+        if verb in ("help", "?"):
+            self.log_event(
+                "[COMMANDS] :ports | :port <COMx> [baud] | :baud <rate> | :reconnect | :status | :quit"
+            )
+            return
+
+        # Shorthand when someone types just "COM5" or "/dev/ttyUSB0"
+        if re.match(r"^(COM\d+|/dev/tty\S+)$", parts[0], re.IGNORECASE):
+            baud = None
+            if len(parts) >= 2:
+                try:
+                    baud = int(parts[1])
+                except ValueError:
+                    self.log_event(f"[ERROR] Invalid baud rate: {parts[1]}")
+                    return
+            self.switch_port(parts[0], baud)
+            return
+
+        self.log_event(f"[UNKNOWN COMMAND] '{cmd_line}'. Type :help for proxy commands.")
 
     def keyboard_loop(self):
-        if not msvcrt or not sys.stdin or not sys.stdin.isatty():
+        if not sys.stdin or not sys.stdin.isatty():
             return
+
+        if msvcrt is None:
+            # POSIX fallback: line-oriented stdin for local proxy commands or serial CLI lines
+            while not self.stop_event.is_set():
+                try:
+                    ready, _, _ = select.select([sys.stdin], [], [], 0.1)
+                    if not ready:
+                        continue
+                    line = sys.stdin.readline()
+                    if not line:
+                        return
+                    stripped = line.rstrip("\r\n")
+                    ser, _, _ = self.get_active_serial()
+                    if stripped.startswith(":") or ser is None:
+                        self.handle_local_command(stripped)
+                    else:
+                        self.write_serial((stripped + "\r\n").encode("utf-8"), source_label="KBD")
+                except Exception:
+                    time.sleep(0.05)
+            return
+
+        local_mode = False
+        local_buf = bytearray()
+
         while not self.stop_event.is_set():
             try:
-                if msvcrt.kbhit():
-                    ch = msvcrt.getch()
-                    if ch == b"\x03":
-                        self.stop_event.set()
-                        return
-                    if ch in (b"\x00", b"\xe0"):
-                        msvcrt.getch()
-                        continue
-                    self.write_serial(ch, source_label="KBD")
-                else:
+                if not msvcrt.kbhit():
                     time.sleep(0.02)
+                    continue
+
+                ch = msvcrt.getch()
+                if ch == b"\x03":  # Ctrl+C
+                    self.stop_event.set()
+                    return
+                if ch in (b"\x00", b"\xe0"):
+                    msvcrt.getch()
+                    continue
+
+                ser, _, _ = self.get_active_serial()
+
+                # Enter local command mode via ':' (or anytime serial isn't connected yet)
+                if not local_mode and (ch == b":" or ser is None):
+                    local_mode = True
+                    local_buf.clear()
+                    sys.stdout.write("\r\nproxy> ")
+                    if ch != b":":
+                        if ch in (b"\r", b"\n"):
+                            sys.stdout.write("\n")
+                            sys.stdout.flush()
+                            local_mode = False
+                            continue
+                        local_buf.extend(ch)
+                        sys.stdout.write(ch.decode("latin1", errors="replace"))
+                    else:
+                        sys.stdout.write(":")
+                    sys.stdout.flush()
+                    continue
+
+                if local_mode:
+                    if ch in (b"\r", b"\n"):
+                        sys.stdout.write("\n")
+                        sys.stdout.flush()
+                        cmd_str = local_buf.decode("utf-8", errors="replace")
+                        local_buf.clear()
+                        local_mode = False
+                        self.handle_local_command(cmd_str)
+                    elif ch in (b"\x08", b"\x7f"):  # Backspace
+                        if local_buf:
+                            local_buf.pop()
+                            sys.stdout.write("\b \b")
+                            sys.stdout.flush()
+                    elif ch == b"\x1b":  # Esc cancels local command entry
+                        local_buf.clear()
+                        local_mode = False
+                        sys.stdout.write(" [cancelled]\n")
+                        sys.stdout.flush()
+                    else:
+                        local_buf.extend(ch)
+                        sys.stdout.write(ch.decode("latin1", errors="replace"))
+                        sys.stdout.flush()
+                    continue
+
+                # Connected & not in local command mode: raw CLI keystroke passthrough
+                self.write_serial(ch, source_label="KBD")
             except Exception:
                 time.sleep(0.05)
 
@@ -402,7 +744,7 @@ class SerialBetaflightProxy:
             pass
 
         try:
-            mode, header_bytes = read_http_header_block(conn)
+            mode, header_bytes = read_http_header_block(conn, self.stop_event)
         except OSError:
             conn.close()
             return
@@ -411,22 +753,36 @@ class SerialBetaflightProxy:
             conn.close()
             return
 
+        ws_note = ""
         if mode == "ws":
-            if not try_ws_handshake(conn, header_bytes):
+            ok, ws_info = try_ws_handshake(conn, header_bytes)
+            if not ok:
+                self.log_event(f"[WS HANDSHAKE REJECTED] {addr[0]}:{addr[1]} ({ws_info})")
                 conn.close()
                 return
+            ws_note = f" {ws_info}"
 
         session = ClientSession(conn, addr, mode)
         self.set_client(session)
-        self.log_event(f"[CLIENT CONNECTED] {addr[0]}:{addr[1]} via {mode.upper()}")
+        ser, act_port, act_baud = self.get_active_serial()
+        ser_note = f"{act_port} @ {act_baud}" if ser else "SERIAL NOT CONNECTED YET"
+        self.log_event(f"[CLIENT CONNECTED] {addr[0]}:{addr[1]} via {mode.upper()}{ws_note} ({ser_note})")
 
+        close_reason = ""
         try:
             while not self.stop_event.is_set() and not session.closed:
                 if mode == "ws":
                     opcode, payload = read_ws_frame(conn)
                     if opcode is None:
+                        close_reason = " (EOF)"
                         break
                     if opcode == 0x8:  # Close
+                        if len(payload) >= 2:
+                            code = struct.unpack("!H", payload[:2])[0]
+                            reason = payload[2:].decode("utf-8", errors="replace")
+                            close_reason = f" (WS close code={code} {reason!r})"
+                        else:
+                            close_reason = " (WS close)"
                         break
                     if opcode == 0x9:  # Ping -> Pong
                         with session.send_lock:
@@ -442,6 +798,7 @@ class SerialBetaflightProxy:
                         continue
                     data = conn.recv(4096)
                     if not data:
+                        close_reason = " (EOF)"
                         break
                     self.write_serial(data, source_label="TCP")
         except OSError as exc:
@@ -450,46 +807,75 @@ class SerialBetaflightProxy:
         finally:
             self.clear_client(session)
             session.close()
-            self.log_event(f"[CLIENT DISCONNECTED] {addr[0]}:{addr[1]}")
+            self.log_event(f"[CLIENT DISCONNECTED] {addr[0]}:{addr[1]}{close_reason}")
 
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="COM9 Serial Monitor + Dual-Mode (WS & TCP) Proxy for Betaflight Configurator."
+        description="Serial Monitor + Dual-Mode (WS & TCP) Proxy for Betaflight Configurator."
     )
-    p.add_argument("--port", default=DEFAULT_SERIAL_PORT, help="Serial port (default: COM9)")
-    p.add_argument("--baud", type=int, default=DEFAULT_BAUD, help="Baud rate (default: 115200)")
+    p.add_argument(
+        "positional_port",
+        nargs="?",
+        default=None,
+        help="Optional serial port shorthand (e.g. COM5), overrides --port",
+    )
+    p.add_argument(
+        "-p",
+        "--port",
+        default=DEFAULT_SERIAL_PORT,
+        help=f"Initial serial port (default: {DEFAULT_SERIAL_PORT})",
+    )
+    p.add_argument(
+        "-b",
+        "--baud",
+        type=int,
+        default=DEFAULT_BAUD,
+        help=f"Baud rate (default: {DEFAULT_BAUD})",
+    )
     p.add_argument(
         "--listen-host",
         default=DEFAULT_LISTEN_HOST,
-        help="Proxy bind address (default: 127.0.0.1)",
+        help=f"Proxy bind address (default: {DEFAULT_LISTEN_HOST})",
     )
     p.add_argument(
+        "-l",
         "--listen-port",
         type=int,
         default=DEFAULT_LISTEN_PORT,
-        help="Proxy TCP/WebSocket port (default: 5761)",
+        help=f"Proxy TCP/WebSocket port (default: {DEFAULT_LISTEN_PORT})",
     )
     p.add_argument(
+        "-o",
         "--out",
-        default=DEFAULT_LOG_PATH,
-        help=f"Output diagnostic log path (default: {DEFAULT_LOG_PATH})",
+        default=None,
+        help="Output log file path (default: <port>_proxy_<YYYYMMDD_HHMMSS>.txt next to script)",
     )
     p.add_argument(
         "--raw-out",
         default=None,
         help="Optional file path to also dump raw unmodified serial RX bytes",
     )
+    p.add_argument(
+        "--list",
+        action="store_true",
+        help="List currently available serial ports and exit",
+    )
     return p.parse_args()
 
 
 def main():
     args = parse_args()
+    if args.list:
+        print(f"Available serial ports: {format_available_ports()}")
+        return
+
     if serial is None:
         print("ERROR: pyserial is required. Install with: pip install pyserial", file=sys.stderr)
         sys.exit(1)
 
-    ser = serial.Serial(args.port, args.baud, timeout=0.01, write_timeout=1.0)
+    initial_port = args.positional_port or args.port
+    log_path = args.out or make_default_log_path(initial_port)
 
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -497,21 +883,30 @@ def main():
     srv.listen(4)
     srv.settimeout(0.5)
 
-    out_dir = os.path.dirname(os.path.abspath(args.out))
+    out_dir = os.path.dirname(os.path.abspath(log_path))
     if out_dir and not os.path.exists(out_dir):
         os.makedirs(out_dir, exist_ok=True)
 
     raw_f = open(args.raw_out, "wb") if args.raw_out else None
-    with open(args.out, "wb") as log_f:
-        proxy = SerialBetaflightProxy(ser, log_f, raw_file=raw_f, echo_stdout=True)
+    with open(log_path, "wb") as log_f:
+        proxy = SerialBetaflightProxy(
+            initial_port,
+            args.baud,
+            log_f,
+            raw_file=raw_f,
+            echo_stdout=True,
+        )
         proxy.log_event(
-            f"[PROXY READY] Serial={args.port} @ {args.baud} | Log={args.out}"
+            f"[PROXY READY] Target={initial_port} @ {args.baud} | Log={log_path}"
         )
         proxy.log_event(
             f"[CONNECT URL] Betaflight Web App (Manual Mode): ws://{args.listen_host}:{args.listen_port}"
         )
         proxy.log_event(
             f"[CONNECT URL] Betaflight Desktop (Manual):      tcp://{args.listen_host}:{args.listen_port}"
+        )
+        proxy.log_event(
+            "[SWITCH PORTS] Type :ports or :port COM5 (no ':' needed while waiting) | Ctrl+C to quit"
         )
 
         rx_thread = threading.Thread(target=proxy.serial_reader_loop, daemon=True)
@@ -536,14 +931,10 @@ def main():
                 srv.close()
             except OSError:
                 pass
-            try:
-                ser.close()
-            except OSError:
-                pass
+            rx_thread.join(timeout=1.5)
             if raw_f is not None:
                 raw_f.close()
-            rx_thread.join(timeout=1.0)
-            print(f"\nSaved log to {args.out}")
+            print(f"\nSaved log to {log_path}")
 
 
 if __name__ == "__main__":

@@ -43,6 +43,12 @@
 
 #include "pg/msp.h"
 
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+#include "platform/aries_probe.h"
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
+
 static mspPort_t mspPorts[MSP_PORT_COUNT];
 
 static void resetMspPort(mspPort_t *mspPortToReset, serialPort_t *serialPort, bool sharedWithTelemetry)
@@ -273,6 +279,11 @@ static void mspSerialProcessReceivedPacketData(mspPort_t *mspPort, uint8_t c)
             if (mspPort->checksum1 == c) {
                 mspPort->packetState = MSP_COMMAND_RECEIVED;
             } else {
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+                ariesProbeRecordMspCrcErr(mspPort->cmdMSP, (uint8_t)mspPort->packetState);
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
                 mspPort->packetState = MSP_IDLE;
             }
             break;
@@ -494,6 +505,11 @@ static mspPostProcessFnPtr mspSerialProcessReceivedCommand(mspPort_t *msp, mspPr
     const mspResult_e status = mspProcessCommandFn(msp->descriptor, &command, &reply, &mspPostProcessFn);
 
     if (status != MSP_RESULT_NO_REPLY) {
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+        ariesProbeRecordMspCmdOk((uint16_t)command.cmd);
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
         sbufSwitchToReader(&reply.buf, outBufHead); // change streambuf direction
         mspSerialEncode(msp, &reply, msp->mspVersion);
     }
@@ -566,6 +582,13 @@ static void mspProcessPacket(mspPort_t *mspPort, mspProcessCommandFnPtr mspProce
         const uint8_t c = serialRead(mspPort->port);
 
         mspSerialProcessReceivedPacketData(mspPort, c);
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+        ariesProbeRecordMspByte((uint8_t)mspPort->portState, (uint8_t)mspPort->packetState, c,
+                                (uint16_t)mspPort->offset, (uint16_t)mspPort->dataSize,
+                                (uint16_t)mspPort->cmdMSP, (uint8_t)mspPort->pendingRequest);
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
 
         if (mspPort->packetState == MSP_COMMAND_RECEIVED) {
             if (mspPort->packetType == MSP_PACKET_COMMAND) {
@@ -612,6 +635,11 @@ static bool mspPortIsPeripheral(serialPortIdentifier_e identifier)
 
 void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessCommandFnPtr mspProcessCommandFn, mspProcessReplyFnPtr mspProcessReplyFn)
 {
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    ariesProbeTickSerial(mspPorts[0].port, &mspPorts[0]);
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
     for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
         if (!mspPort->port) {
             continue;
@@ -621,6 +649,13 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
         while (mspPort->portState == PORT_IDLE && serialRxBytesWaiting(mspPort->port)) {
             mspPort->lastActivityMs = millis();
             const uint8_t c = serialRead(mspPort->port);
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+            ariesProbeRecordMspByte((uint8_t)mspPort->portState, (uint8_t)mspPort->packetState, c,
+                                    (uint16_t)mspPort->offset, (uint16_t)mspPort->dataSize,
+                                    (uint16_t)mspPort->cmdMSP, (uint8_t)mspPort->pendingRequest);
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
             if (c == '$') {
                 // MSP frame incoming — cancel any pending non-MSP request.
                 // Resetting only on '$' (not every byte) allows '#\r' sequences to set

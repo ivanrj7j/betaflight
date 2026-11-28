@@ -29,6 +29,12 @@
 
 #include "platform.h"
 
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+#include "platform/aries_probe.h"
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
+
 // FIXME remove this for targets that don't need a CLI.  Perhaps use a no-op macro when USE_CLI is not enabled
 // signal that we're in cli mode
 bool cliMode = false;
@@ -8997,6 +9003,11 @@ static void cliExit(const bool reboot)
 
 void cliEnter(serialPort_t *serialPort, bool interactive)
 {
+// [HARDWARE-DEBUG-PROBE: DBG-01]
+#if defined(ARIES_PROBE_DEBUG) && (ARIES_PROBE_DEBUG > 0) && !defined(UNIT_TEST)
+    ariesProbeRecordCliEnter(interactive);
+#endif
+// [/HARDWARE-DEBUG-PROBE: DBG-01]
     cliMode = true;
     cliInteractive = interactive;
     cliPort = serialPort;

@@ -78,6 +78,18 @@ Agents working through the TDD protocol must automatically activate and execute 
 
 ---
 
+## 1.2 Hypothesis-Driven Hardware Debug Protocol (Pre-TDD Gate for Unproven Silicon Failures)
+
+When physical ARIES v3.0 testing uncovers an unexplained runtime failure (e.g., intermittent serial drops, MSP Configurator timeouts, hardware lockups, or traps where the root cause is still unknown), agents **MUST NOT guess a fix and jump straight to permanent TDD edits**. Activate [`.agents/skills/hardware-debug/SKILL.md`](.agents/skills/hardware-debug/SKILL.md) first:
+
+1. **D1 — Forensic Audit (`knowledge-search`):** Read captures (`tempfiles/`, `logs/dev/`), `rebuild` code/diffs, knowledge base audits, and VEGA SDK / STM32 / ESP32 references to build an exact byte-level event timeline.
+2. **D2 — Ranked Hypotheses:** List concrete, falsifiable hypotheses (`H1`, `H2`, ...) with exact discriminating signals (registers, counters, UART/proxy observations) that confirm vs. refute each hypothesis.
+3. **D3 — Minimal Probe Build:** Instrument a reversible, wire-safe diagnostic probe (e.g., SRAM flight-recorder rings dumped outside binary MSP/CRSF frames, or isolated A/B silicon toggles) obeying `rebuild`, `0` RVC (`c.`), $\le 248\text{ KB}$, and `tempfiles/` copy, and wait for user hardware output.
+4. **D4 — Silicon Verdict:** Classify every hypothesis (`CONFIRMED` / `REFUTED` / `INCONCLUSIVE`) from captured logs; iterate until the true root cause is experimentally proven.
+5. **D5 — Return to Normal TDD:** Strip temporary probe scaffolding and enter **Step 1 -> Step 5** below (author AAA tests reproducing the proven bug, await user approval, consult VEGA SDK + STM32 + ESP32, implement fix, audit, verify on hardware, and update knowledge base via `knowledge-update`).
+
+---
+
 ## 2. The 5-Step Agent TDD Protocol
 
 ### Step 1: Write Unit Test Cases First (Tests as Living Documentation)
